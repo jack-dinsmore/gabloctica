@@ -1,11 +1,11 @@
 use std::ops::{Index, IndexMut};
-
-use cgmath::{Matrix4, Quaternion, SquareMatrix, Vector3};
+use bytemuck::Zeroable;
+use cgmath::{Matrix4, Quaternion, Vector3};
 use wgpu::{RenderPass, Buffer};
 use wgpu::util::DeviceExt;
 
-use crate::graphics::Graphics;
-use crate::graphics::components::{Component, MODEL_BINDING};
+use crate::graphics::{Camera, Graphics};
+use crate::graphics::components::{Component, MODEL_GROUP};
 use crate::graphics::vertex::Vertex;
 
 
@@ -72,9 +72,9 @@ impl Chunk {
             usage: wgpu::BufferUsages::INDEX,
         });
 
-        let component = Component::new(graphics, MODEL_BINDING, &wgpu::util::BufferInitDescriptor {
+        let component = Component::new(graphics, MODEL_GROUP, &wgpu::util::BufferInitDescriptor {
             label: Some("Model Buffer"),
-            contents: bytemuck::cast_slice(&[ModelUniform::new(Matrix4::identity())]),
+            contents: bytemuck::cast_slice(&[ModelUniform::zeroed()]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -99,8 +99,8 @@ impl Chunk {
         
     }
 
-    pub(super) fn update_component(&self, graphics: &Graphics) {
-        let model = Matrix4::from_translation(self.global_pos) * Matrix4::from(self.global_ori);
+    pub(super) fn update_component(&self, graphics: &Graphics, camera: &Camera) {
+        let model = Matrix4::from_translation(self.global_pos - camera.pos) * Matrix4::from(self.global_ori);
         let uniform = ModelUniform::new(model);
 
         graphics.queue.write_buffer(

@@ -1,4 +1,4 @@
-use crate::graphics::{Camera, Chunk, Graphics};
+use crate::graphics::{Camera, Chunk, Graphics, Lighting};
 use rustc_hash::FxHashSet;
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
@@ -36,6 +36,7 @@ pub struct Game {
     graphics: Graphics,
     key_state: KeyState,
     camera: Camera,
+    lighting: Lighting,
     chunks: Vec<Chunk>,
     mouse_motion: (f32, f32)
 }
@@ -45,6 +46,7 @@ impl Game {
         let key_state = KeyState::new();
         let chunks = vec![Chunk::new(&graphics)];
         let camera = Camera::new(&graphics);
+        let lighting = Lighting::new(&graphics);
 
         // Set cursor to center of screen
         let size = graphics.window.inner_size();
@@ -59,7 +61,8 @@ impl Game {
             key_state,
             camera,
             chunks,
-            mouse_motion: (0., 0.)
+            mouse_motion: (0., 0.),
+            lighting,
         }
     }
 
@@ -69,9 +72,8 @@ impl Game {
 
     pub fn update(&mut self, delta_t: f64) {
         {
-            const SPEED: f64 = 1.;
-
             // Move camera pos
+            const SPEED: f64 = 1.;
             let forward = self.camera.get_forward();
             let up = self.camera.get_up();
             let right = self.camera.get_right();
@@ -87,6 +89,12 @@ impl Game {
             if self.key_state.get(KeyCode::KeyA){
                 self.camera.pos -= right * (SPEED*delta_t) as f32;
             }
+            if self.key_state.get(KeyCode::KeyQ) {
+                self.camera.pos += up * (SPEED*delta_t) as f32;
+            }
+            if self.key_state.get(KeyCode::KeyE){
+                self.camera.pos -= up * (SPEED*delta_t) as f32;
+            }
         }
 
         {
@@ -99,7 +107,7 @@ impl Game {
     }
 
     pub fn draw(&mut self) {
-        self.graphics.draw(&self.chunks, &self.camera);
+        self.graphics.draw(&self.chunks, &self.camera, &self.lighting);
     }
 
     fn resized(&mut self, size: PhysicalSize<u32>) {

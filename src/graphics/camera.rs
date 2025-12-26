@@ -1,6 +1,7 @@
 use crate::graphics::Graphics;
-use crate::graphics::components::{Component, CAMERA_BINDING};
-use cgmath::{EuclideanSpace, Matrix4, Point3, SquareMatrix, Vector3};
+use crate::graphics::components::{Component, CAMERA_GROUP};
+use bytemuck::Zeroable;
+use cgmath::{EuclideanSpace, Matrix4, Point3, Vector3};
 use wgpu::RenderPass;
 
 #[rustfmt::skip]
@@ -10,7 +11,6 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::from_co
     cgmath::Vector4::new(0.0, 0.0, 0.5, 0.0),
     cgmath::Vector4::new(0.0, 0.0, 0.5, 1.0),
 );
-
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -46,9 +46,9 @@ impl Camera {
         let aspect = graphics.surface_config.width as f32 / graphics.surface_config.height as f32;
         let up = Vector3::new(0., 0., 1.);
 
-        let component = Component::new(graphics, CAMERA_BINDING, &wgpu::util::BufferInitDescriptor {
+        let component = Component::new(graphics, CAMERA_GROUP, &wgpu::util::BufferInitDescriptor {
             label: Some("Camera Buffer"),
-            contents: bytemuck::cast_slice(&[CameraUniform::new(Matrix4::identity())]),
+            contents: bytemuck::cast_slice(&[CameraUniform::zeroed()]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -79,22 +79,22 @@ impl Camera {
         Vector3::new(
             self.theta.sin() * self.phi.sin(),
             self.theta.sin() * -self.phi.cos(),
-            self.theta.cos(),
+            0.,
         )
     }
 
     pub fn get_up(&self) -> Vector3<f32> {
         Vector3::new(
-            self.theta.cos() * self.phi.cos(),
-            self.theta.cos() * self.phi.sin(),
-            -self.theta.sin(),
+            -self.theta.cos() * self.phi.cos(),
+            -self.theta.cos() * self.phi.sin(),
+            self.theta.sin(),
         )
     }
 
     pub(super) fn update_component(&self, graphics: &Graphics) {
         let view = cgmath::Matrix4::look_at_rh(
-            Point3::from_vec(self.pos),
-            Point3::from_vec(self.pos + self.get_forward()),
+            Point3::new(0., 0., 0.),
+            Point3::from_vec(self.get_forward()),
             self.up
         );
         let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);

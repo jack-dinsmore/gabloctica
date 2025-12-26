@@ -1,11 +1,10 @@
 use std::borrow::Cow;
 use crate::graphics::{components::ComponentLayout, vertex::Vertex};
-use wgpu::{Device, FragmentState, PipelineLayout, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderSource, TextureFormat, VertexState
-};
+use wgpu::{Device, RenderPass};
 
 pub struct ShaderLayout {
     pub(super) layouts: Vec<ComponentLayout>,
-    layout: PipelineLayout,
+    layout: wgpu::PipelineLayout,
 }
 impl ShaderLayout {
     pub fn new(device: &Device) -> Self {
@@ -36,26 +35,26 @@ impl ShaderLayout {
 
 
 pub struct Shader {
-    render_pipeline: RenderPipeline,
+    render_pipeline: wgpu::RenderPipeline,
 }
 
 impl Shader {
-    pub fn new(source: &'static str, device: &Device, layout: &ShaderLayout, swap_chain_format: TextureFormat) -> Self {
-        let shader = device.create_shader_module(ShaderModuleDescriptor {
+    pub fn new(source: &'static str, device: &Device, layout: &ShaderLayout, swap_chain_format: wgpu::TextureFormat) -> Self {
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
-            source: ShaderSource::Wgsl(Cow::Borrowed(source)),
+            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(source)),
         });
     
-        let render_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render pipeline"),
             layout: Some(&layout.layout),
-            vertex: VertexState {
+            vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
                 buffers: &[Vertex::desc()],
                 compilation_options: Default::default(),
             },
-            fragment: Some(FragmentState {
+            fragment: Some(wgpu::FragmentState {
                 module: &shader,
                 entry_point: Some("fs_main"),
                 targets: &[Some(swap_chain_format.into())],

@@ -3,9 +3,11 @@ mod chunk;
 mod vertex;
 mod camera;
 mod components;
+mod lighting;
 
 pub use chunk::Chunk;
 pub use camera::Camera;
+pub use lighting::Lighting;
 use shader::Shader;
 
 use std::sync::Arc;
@@ -92,10 +94,11 @@ impl Graphics {
         self.surface.configure(&self.device, &self.surface_config);
     }
 
-    pub fn draw(&mut self, chunks: &Vec<Chunk>, camera: &Camera) {
+    pub fn draw(&mut self, chunks: &Vec<Chunk>, camera: &Camera, lighting: &Lighting) {
         camera.update_component(&self);
+        lighting.update_component(&self, camera);
         for chunk in chunks {
-            chunk.update_component(&self);
+            chunk.update_component(&self, camera);
         }
 
         let frame = self.surface.get_current_texture() .expect("Failed to acquire next swap chain texture.");
@@ -120,6 +123,7 @@ impl Graphics {
             });
             self.shader.bind(&mut render_pass);
             camera.bind(&mut render_pass);
+            lighting.bind(&mut render_pass);
             for chunk in chunks {
                 chunk.draw(&mut render_pass)
             }
