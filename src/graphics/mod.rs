@@ -1,8 +1,11 @@
 mod shader;
 mod chunk;
 mod vertex;
+mod camera;
+mod components;
 
 pub use chunk::Chunk;
+pub use camera::Camera;
 use shader::Shader;
 
 use std::sync::Arc;
@@ -15,15 +18,18 @@ use wgpu::{
     SurfaceConfiguration, TextureViewDescriptor,
 };
 
+use crate::graphics::shader::ShaderLayout;
+
 pub struct Graphics {
-    window: Arc<Window>,
-    instance: Instance,
+    pub window: Arc<Window>,
+    _instance: Instance,
     surface: Surface<'static>,
     surface_config: SurfaceConfiguration,
-    adapter: Adapter,
+    _adapter: Adapter,
     device: Device,
     queue: Queue,
     shader: Shader,
+    shader_layout: ShaderLayout,
 }
 
 impl Graphics {
@@ -54,19 +60,23 @@ impl Graphics {
         let height = size.height.max(1);
         let surface_config = surface.get_default_config(&adapter, width, height).unwrap();
         surface.configure(&device, &surface_config);
-    
+
+        // ShaderLayout
+        let shader_layout = ShaderLayout::new(&device);
+
         // Shaders
-        let shader = Shader::new(include_str!("shaders/shader.wgsl"), &device, surface_config.format);
+        let shader = Shader::new(include_str!("shaders/shader.wgsl"), &device, &shader_layout, surface_config.format);
     
         let output = Graphics {
             window: window.clone(),
-            instance,
+            _instance: instance,
             surface,
             surface_config,
-            adapter,
+            _adapter: adapter,
             device,
             queue,
             shader,
+            shader_layout,
         };
     
         let _ = proxy.send_event(output);
@@ -82,15 +92,19 @@ impl Graphics {
         self.surface.configure(&self.device, &self.surface_config);
     }
 
-    pub fn draw(&mut self, chunks: &Vec<Chunk>) {
+    pub fn draw(&mut self, chunks: &Vec<Chunk>, camera: &Camera) {
+        camera.update_component(&self);
+        for chunk in chunks {
+            chunk.update_component(&self);
+        }
+
         let frame = self.surface.get_current_texture() .expect("Failed to acquire next swap chain texture.");
         let view = frame.texture.create_view(&TextureViewDescriptor::default());
-
         let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor { label: None });
 
         {
-            let mut r_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: None,
+            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                label: Some("Render pass"),
                 color_attachments: &[Some(RenderPassColorAttachment {
                     view: &view,
                     depth_slice: None,
@@ -104,13 +118,15 @@ impl Graphics {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-            r_pass.set_pipeline(self.shader.get_pipeline());
+            self.shader.bind(&mut render_pass);
+            camera.bind(&mut render_pass);
             for chunk in chunks {
-                chunk.draw(&mut r_pass)
+                chunk.draw(&mut render_pass)
             }
         } 
 
         self.queue.submit(Some(encoder.finish()));
         frame.present();
+        self.window.request_redraw();
     }
 }

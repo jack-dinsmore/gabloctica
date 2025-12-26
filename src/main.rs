@@ -1,6 +1,8 @@
 mod graphics;
 mod game;
 
+use std::time::Instant;
+
 use graphics::Graphics;
 use game::Game;
 use winit::event_loop::{ControlFlow, EventLoop, ActiveEventLoop, EventLoopProxy};
@@ -10,7 +12,7 @@ use winit::event::WindowEvent;
 
 enum Initializer {
     Init(Option<EventLoopProxy<Graphics>>),
-    Ready(Game),
+    Ready(Game, Instant),
 }
 
 impl Initializer {
@@ -35,11 +37,17 @@ impl ApplicationHandler<Graphics> for Initializer {
     fn user_event(&mut self, _event_loop: &ActiveEventLoop, graphics: Graphics) {
         // Request a redraw now that graphics are ready
         graphics.request_redraw();
-        *self = Self::Ready(Game::new(graphics));
+        *self = Self::Ready(Game::new(graphics), Instant::now());
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
-        if let Self::Ready(game) = self {
+        if let Self::Ready(game, last_time) = self {
+            if let WindowEvent::RedrawRequested = event {
+                game.update(last_time.elapsed().as_secs_f64());
+                *last_time = Instant::now();
+                game.draw()
+            };
+
             let close = game.window_event(event);
             if close {
                 event_loop.exit();
