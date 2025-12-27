@@ -1,14 +1,11 @@
 use cgmath::Vector3;
-use bytemuck::Zeroable;
 use wgpu::RenderPass;
-use crate::graphics::{Camera, Graphics, components::{Component, LIGHT_GROUP}};
-
-
-
+use crate::graphics::{Camera, Graphics};
+use crate::graphics::resource::{Buffer, Uniform};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-struct LightUniform {
+pub(super) struct LightUniform {
     pos: [f32; 4],
 }
 impl LightUniform {
@@ -19,41 +16,32 @@ impl LightUniform {
         }
     }
 }
+impl Uniform for LightUniform {
+    const GROUP: u32 = 2;
+}
 
 
 pub struct Lighting {
     pos: Vector3<f32>,
-
-    component: Component,
+    buffer: Buffer<LightUniform>,
 }
 
 impl Lighting {
     pub fn new(graphics: &Graphics) -> Self {
-        let pos = Vector3::new(0., 0., 10.);
-
-        let component = Component::new(graphics, LIGHT_GROUP, &wgpu::util::BufferInitDescriptor {
-            label: Some("Light Buffer"),
-            contents: bytemuck::cast_slice(&[LightUniform::zeroed()]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
+        let pos = Vector3::new(10., 10., 10.);
+        let buffer = Buffer::new(graphics);
         Self {
             pos,
-            component,
+            buffer,
         }
     }
 
-    pub(super) fn update_component(&self, graphics: &Graphics, camera: &Camera) {
+    pub fn update_buffer(&self, graphics: &Graphics, camera: &Camera) {
         let uniform = LightUniform::new(self, camera);
-
-        graphics.queue.write_buffer(
-            &self.component.buffer,
-            0,
-            bytemuck::cast_slice(&[uniform]),
-        );
+        self.buffer.write(graphics, uniform);
     }
 
-    pub(super) fn bind(&self, render_pass: &mut RenderPass) {
-        self.component.bind(render_pass);
+    pub fn bind(&self, render_pass: &mut RenderPass) {
+        self.buffer.bind(render_pass);
     }
 }

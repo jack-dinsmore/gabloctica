@@ -1,18 +1,19 @@
 use std::ops::{Index, IndexMut};
-use bytemuck::Zeroable;
 use cgmath::{Matrix4, Quaternion, Vector3};
-use wgpu::{RenderPass, Buffer};
 use wgpu::util::DeviceExt;
 
 use crate::graphics::{Camera, Graphics};
-use crate::graphics::components::{Component, MODEL_GROUP};
+use crate::graphics::resource::{Buffer, Uniform};
 use crate::graphics::vertex::Vertex;
 
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-struct ModelUniform {
+pub(super) struct ModelUniform {
     model: [[f32; 4]; 4],
+}
+impl Uniform for ModelUniform {
+    const GROUP: u32 = 1;
 }
 impl ModelUniform {
     fn new(mat: Matrix4<f32>) -> Self {
@@ -28,38 +29,38 @@ const CHUNK_SIZE: usize = 16;
 
 const VERTICES: &[Vertex] = &[
     // n, z, y, x
-    Vertex { data: 0x5000},
-    Vertex { data: 0x5001},
-    Vertex { data: 0x5011},
-    Vertex { data: 0x5010},
-    Vertex { data: 0x3000},
-    Vertex { data: 0x3001},
-    Vertex { data: 0x3101},
-    Vertex { data: 0x3100},
-    Vertex { data: 0x1000},
-    Vertex { data: 0x1010},
-    Vertex { data: 0x1110},
-    Vertex { data: 0x1100},
-    Vertex { data: 0x4100},
-    Vertex { data: 0x4101},
-    Vertex { data: 0x4111},
-    Vertex { data: 0x4110},
-    Vertex { data: 0x2010},
-    Vertex { data: 0x2011},
-    Vertex { data: 0x2111},
-    Vertex { data: 0x2110},
-    Vertex { data: 0x0001},
-    Vertex { data: 0x0011},
-    Vertex { data: 0x0111},
-    Vertex { data: 0x0101},
+    Vertex { data: 0x00_01_5_000},
+    Vertex { data: 0x00_01_5_001},
+    Vertex { data: 0x00_01_5_011},
+    Vertex { data: 0x00_01_5_010},
+    Vertex { data: 0x00_01_3_000},
+    Vertex { data: 0x00_01_3_001},
+    Vertex { data: 0x00_01_3_101},
+    Vertex { data: 0x00_01_3_100},
+    Vertex { data: 0x00_01_1_000},
+    Vertex { data: 0x00_01_1_010},
+    Vertex { data: 0x00_01_1_110},
+    Vertex { data: 0x00_01_1_100},
+    Vertex { data: 0x00_01_4_100},
+    Vertex { data: 0x00_01_4_101},
+    Vertex { data: 0x00_01_4_111},
+    Vertex { data: 0x00_01_4_110},
+    Vertex { data: 0x00_01_2_010},
+    Vertex { data: 0x00_01_2_011},
+    Vertex { data: 0x00_01_2_111},
+    Vertex { data: 0x00_01_2_110},
+    Vertex { data: 0x00_01_0_001},
+    Vertex { data: 0x00_01_0_011},
+    Vertex { data: 0x00_01_0_111},
+    Vertex { data: 0x00_01_0_101},
 ];
 
 const INDICES: &[u16] = &[
-    0, 1, 2, 0, 2, 3,
+    0, 2, 1, 0, 3, 2,
     4, 5, 6, 4, 6, 7,
-    8, 9, 10,8, 10,11,
+    8, 10,9 ,8, 11,10,
     12,13,14,12,14,15,
-    16,17,18,16,18,19,
+    16,18,17,16,19,18,
     20,21,22,20,22,23,
 ];
 
@@ -67,11 +68,11 @@ pub struct Chunk {
     data: [u16; CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE],
     pub global_pos: Vector3<f32>,
     pub global_ori: Quaternion<f32>,
-    vertex_buffer: Buffer,
-    index_buffer: Buffer,
+    vertex_buffer: wgpu::Buffer,
+    index_buffer: wgpu::Buffer,
     n_indices: u32,
 
-    component: Component,
+    buffer: Buffer<ModelUniform>,
 }
 
 impl Chunk {
@@ -89,11 +90,7 @@ impl Chunk {
             usage: wgpu::BufferUsages::INDEX,
         });
 
-        let component = Component::new(graphics, MODEL_GROUP, &wgpu::util::BufferInitDescriptor {
-            label: Some("Model Buffer"),
-            contents: bytemuck::cast_slice(&[ModelUniform::zeroed()]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
+        let buffer = Buffer::new(graphics);
 
         Self {
             data,
@@ -103,7 +100,7 @@ impl Chunk {
             index_buffer,
             n_indices: INDICES.len() as u32,
 
-            component
+            buffer,
         }
     }
 
@@ -116,19 +113,14 @@ impl Chunk {
         
     }
 
-    pub(super) fn update_component(&self, graphics: &Graphics, camera: &Camera) {
+    pub fn update_buffer(&self, graphics: &Graphics, camera: &Camera) {
         let model = Matrix4::from_translation(self.global_pos - camera.pos) * Matrix4::from(self.global_ori);
         let uniform = ModelUniform::new(model);
-
-        graphics.queue.write_buffer(
-            &self.component.buffer,
-            0,
-            bytemuck::cast_slice(&[uniform]),
-        );
+        self.buffer.write(graphics, uniform);
     }
 
-    pub(super) fn draw(&self, render_pass: &mut RenderPass) {
-        self.component.bind(render_pass);
+    pub fn draw(&self, render_pass: &mut wgpu::RenderPass) {
+        self.buffer.bind(render_pass);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
         render_pass.draw_indexed(0..self.n_indices, 0, 0..1);

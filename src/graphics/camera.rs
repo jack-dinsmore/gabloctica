@@ -1,8 +1,6 @@
-use crate::graphics::Graphics;
-use crate::graphics::components::{Component, CAMERA_GROUP};
-use bytemuck::Zeroable;
+use crate::graphics::{Graphics, resource::Buffer};
+use crate::graphics::resource::Uniform;
 use cgmath::{EuclideanSpace, Matrix4, Point3, Vector3};
-use wgpu::RenderPass;
 
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::from_cols(
@@ -14,8 +12,11 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::from_co
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-struct CameraUniform {
+pub(super) struct CameraUniform {
     view_proj: [[f32; 4]; 4],
+}
+impl Uniform for CameraUniform {
+    const GROUP: u32 = 0;
 }
 impl CameraUniform {
     fn new(view_proj: Matrix4<f32>) -> Self {
@@ -38,19 +39,14 @@ pub struct Camera {
     zfar: f32,
     aspect: f32,
 
-    component: Component,
+    buffer: Buffer<CameraUniform>,
 }
 
 impl Camera {
     pub fn new(graphics: &Graphics) -> Self {
         let aspect = graphics.surface_config.width as f32 / graphics.surface_config.height as f32;
         let up = Vector3::new(0., 0., 1.);
-
-        let component = Component::new(graphics, CAMERA_GROUP, &wgpu::util::BufferInitDescriptor {
-            label: Some("Camera Buffer"),
-            contents: bytemuck::cast_slice(&[CameraUniform::zeroed()]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
+        let buffer = Buffer::new(graphics);
 
         Self {
             pos: Vector3::new(0., 1., 2.),
@@ -63,7 +59,7 @@ impl Camera {
             zfar: 100.,
             aspect,
 
-            component,
+            buffer,
         }
     }
     
@@ -95,7 +91,7 @@ impl Camera {
         )
     }
 
-    pub(super) fn update_component(&self, graphics: &Graphics) {
+    pub fn update_buffer(&self, graphics: &Graphics) {
         let view = cgmath::Matrix4::look_at_rh(
             Point3::new(0., 0., 0.),
             Point3::from_vec(self.get_forward()),
@@ -103,15 +99,10 @@ impl Camera {
         );
         let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
         let uniform = CameraUniform::new(proj * view);
-
-        graphics.queue.write_buffer(
-            &self.component.buffer,
-            0,
-            bytemuck::cast_slice(&[uniform]),
-        );
+        self.buffer.write(graphics, uniform);
     }
 
-    pub(super) fn bind(&self, render_pass: &mut RenderPass) {
-        self.component.bind(render_pass);
+    pub fn bind(&self, render_pass: &mut wgpu::RenderPass) {
+        self.buffer.bind(render_pass);
     }
 }

@@ -1,9 +1,90 @@
 use std::borrow::Cow;
-use crate::graphics::{components::ComponentLayout, vertex::Vertex};
-use wgpu::{Device, RenderPass};
+use crate::graphics::{
+    Graphics, camera::CameraUniform, chunk::ModelUniform, lighting::LightUniform, resource::{TEXTURE_GROUP, Uniform}, vertex::Vertex
+};
+use wgpu::{BindGroupLayoutDescriptor, Device, RenderPass};
 
-pub struct ShaderLayout {
-    pub(super) layouts: Vec<ComponentLayout>,
+
+#[derive(Debug)]
+pub(super) struct ResourceLayout {
+    pub(super) layout: wgpu::BindGroupLayout,
+}
+impl ResourceLayout {
+    pub(super) fn new(device: &Device, i: u32) -> Option<Self> {
+        let desc = match i {
+            CameraUniform::GROUP => BindGroupLayoutDescriptor {
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+                label: Some("camera_bind_group_layout"),
+            },
+            ModelUniform::GROUP => BindGroupLayoutDescriptor {
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+                label: Some("model_bind_group_layout"),
+            },
+            LightUniform::GROUP => BindGroupLayoutDescriptor {
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+                label: Some("light_bind_group_layout"),
+            },
+            TEXTURE_GROUP => BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+                label: Some("texture_bind_group_layout"),
+            },
+            _ => return None,
+        };
+
+        Some(Self {
+            layout: device.create_bind_group_layout(&desc),
+        })
+    }
+}
+
+
+
+pub(super) struct ShaderLayout {
+    pub(super) layouts: Vec<ResourceLayout>,
     layout: wgpu::PipelineLayout,
 }
 impl ShaderLayout {
@@ -12,7 +93,7 @@ impl ShaderLayout {
         let mut i = 0;
         let mut layouts = Vec::new();
         loop {
-            match ComponentLayout::new(device, i) {
+            match ResourceLayout::new(device, i) {
                 Some(l) => layouts.push(l),
                 None => break,
             }
@@ -34,20 +115,21 @@ impl ShaderLayout {
 }
 
 
+
 pub struct Shader {
     render_pipeline: wgpu::RenderPipeline,
 }
 
 impl Shader {
-    pub fn new(source: &'static str, device: &Device, layout: &ShaderLayout, swap_chain_format: wgpu::TextureFormat) -> Self {
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+    pub fn new(graphics: &Graphics, source: &'static str) -> Self {
+        let shader = graphics.device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
             source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(source)),
         });
     
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        let render_pipeline = graphics.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render pipeline"),
-            layout: Some(&layout.layout),
+            layout: Some(&graphics.shader_layout.layout),
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
@@ -57,7 +139,14 @@ impl Shader {
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
                 entry_point: Some("fs_main"),
-                targets: &[Some(swap_chain_format.into())],
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: graphics.surface_config.format,
+                    blend: Some(wgpu::BlendState {
+                        color: wgpu::BlendComponent::REPLACE,
+                        alpha: wgpu::BlendComponent::REPLACE,
+                    }),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
                 compilation_options: Default::default(),
             }),
             primitive: wgpu::PrimitiveState {
@@ -70,7 +159,7 @@ impl Shader {
                 conservative: false,
             },
             depth_stencil: Some(wgpu::DepthStencilState {
-                format: super::texture::DEPTH_FORMAT,
+                format: super::resource::DEPTH_FORMAT,
                 depth_write_enabled: true,
                 depth_compare: wgpu::CompareFunction::Less,
                 stencil: wgpu::StencilState::default(),

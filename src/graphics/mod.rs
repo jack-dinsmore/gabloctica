@@ -2,15 +2,14 @@ mod shader;
 mod chunk;
 mod vertex;
 mod camera;
-mod components;
+mod resource;
 mod lighting;
-mod texture;
 
 pub use chunk::Chunk;
 pub use camera::Camera;
 pub use lighting::Lighting;
-use shader::Shader;
-use texture::Texture;
+pub use shader::Shader;
+pub use resource::Texture;
 
 use std::sync::Arc;
 use winit::{dpi::PhysicalSize, event_loop::EventLoopProxy, window::Window};
@@ -28,8 +27,7 @@ pub struct Graphics {
     _adapter: Adapter,
     device: Device,
     queue: Queue,
-    shader: Shader,
-    depth_texture: Texture,
+    depth_texture_view: wgpu::TextureView,
     shader_layout: ShaderLayout,
 }
 
@@ -59,16 +57,13 @@ impl Graphics {
         let size = window.inner_size();
         let width = size.width.max(1);
         let height = size.height.max(1);
+        
         let surface_config = surface.get_default_config(&adapter, width, height).unwrap();
         surface.configure(&device, &surface_config);
 
         // ShaderLayout
         let shader_layout = ShaderLayout::new(&device);
-
-        // Shaders
-        let shader = Shader::new(include_str!("shaders/shader.wgsl"), &device, &shader_layout, surface_config.format);
-
-        let depth_texture = Texture::new_depth(&device, width, height);
+        let depth_texture_view = Texture::depth_view(&device, width, height);
     
         let output = Graphics {
             window: window.clone(),
@@ -78,9 +73,8 @@ impl Graphics {
             _adapter: adapter,
             device,
             queue,
-            shader,
             shader_layout,
-            depth_texture,
+            depth_texture_view,
         };
     
         let _ = proxy.send_event(output);
@@ -94,15 +88,10 @@ impl Graphics {
         self.surface_config.width = new_size.width.max(1);
         self.surface_config.height = new_size.height.max(1);
         self.surface.configure(&self.device, &self.surface_config);
+        // TODO resize the depth texture
     }
 
-    pub fn draw(&mut self, chunks: &Vec<Chunk>, camera: &Camera, lighting: &Lighting) {
-        camera.update_component(&self);
-        lighting.update_component(&self, camera);
-        for chunk in chunks {
-            chunk.update_component(&self, camera);
-        }
-
+    pub fn draw(&mut self, pipeline: impl FnOnce(&mut wgpu::RenderPass)) {
         let frame = self.surface.get_current_texture() .expect("Failed to acquire next swap chain texture.");
         let view = frame.texture.create_view(&TextureViewDescriptor::default());
         let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor { label: None });
@@ -120,7 +109,7 @@ impl Graphics {
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.depth_texture.view,
+                    view: &self.depth_texture_view,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(1.0),
                         store: wgpu::StoreOp::Store,
@@ -130,12 +119,8 @@ impl Graphics {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-            self.shader.bind(&mut render_pass);
-            camera.bind(&mut render_pass);
-            lighting.bind(&mut render_pass);
-            for chunk in chunks {
-                chunk.draw(&mut render_pass)
-            }
+            
+            pipeline(&mut render_pass);
         } 
 
         self.queue.submit(Some(encoder.finish()));

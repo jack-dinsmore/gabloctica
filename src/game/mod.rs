@@ -1,4 +1,4 @@
-use crate::graphics::{Camera, Chunk, Graphics, Lighting};
+use crate::graphics::{Camera, Chunk, Graphics, Lighting, Shader, Texture};
 use rustc_hash::FxHashSet;
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
@@ -34,9 +34,11 @@ impl KeyState {
 
 pub struct Game {
     graphics: Graphics,
+    shader: Shader,
     key_state: KeyState,
     camera: Camera,
     lighting: Lighting,
+    texture: Texture,
     chunks: Vec<Chunk>,
     mouse_motion: (f32, f32)
 }
@@ -44,6 +46,7 @@ pub struct Game {
 impl Game {
     pub fn new(graphics: Graphics) -> Self {
         let key_state = KeyState::new();
+        let shader = Shader::new(&graphics, include_str!("../shaders/shader.wgsl"));
         let chunks = vec![Chunk::new(&graphics)];
         let camera = Camera::new(&graphics);
         let lighting = Lighting::new(&graphics);
@@ -55,6 +58,9 @@ impl Game {
             size.height as f64 / 2.0,
         );
         graphics.window.set_cursor_position(center).unwrap();
+
+        // Load block texture
+        let texture = Texture::new(&graphics, include_bytes!("../../assets/texture.png"));
         
         Self {
             graphics,
@@ -63,6 +69,8 @@ impl Game {
             chunks,
             mouse_motion: (0., 0.),
             lighting,
+            texture,
+            shader,
         }
     }
 
@@ -108,11 +116,25 @@ impl Game {
     }
 
     pub fn draw(&mut self) {
-        self.graphics.draw(&self.chunks, &self.camera, &self.lighting);
+        self.camera.update_buffer(&self.graphics);
+        self.lighting.update_buffer(&self.graphics, &self.camera);
+        for chunk in &self.chunks {
+            chunk.update_buffer(&self.graphics, &self.camera);
+        }
+
+        self.graphics.draw(|render_pass| {
+            self.shader.bind(render_pass);
+            self.camera.bind(render_pass);
+            self.lighting.bind(render_pass);
+            self.texture.bind(render_pass);
+            for chunk in &self.chunks {
+                chunk.draw(render_pass)
+            }
+        });
     }
 
     fn resized(&mut self, size: PhysicalSize<u32>) {
-        self.camera.resize(size); // TODO
+        self.camera.resize(size);
         self.graphics.resize(size);
     }
     
