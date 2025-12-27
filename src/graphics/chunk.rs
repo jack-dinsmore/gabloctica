@@ -27,23 +27,40 @@ impl ModelUniform {
 const CHUNK_SIZE: usize = 16;
 
 const VERTICES: &[Vertex] = &[
-    Vertex { position: [0., 0., 0.], },
-    Vertex { position: [0., 1., 0.], },
-    Vertex { position: [1., 1., 0.], },
-    Vertex { position: [1., 0., 0.], },
-    Vertex { position: [0., 0., 1.], },
-    Vertex { position: [0., 1., 1.], },
-    Vertex { position: [1., 1., 1.], },
-    Vertex { position: [1., 0., 1.], },
+    // n, z, y, x
+    Vertex { data: 0x5000},
+    Vertex { data: 0x5001},
+    Vertex { data: 0x5011},
+    Vertex { data: 0x5010},
+    Vertex { data: 0x3000},
+    Vertex { data: 0x3001},
+    Vertex { data: 0x3101},
+    Vertex { data: 0x3100},
+    Vertex { data: 0x1000},
+    Vertex { data: 0x1010},
+    Vertex { data: 0x1110},
+    Vertex { data: 0x1100},
+    Vertex { data: 0x4100},
+    Vertex { data: 0x4101},
+    Vertex { data: 0x4111},
+    Vertex { data: 0x4110},
+    Vertex { data: 0x2010},
+    Vertex { data: 0x2011},
+    Vertex { data: 0x2111},
+    Vertex { data: 0x2110},
+    Vertex { data: 0x0001},
+    Vertex { data: 0x0011},
+    Vertex { data: 0x0111},
+    Vertex { data: 0x0101},
 ];
 
 const INDICES: &[u16] = &[
     0, 1, 2, 0, 2, 3,
-    4, 6, 5, 4, 7, 6,
-    2, 3, 6, 2, 6, 7,
-    0, 1, 4, 0, 4, 5,
-    1, 2, 5, 1, 5, 6,
-    0, 3, 4, 0, 4, 7,
+    4, 5, 6, 4, 6, 7,
+    8, 9, 10,8, 10,11,
+    12,13,14,12,14,15,
+    16,17,18,16,18,19,
+    20,21,22,20,22,23,
 ];
 
 pub struct Chunk {

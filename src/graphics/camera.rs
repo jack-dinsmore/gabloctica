@@ -66,6 +66,10 @@ impl Camera {
             component,
         }
     }
+    
+    pub fn resize(&mut self, size: winit::dpi::PhysicalSize<u32>) {
+        self.aspect = size.width as f32 / size.height as f32;
+    }
 
     pub fn get_forward(&self) -> Vector3<f32> {
         Vector3::new(

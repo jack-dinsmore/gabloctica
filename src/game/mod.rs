@@ -73,7 +73,7 @@ impl Game {
     pub fn update(&mut self, delta_t: f64) {
         {
             // Move camera pos
-            const SPEED: f64 = 1.;
+            const SPEED: f64 = 2.;
             let forward = self.camera.get_forward();
             let up = self.camera.get_up();
             let right = self.camera.get_right();
@@ -102,7 +102,8 @@ impl Game {
             const SPEED: f64 = 0.3;
             self.camera.theta += (SPEED*delta_t) as f32*self.mouse_motion.1;
             self.camera.phi -= (SPEED*delta_t) as f32*self.mouse_motion.0;
-            self.mouse_motion = (0., 0.)
+            self.mouse_motion = (0., 0.);
+            self.camera.theta = self.camera.theta.clamp(0.0001, 3.1415);
         }
     }
 
@@ -111,6 +112,7 @@ impl Game {
     }
 
     fn resized(&mut self, size: PhysicalSize<u32>) {
+        self.camera.resize(size); // TODO
         self.graphics.resize(size);
     }
     
