@@ -50,8 +50,8 @@ impl Camera {
 
         Self {
             pos: Vector3::new(0., 1., 2.),
-            theta: 2.5,
-            phi: 0.,
+            theta: 1.,
+            phi: 1.,
             up,
             fovy: 45., // Degrees
             

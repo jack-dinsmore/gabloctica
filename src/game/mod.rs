@@ -31,7 +31,6 @@ impl KeyState {
     }
 }
 
-
 pub struct Game {
     graphics: Graphics,
     shader: Shader,
@@ -47,9 +46,11 @@ impl Game {
     pub fn new(graphics: Graphics) -> Self {
         let key_state = KeyState::new();
         let shader = Shader::new(&graphics, include_str!("../shaders/shader.wgsl"));
-        let chunks = vec![Chunk::new(&graphics)];
+        let mut chunks = vec![Chunk::new(&graphics)];
         let camera = Camera::new(&graphics);
         let lighting = Lighting::new(&graphics);
+
+        chunks[0].demo(&graphics);
 
         // Set cursor to center of screen
         let size = graphics.window.inner_size();

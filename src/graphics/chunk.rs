@@ -6,7 +6,6 @@ use crate::graphics::{Camera, Graphics};
 use crate::graphics::resource::{Buffer, Uniform};
 use crate::graphics::vertex::Vertex;
 
-
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub(super) struct ModelUniform {
@@ -23,49 +22,11 @@ impl ModelUniform {
     }
 }
 
-
-
-const CHUNK_SIZE: usize = 16;
-
-const VERTICES: &[Vertex] = &[
-    // n, z, y, x
-    Vertex { data: 0x00_01_5_000},
-    Vertex { data: 0x00_01_5_001},
-    Vertex { data: 0x00_01_5_011},
-    Vertex { data: 0x00_01_5_010},
-    Vertex { data: 0x00_01_3_000},
-    Vertex { data: 0x00_01_3_001},
-    Vertex { data: 0x00_01_3_101},
-    Vertex { data: 0x00_01_3_100},
-    Vertex { data: 0x00_01_1_000},
-    Vertex { data: 0x00_01_1_010},
-    Vertex { data: 0x00_01_1_110},
-    Vertex { data: 0x00_01_1_100},
-    Vertex { data: 0x00_01_4_100},
-    Vertex { data: 0x00_01_4_101},
-    Vertex { data: 0x00_01_4_111},
-    Vertex { data: 0x00_01_4_110},
-    Vertex { data: 0x00_01_2_010},
-    Vertex { data: 0x00_01_2_011},
-    Vertex { data: 0x00_01_2_111},
-    Vertex { data: 0x00_01_2_110},
-    Vertex { data: 0x00_01_0_001},
-    Vertex { data: 0x00_01_0_011},
-    Vertex { data: 0x00_01_0_111},
-    Vertex { data: 0x00_01_0_101},
-];
-
-const INDICES: &[u16] = &[
-    0, 2, 1, 0, 3, 2,
-    4, 5, 6, 4, 6, 7,
-    8, 10,9 ,8, 11,10,
-    12,13,14,12,14,15,
-    16,18,17,16,19,18,
-    20,21,22,20,22,23,
-];
+const CHUNK_SIZE: u32 = 16;
+const VERTEX_CAPACITY: usize = 1024;
 
 pub struct Chunk {
-    data: [u16; CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE],
+    data: [u16; (CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize],
     pub global_pos: Vector3<f32>,
     pub global_ori: Quaternion<f32>,
     vertex_buffer: wgpu::Buffer,
@@ -77,17 +38,18 @@ pub struct Chunk {
 
 impl Chunk {
     pub fn new(graphics: &Graphics) -> Self {
-        let data = [0; CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE];
+        const INDEX_CAPACITY: usize = (VERTEX_CAPACITY/4) * 6;
+        let data = [0; (CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize];
 
         let vertex_buffer = graphics.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(VERTICES),
-            usage: wgpu::BufferUsages::VERTEX,
+            contents: bytemuck::cast_slice(&[Vertex { data: 0}; VERTEX_CAPACITY]),
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
         let index_buffer = graphics.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(INDICES),
-            usage: wgpu::BufferUsages::INDEX,
+            contents: bytemuck::cast_slice(&[0; INDEX_CAPACITY]),
+            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
         });
 
         let buffer = Buffer::new(graphics);
@@ -98,19 +60,125 @@ impl Chunk {
             global_ori: Quaternion::new(1., 0., 0., 0.),
             vertex_buffer,
             index_buffer,
-            n_indices: INDICES.len() as u32,
+            n_indices: 0,
 
             buffer,
         }
     }
 
-    pub fn demo(&mut self) {
+    pub fn demo(&mut self, graphics: &Graphics) {
         self[(8,8,8)] = 1;
-        self.update_buffers();
+        self.update_model(graphics);
     }
 
-    pub fn update_buffers(&mut self) {
-        
+    // Create vertex and index buffers from the block layout
+    pub fn update_model(&mut self, graphics: &Graphics) {
+        // Right now I'm just making vertices for every block, including faces that don't face outwards.
+        let mut vertices = Vec::new();
+        let mut indices = Vec::new();
+        let mut index_offset = 0u16;
+        for x in 0..CHUNK_SIZE {
+            for y in 0..CHUNK_SIZE {
+                for z in 0..CHUNK_SIZE {
+                    let typ = self[(x,y,z)];
+                    if typ == 0 {continue;}
+
+                    let mut vertex_offset = 0;
+                    vertex_offset += x;
+                    vertex_offset += y << 4;
+                    vertex_offset += z << 8;
+                    vertex_offset += (typ as u32) << 16;
+
+                    //00_uv_n_zyx
+                    if x == CHUNK_SIZE-1 || self[(x+1,y,z)] == 0 {
+                        vertices.push(Vertex {data: 0x00_00_0_001 + vertex_offset});
+                        vertices.push(Vertex {data: 0x00_01_0_011 + vertex_offset});
+                        vertices.push(Vertex {data: 0x00_11_0_111 + vertex_offset});
+                        vertices.push(Vertex {data: 0x00_10_0_101 + vertex_offset});
+                        indices.push(0+index_offset);
+                        indices.push(1+index_offset);
+                        indices.push(2+index_offset);
+                        indices.push(0+index_offset);
+                        indices.push(2+index_offset);
+                        indices.push(3+index_offset);
+                        index_offset += 4;
+                    }
+                    if x == 0 || self[(x-1,y,z)] == 0 {
+                        vertices.push(Vertex {data: 0x00_00_1_000 + vertex_offset});
+                        vertices.push(Vertex {data: 0x00_01_1_010 + vertex_offset});
+                        vertices.push(Vertex {data: 0x00_11_1_110 + vertex_offset});
+                        vertices.push(Vertex {data: 0x00_10_1_100 + vertex_offset});
+                        indices.push(0+index_offset);
+                        indices.push(2+index_offset);
+                        indices.push(1+index_offset);
+                        indices.push(0+index_offset);
+                        indices.push(3+index_offset);
+                        indices.push(2+index_offset);
+                        index_offset += 4;
+                    }
+                    if y == CHUNK_SIZE-1 || self[(x,y+1,z)] == 0 {
+                        vertices.push(Vertex {data: 0x00_00_2_010 + vertex_offset});
+                        vertices.push(Vertex {data: 0x00_01_2_011 + vertex_offset});
+                        vertices.push(Vertex {data: 0x00_11_2_111 + vertex_offset});
+                        vertices.push(Vertex {data: 0x00_10_2_110 + vertex_offset});
+                        indices.push(0+index_offset);
+                        indices.push(2+index_offset);
+                        indices.push(1+index_offset);
+                        indices.push(0+index_offset);
+                        indices.push(3+index_offset);
+                        indices.push(2+index_offset);
+                        index_offset += 4;
+                    }
+                    if y == 0 || self[(x,y-1,z)] == 0 {
+                        vertices.push(Vertex {data: 0x00_00_3_000 + vertex_offset});
+                        vertices.push(Vertex {data: 0x00_01_3_001 + vertex_offset});
+                        vertices.push(Vertex {data: 0x00_11_3_101 + vertex_offset});
+                        vertices.push(Vertex {data: 0x00_10_3_100 + vertex_offset});
+                        indices.push(0+index_offset);
+                        indices.push(1+index_offset);
+                        indices.push(2+index_offset);
+                        indices.push(0+index_offset);
+                        indices.push(2+index_offset);
+                        indices.push(3+index_offset);
+                        index_offset += 4;
+                    }
+                    if z == CHUNK_SIZE-1 || self[(x,y,z+1)] == 0 {
+                        vertices.push(Vertex {data: 0x00_00_4_100 + vertex_offset});
+                        vertices.push(Vertex {data: 0x00_01_4_101 + vertex_offset});
+                        vertices.push(Vertex {data: 0x00_11_4_111 + vertex_offset});
+                        vertices.push(Vertex {data: 0x00_10_4_110 + vertex_offset});
+                        indices.push(0+index_offset);
+                        indices.push(1+index_offset);
+                        indices.push(2+index_offset);
+                        indices.push(0+index_offset);
+                        indices.push(2+index_offset);
+                        indices.push(3+index_offset);
+                        index_offset += 4;
+                    }
+                    if z == 0 || self[(x,y,z-1)] == 0 {
+                        vertices.push(Vertex {data: 0x00_00_5_000 + vertex_offset});
+                        vertices.push(Vertex {data: 0x00_01_5_001 + vertex_offset});
+                        vertices.push(Vertex {data: 0x00_11_5_011 + vertex_offset});
+                        vertices.push(Vertex {data: 0x00_10_5_010 + vertex_offset});
+                        indices.push(0+index_offset);
+                        indices.push(2+index_offset);
+                        indices.push(1+index_offset);
+                        indices.push(0+index_offset);
+                        indices.push(3+index_offset);
+                        indices.push(2+index_offset);
+                        index_offset += 4;
+                    }
+                }
+            }
+        }
+
+        if vertices.len() > VERTEX_CAPACITY {
+            panic!();
+        }
+
+        graphics.queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&vertices));
+        graphics.queue.write_buffer(&self.index_buffer, 0, bytemuck::cast_slice(&indices));
+        self.n_indices = indices.len() as u32;
     }
 
     pub fn update_buffer(&self, graphics: &Graphics, camera: &Camera) {
@@ -127,16 +195,16 @@ impl Chunk {
     }
 }
 
-impl Index<(usize, usize, usize)> for Chunk {
+impl Index<(u32, u32, u32)> for Chunk {
     type Output = u16;
 
-    fn index(&self, index: (usize, usize, usize)) -> &Self::Output {
-        &self.data[index.0 + index.1*CHUNK_SIZE + index.2*CHUNK_SIZE*CHUNK_SIZE]
+    fn index(&self, index: (u32, u32, u32)) -> &Self::Output {
+        &self.data[(index.0 + index.1*CHUNK_SIZE + index.2*CHUNK_SIZE*CHUNK_SIZE) as usize]
     }
 }
 
-impl IndexMut<(usize, usize, usize)> for Chunk {
-    fn index_mut(&mut self, index: (usize, usize, usize)) -> &mut Self::Output {
-        &mut self.data[index.0 + index.1*CHUNK_SIZE + index.2*CHUNK_SIZE*CHUNK_SIZE]
+impl IndexMut<(u32, u32, u32)> for Chunk {
+    fn index_mut(&mut self, index: (u32, u32, u32)) -> &mut Self::Output {
+        &mut self.data[(index.0 + index.1*CHUNK_SIZE + index.2*CHUNK_SIZE*CHUNK_SIZE) as usize]
     }
 }
