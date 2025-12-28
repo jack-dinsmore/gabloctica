@@ -22,8 +22,8 @@ impl ModelUniform {
     }
 }
 
-const CHUNK_SIZE: u32 = 16;
-const VERTEX_CAPACITY: usize = 1024;
+const CHUNK_SIZE: u32 = 15;
+const VERTEX_CAPACITY: usize = 0x10000;
 
 pub struct Chunk {
     data: [u16; (CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize],
@@ -67,7 +67,13 @@ impl Chunk {
     }
 
     pub fn demo(&mut self, graphics: &Graphics) {
-        self[(8,8,8)] = 1;
+        for x in 0..CHUNK_SIZE {
+            for y in 0..CHUNK_SIZE {
+                for z in 0..CHUNK_SIZE {
+                    self[(x,y,z)] = 1;
+                }
+            }
+        }
         self.update_model(graphics);
     }
 
@@ -171,9 +177,8 @@ impl Chunk {
                 }
             }
         }
-
         if vertices.len() > VERTEX_CAPACITY {
-            panic!();
+            panic!("too many vertices");
         }
 
         graphics.queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&vertices));
