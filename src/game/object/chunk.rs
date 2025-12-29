@@ -11,8 +11,19 @@ pub(super) struct Chunk {
 }
 
 impl Chunk {
+    pub fn empty(graphics: &Graphics, pos: Vector3<f32>) -> Self {
+        let mut grid = CubeGrid::new(graphics);
+        grid.global_pos = pos;
+        Self {
+            grid,
+            mass_m0: 0.,
+            mass_m1: Vector3::zero(),
+            mass_m2: Mat::zeros(3, 3),
+        }
+    }
+
     // Update the rigid body collider to have the current block layout.
-    pub fn update_collision_layout(&mut self, blocks: &mut [u16; (CHUNK_SIZE*CHUNK_SIZE) as usize]) {
+    pub fn update_rigid_body(&mut self, blocks: &mut [u16; (CHUNK_SIZE*CHUNK_SIZE) as usize]) {
         // Update the collider
         self.mass_m0 = 0.;
         self.mass_m1 = Vector3::zero();

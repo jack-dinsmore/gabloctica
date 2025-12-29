@@ -33,19 +33,14 @@ pub struct PlanetLoader {
 impl PlanetLoader {
     pub(super) fn load_chunk(&self, graphics: &crate::graphics::Graphics, chunk_coord: (i32, i32, i32)) -> Option<Chunk> {
         if chunk_coord.2 < 0 {return None;}
-        let mut grid = CubeGrid::new(graphics);
-        grid.global_pos = Vector3::new(
+        let pos = Vector3::new(
             chunk_coord.0 as f32 * CHUNK_SIZE as f32,
             chunk_coord.1 as f32 * CHUNK_SIZE as f32,
             chunk_coord.2 as f32 * CHUNK_SIZE as f32,
         );
-        grid.demo(graphics);
-        Some(Chunk {
-            grid,
-            mass_m0: 0.,
-            mass_m1: Vector3::zero(),
-            mass_m2: Mat::zeros(3, 3),
-        })
+        let mut chunk = Chunk::empty(graphics, pos);
+        chunk.grid.demo(graphics);
+        Some(chunk)
     }
     pub(super) fn unload_chunk(&self, chunk_coord: (i32, i32, i32), chunk: &Chunk) {
         // TODO 

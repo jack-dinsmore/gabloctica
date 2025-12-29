@@ -97,6 +97,7 @@ impl RigidBody {
 pub struct RigidBodyInit {
     pub pos: Vector3<f64>,
     pub vel: Vector3<f64>,
+    /// Orientation rotates FROM body TO inertial
     pub ori: Quaternion<f64>,
     pub ang_vel: Vector3<f64>,
     pub mass: f64,

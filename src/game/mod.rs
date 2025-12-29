@@ -1,4 +1,5 @@
-use crate::{game::object::Object, graphics::{Camera, Graphics, Lighting, Shader, Texture}, physics::Physics};
+use crate::{game::object::Object, graphics::{Camera, Graphics, Lighting, Shader, Texture}, physics::{Collider, CollisionReport, Physics, RigidBody, RigidBodyInit}};
+use cgmath::Rotation;
 use rustc_hash::FxHashSet;
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
@@ -35,6 +36,7 @@ impl KeyState {
 pub struct Game {
     graphics: Graphics,
     physics: Box<Physics>,
+    player: RigidBody,
     shader: Shader,
     key_state: KeyState,
     camera: Camera,
@@ -53,6 +55,7 @@ impl Game {
         let objects = vec![
             Object::new(&graphics, &mut physics, object::ObjectLoader::demo(), camera.pos.cast().unwrap())
         ];
+        let player = RigidBody::new(&mut physics, RigidBodyInit::default());
         let lighting = Lighting::new(&graphics);
 
 
@@ -77,11 +80,50 @@ impl Game {
             texture,
             shader,
             physics,
+            player,
         }
     }
 
     pub fn mouse_moved(&mut self, difference: (f32, f32)) {
         self.mouse_motion = difference;
+    }
+    
+    fn mouse_clicked(&mut self, button: winit::event::MouseButton) {
+        match button {
+            winit::event::MouseButton::Left => {
+                // Replace the player's collider with its look ray temporarily
+                const LOOK_DIST: f64 = 5.;
+                let body_collider = self.player.collider.take();
+                let forward = self.camera.get_forward().cast().unwrap();
+                self.player.collider = Some(Collider::new_ray(self.camera.pos.cast().unwrap(), forward*LOOK_DIST));
+
+                let mut report = CollisionReport::None;
+                let mut collided_object = None;
+
+                for object in &mut self.objects {
+                    let new_report = Collider::check_collision(&self.player, &object.body);
+                    if new_report > report {
+                        report = new_report;
+                        collided_object = Some(object);
+                    }
+                }
+
+                if let Some(o) = collided_object {
+                    let place_pos = match report {
+                        CollisionReport::None => todo!(),
+                        CollisionReport::Some { normal, depth, p1, p2 } => {
+                            let offset = o.body.ori.invert() * forward;
+                            p2 - forward*0.001
+                        }
+                    };
+                    o.insert_block(&self.graphics, 1, place_pos);
+                }
+
+                // Put the collider back
+                self.player.collider = body_collider;
+            },
+            _ => (),
+        }
     }
 
     pub fn update(&mut self, delta_t: f64) {
@@ -174,6 +216,12 @@ impl Game {
                 self.graphics.window.set_cursor_position(center).unwrap();
 
                 self.mouse_moved(difference)
+            },
+            WindowEvent::MouseInput { state, button, .. } => {
+                match state {
+                    winit::event::ElementState::Pressed => self.mouse_clicked(button),
+                    winit::event::ElementState::Released => (),
+                }
             }
             _ => ()
         };

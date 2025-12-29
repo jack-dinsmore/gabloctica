@@ -7,6 +7,7 @@ use crate::physics::{RigidBody, collisions::shapes::ObjectData};
 use algo::ColliderType;
 use shapes::ColliderIterator;
 
+/// Note: Greater reports are collided more deeply
 #[derive(Debug)]
 pub enum CollisionReport {
     None,
@@ -111,5 +112,9 @@ impl Collider {
             chunks: Vec::new(),
             coords: Vec::new(),
         })
+    }
+    
+    pub fn new_ray(pos: Vector3<f64>, dir: Vector3<f64>) -> Collider {
+        Collider::Ray(shapes::RayData{pos, dir})
     }
 }

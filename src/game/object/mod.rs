@@ -27,7 +27,7 @@ pub struct Object {
     chunks: Vec<Chunk>,
     coords: Vec<(i32, i32, i32)>,
     loader: ObjectLoader,
-    body: RigidBody,
+    pub body: RigidBody,
     last_load: std::time::Instant,
 }
 impl Object {
@@ -48,14 +48,14 @@ impl Object {
         out
     }
 
-    pub fn update_collision_layout(&mut self, chunk_pos: (i32, i32, i32)) {
+    pub fn update_rigid_body(&mut self, chunk_pos: (i32, i32, i32)) {
         let mut mass_m0 = 0.;
         let mut mass_m1 = Vector3::zero();
         let mut mass_m2 = Mat::zeros(3,3);
         let collider = self.body.get_object_collider_mut();
         for (i, coord) in self.coords.iter().enumerate() {
             if *coord == chunk_pos {
-                self.chunks[i].update_collision_layout(&mut collider.chunks[i]);
+                self.chunks[i].update_rigid_body(&mut collider.chunks[i]);
             }
             mass_m0 += self.chunks[i].mass_m0;
             mass_m1 += self.chunks[i].mass_m1;
@@ -119,7 +119,7 @@ impl Object {
                         for i in 0..self.chunks.len() {
                             collider.chunks.push([0; (CHUNK_SIZE*CHUNK_SIZE) as usize]);
                             collider.coords.push(self.coords[i]);
-                            self.chunks[i].update_collision_layout(&mut collider.chunks[i]);
+                            self.chunks[i].update_rigid_body(&mut collider.chunks[i]);
                         }
                     }
                 } else {
@@ -173,7 +173,7 @@ impl Object {
                                 collider.chunks.push([0; (CHUNK_SIZE*CHUNK_SIZE) as usize]);
                                 collider.coords.push(coord);
                                 let i = self.chunks.len()-1;
-                                self.chunks[i].update_collision_layout(&mut collider.chunks[i]);
+                                self.chunks[i].update_rigid_body(&mut collider.chunks[i]);
                             }
                         }
                     }
@@ -193,5 +193,38 @@ impl Object {
         for chunk in &mut self.chunks {
             chunk.update_buffer(&self.body, graphics, camera);
         }
+    }
+    
+    /// Insert a block into the cell containg position pos. Pos is in body coordinates.
+    pub(crate) fn insert_block(&mut self, graphics: &Graphics, typ: u16, pos: Vector3<f64>) {
+        let updated_chunk = (
+            pos.x as i32 / CHUNK_SIZE as i32,
+            pos.y as i32 / CHUNK_SIZE as i32,
+            pos.z as i32 / CHUNK_SIZE as i32,
+        );
+        let updated_block = (
+            (pos.x as i32 % CHUNK_SIZE as i32) as u32,
+            (pos.y as i32 % CHUNK_SIZE as i32) as u32,
+            (pos.z as i32 % CHUNK_SIZE as i32) as u32,
+        );
+
+        let mut found_chunk_index = None;
+        for (i, coord) in self.coords.iter().enumerate() {
+            if *coord == updated_chunk {
+                found_chunk_index = Some(i)
+            }
+        }
+        if let None = found_chunk_index {
+            // Make a new chunk
+            let pos = Vector3::new(updated_chunk.0 as f32, updated_chunk.1 as f32, updated_chunk.2 as f32);
+            let new_chunk = Chunk::empty(graphics, pos);
+            self.chunks.push(new_chunk);
+            found_chunk_index = Some(self.chunks.len());
+        }
+        // Set the block
+        let chunk = &mut self.chunks[found_chunk_index.unwrap()];
+        chunk.grid[updated_block] = typ;
+
+        self.update_rigid_body(updated_chunk);
     }
 }

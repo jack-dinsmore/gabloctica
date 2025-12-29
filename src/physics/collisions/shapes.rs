@@ -1,3 +1,5 @@
+use cgmath::Vector3;
+
 use crate::graphics::CHUNK_SIZE;
 
 use super::algo::ColliderType;
@@ -5,7 +7,8 @@ use super::algo::ColliderType;
 
 #[derive(Debug, Clone)]
 pub struct RayData {
-    
+    pub pos: Vector3<f64>,
+    pub dir: Vector3<f64>,
 }
 
 #[derive(Debug, Clone)]
