@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use crate::graphics::{
-    Graphics, camera::CameraUniform, chunk::ModelUniform, lighting::LightUniform, resource::{TEXTURE_GROUP, Uniform}, vertex::Vertex
+    Graphics, camera::CameraUniform, grid::ModelUniform, lighting::LightUniform, resource::{TEXTURE_GROUP, Uniform}, vertex::Vertex
 };
 use wgpu::{BindGroupLayoutDescriptor, Device, RenderPass};
 

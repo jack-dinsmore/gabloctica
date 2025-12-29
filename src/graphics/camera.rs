@@ -49,7 +49,7 @@ impl Camera {
         let buffer = Buffer::new(graphics);
 
         Self {
-            pos: Vector3::new(-1., -1., -1.),
+            pos: Vector3::new(-30., -30., -30.),
             theta: 1.,
             phi: 1.,
             up,

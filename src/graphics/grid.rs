@@ -22,12 +22,14 @@ impl ModelUniform {
     }
 }
 
-const CHUNK_SIZE: u32 = 15;
+pub const CHUNK_SIZE: u32 = 15;
 const VERTEX_CAPACITY: usize = 0x10000;
 
-pub struct Chunk {
+pub struct CubeGrid {
     data: [u16; (CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize],
+    /// Offset of the chunk from the rigid body center (i.e. the center of mass)
     pub global_pos: Vector3<f32>,
+    /// Offset of the chunk in rotation from the rigid body axis (i.e. this quaternion rotates to the principal axes)
     pub global_ori: Quaternion<f32>,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
@@ -36,7 +38,7 @@ pub struct Chunk {
     buffer: Buffer<ModelUniform>,
 }
 
-impl Chunk {
+impl CubeGrid {
     pub fn new(graphics: &Graphics) -> Self {
         const INDEX_CAPACITY: usize = (VERTEX_CAPACITY/4) * 6;
         let data = [0; (CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize];
@@ -70,7 +72,7 @@ impl Chunk {
         for x in 0..CHUNK_SIZE {
             for y in 0..CHUNK_SIZE {
                 for z in 0..CHUNK_SIZE {
-                    self[(x,y,z)] = 1;
+                    self[(x,y,z)] = ((x+y+z)%2) as u16 + 1;
                 }
             }
         }
@@ -186,8 +188,9 @@ impl Chunk {
         self.n_indices = indices.len() as u32;
     }
 
-    pub fn update_buffer(&self, graphics: &Graphics, camera: &Camera) {
-        let model = Matrix4::from_translation(self.global_pos - camera.pos) * Matrix4::from(self.global_ori);
+    pub fn update_buffer(&self, graphics: &Graphics, pos: Vector3<f32>, ori: Quaternion<f32>, camera: &Camera) {
+        let model = Matrix4::from_translation(pos + ori * self.global_pos - camera.pos)
+            * Matrix4::from(ori * self.global_ori);
         let uniform = ModelUniform::new(model);
         self.buffer.write(graphics, uniform);
     }
@@ -200,7 +203,7 @@ impl Chunk {
     }
 }
 
-impl Index<(u32, u32, u32)> for Chunk {
+impl Index<(u32, u32, u32)> for CubeGrid {
     type Output = u16;
 
     fn index(&self, index: (u32, u32, u32)) -> &Self::Output {
@@ -208,7 +211,7 @@ impl Index<(u32, u32, u32)> for Chunk {
     }
 }
 
-impl IndexMut<(u32, u32, u32)> for Chunk {
+impl IndexMut<(u32, u32, u32)> for CubeGrid {
     fn index_mut(&mut self, index: (u32, u32, u32)) -> &mut Self::Output {
         &mut self.data[(index.0 + index.1*CHUNK_SIZE + index.2*CHUNK_SIZE*CHUNK_SIZE) as usize]
     }

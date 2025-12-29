@@ -1,10 +1,11 @@
-use crate::graphics::{Camera, Chunk, Graphics, Lighting, Shader, Texture};
+use crate::{game::object::Object, graphics::{Camera, Graphics, Lighting, Shader, Texture}, physics::Physics};
 use rustc_hash::FxHashSet;
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
     event::{KeyEvent, WindowEvent}, keyboard::{KeyCode, PhysicalKey},
 };
 
+mod object;
 
 struct KeyState {
     down_set: FxHashSet<KeyCode>
@@ -33,24 +34,27 @@ impl KeyState {
 
 pub struct Game {
     graphics: Graphics,
+    physics: Box<Physics>,
     shader: Shader,
     key_state: KeyState,
     camera: Camera,
     lighting: Lighting,
     texture: Texture,
-    chunks: Vec<Chunk>,
+    objects: Vec<Object>,
     mouse_motion: (f32, f32)
 }
 
 impl Game {
     pub fn new(graphics: Graphics) -> Self {
+        let mut physics = Box::new(Physics::new());
         let key_state = KeyState::new();
         let shader = Shader::new(&graphics, include_str!("../shaders/shader.wgsl"));
-        let mut chunks = vec![Chunk::new(&graphics)];
         let camera = Camera::new(&graphics);
+        let objects = vec![
+            Object::new(&graphics, &mut physics, object::ObjectLoader::demo(), camera.pos.cast().unwrap())
+        ];
         let lighting = Lighting::new(&graphics);
 
-        chunks[0].demo(&graphics);
 
         // Set cursor to center of screen
         let size = graphics.window.inner_size();
@@ -67,11 +71,12 @@ impl Game {
             graphics,
             key_state,
             camera,
-            chunks,
+            objects,
             mouse_motion: (0., 0.),
             lighting,
             texture,
             shader,
+            physics,
         }
     }
 
@@ -80,9 +85,13 @@ impl Game {
     }
 
     pub fn update(&mut self, delta_t: f64) {
+        for object in &mut self.objects {
+            object.update(&self.graphics, self.camera.pos.cast().unwrap());
+        }
+
         {
             // Move camera pos
-            const SPEED: f64 = 2.;
+            const SPEED: f64 = 20.;
             let forward = self.camera.get_forward();
             let up = self.camera.get_up();
             let right = self.camera.get_right();
@@ -114,12 +123,14 @@ impl Game {
             self.mouse_motion = (0., 0.);
             self.camera.theta = self.camera.theta.clamp(0.0001, 3.1415);
         }
+
+        self.physics.update(delta_t);
     }
 
     pub fn draw(&mut self) {
         self.camera.update_buffer(&self.graphics);
         self.lighting.update_buffer(&self.graphics, &self.camera);
-        for chunk in &self.chunks {
+        for chunk in &mut self.objects {
             chunk.update_buffer(&self.graphics, &self.camera);
         }
 
@@ -128,8 +139,8 @@ impl Game {
             self.camera.bind(render_pass);
             self.lighting.bind(render_pass);
             self.texture.bind(render_pass);
-            for chunk in &self.chunks {
-                chunk.draw(render_pass)
+            for object in &self.objects {
+                object.draw(render_pass)
             }
         });
     }

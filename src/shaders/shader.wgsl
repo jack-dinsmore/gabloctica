@@ -40,20 +40,27 @@ fn vs_main(
         1.
     );
     
-    out.normal = vec4(0., 0., 0., 1.);
-    if (((vert.data>>12) & 0xf) == 0) { out.normal.x = 1.; }
-    if (((vert.data>>12) & 0xf) == 1) { out.normal.x = -1.; }
-    if (((vert.data>>12) & 0xf) == 2) { out.normal.y = 1.; }
-    if (((vert.data>>12) & 0xf) == 3) { out.normal.y = -1.; }
-    if (((vert.data>>12) & 0xf) == 4) { out.normal.z = 1.; }
-    if (((vert.data>>12) & 0xf) == 5) { out.normal.z = -1.; }
+    var normal = vec3(0., 0., 0.);
+    if (((vert.data>>12) & 0xf) == 0) { normal.x = 1.; }
+    if (((vert.data>>12) & 0xf) == 1) { normal.x = -1.; }
+    if (((vert.data>>12) & 0xf) == 2) { normal.y = 1.; }
+    if (((vert.data>>12) & 0xf) == 3) { normal.y = -1.; }
+    if (((vert.data>>12) & 0xf) == 4) { normal.z = 1.; }
+    if (((vert.data>>12) & 0xf) == 5) { normal.z = -1.; }
 
     out.texpos = vec2(
         f32((vert.data>>16) & 0xf) / TEXTURE_SIZE,
         f32((vert.data>>20) & 0xf) / TEXTURE_SIZE
     );
+
+    let rotation = mat3x3(
+        model.model[0].xyz,
+        model.model[1].xyz,
+        model.model[2].xyz,
+    );
     
     out.position = model.model * out.position;
+    out.normal = vec4(rotation * normal, 1.);
     out.clip_position = camera.view_proj * out.position;
     return out;
 }
@@ -64,7 +71,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var color = textureSample(t_diffuse, s_diffuse, in.texpos);
     var to_light = normalize(lights.pos - in.position);
     var illum = dot(in.normal, to_light);
-    illum = max(illum, 0.);
+    illum = max(illum, 0.1);
 
     color.x *= illum;
     color.y *= illum;

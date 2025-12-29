@@ -1,11 +1,11 @@
 mod shader;
-mod chunk;
+mod grid;
 mod vertex;
 mod camera;
 mod resource;
 mod lighting;
 
-pub use chunk::Chunk;
+pub use grid::{CubeGrid, CHUNK_SIZE};
 pub use camera::Camera;
 pub use lighting::Lighting;
 pub use shader::Shader;
