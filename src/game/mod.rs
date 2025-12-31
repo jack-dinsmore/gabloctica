@@ -118,7 +118,6 @@ impl Game {
                         }
                         CollisionReport::None => unreachable!(),
                     };
-                    dbg!(place_pos);
                     o.insert_block(&self.graphics, 1, place_pos);
                 }
 

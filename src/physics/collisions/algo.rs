@@ -68,16 +68,11 @@ impl ColliderType {
                 ColliderType::Box { center, edges },
                 ColliderType::Ray { start, stop, dir }
             ) =>  {
-                todo!();
-            },
-            (
-                ColliderType::Ray { start, stop, dir },
-                ColliderType::Box { center, edges }
-            ) => {
-                let normals = get_normals(b.ori);// TODO WRONG if the grid is rotated using global_ori
-                let endpoints = [a.ori * start, a.ori * stop];
+                let global_center = a.pos + a.ori * (center - a.com_pos);
+                let normals = get_normals(a.ori);
+                let endpoints = [start, stop];
 
-                let mut best_alpha = f64::INFINITY; // Distance of collision point from end of ray
+                let mut best_alpha = f64::INFINITY;
                 let mut best_sepax = Vector3::zero();
                 for sepax in [
                     normals[0],
@@ -89,12 +84,12 @@ impl ColliderType {
                         normals[1].dot(sepax)*edges.y,
                         normals[2].dot(sepax)*edges.z,
                     ];
-                    let center_d = center.dot(sepax);
+                    let center_d = global_center.dot(sepax);
                     let dots_cube = [
                         center_d+dots_cube[0], center_d+dots_cube[1], center_d+dots_cube[2],
                         center_d-dots_cube[0], center_d-dots_cube[1], center_d-dots_cube[2],
                     ];
-                    let dots_ray = endpoints.map(|v| (v + b.pos).dot(sepax));
+                    let dots_ray = endpoints.map(|v| v.dot(sepax));
                     match get_sepn(&dots_cube, &dots_ray) {
                         Some(sepn) => {
                             // Since this is a ray-box collision, use the normal with the closest collision point. That is, minimize alpha = sepn / |sepax.dir|.
@@ -113,8 +108,56 @@ impl ColliderType {
                 CollisionReport::Some {
                     normal: best_sepax,
                     depth: best_alpha,
-                    p1: a.ori.invert() * (collision_pos - a.pos),
-                    p2: b.ori.invert() * (collision_pos - b.pos),
+                    p1: a.ori.invert() * (collision_pos - a.pos) + a.com_pos,
+                    p2: b.ori.invert() * (collision_pos - b.pos) + b.com_pos,
+                }
+            },
+            (
+                ColliderType::Ray { start, stop, dir },
+                ColliderType::Box { center, edges }
+            ) => {
+                let global_center = b.pos + b.ori * (center - b.com_pos);
+                let normals = get_normals(b.ori);
+                let endpoints = [start, stop];
+
+                let mut best_alpha = f64::INFINITY;
+                let mut best_sepax = Vector3::zero();
+                for sepax in [
+                    normals[0],
+                    normals[1],
+                    normals[2],
+                ] {
+                    let dots_cube = [
+                        normals[0].dot(sepax)*edges.x,
+                        normals[1].dot(sepax)*edges.y,
+                        normals[2].dot(sepax)*edges.z,
+                    ];
+                    let center_d = global_center.dot(sepax);
+                    let dots_cube = [
+                        center_d+dots_cube[0], center_d+dots_cube[1], center_d+dots_cube[2],
+                        center_d-dots_cube[0], center_d-dots_cube[1], center_d-dots_cube[2],
+                    ];
+                    let dots_ray = endpoints.map(|v| v.dot(sepax));
+                    match get_sepn(&dots_cube, &dots_ray) {
+                        Some(sepn) => {
+                            // Since this is a ray-box collision, use the normal with the closest collision point. That is, minimize alpha = sepn / |sepax.dir|.
+                            let alpha = sepn / sepax.dot(*dir).abs();
+                            if alpha < best_alpha {
+                                best_alpha = alpha;
+                                best_sepax = sepax;
+                            }
+                        },
+                        None => return CollisionReport::None,
+                    }
+                }
+                
+                // A collision occurred
+                let collision_pos = stop - dir * best_alpha;
+                CollisionReport::Some {
+                    normal: best_sepax,
+                    depth: best_alpha,
+                    p1: a.ori.invert() * (collision_pos - a.pos) + a.com_pos,
+                    p2: b.ori.invert() * (collision_pos - b.pos) + b.com_pos,
                 }
             },
             (ColliderType::Ray { .. }, ColliderType::Ray { .. }) => CollisionReport::None,

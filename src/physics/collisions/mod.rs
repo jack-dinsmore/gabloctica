@@ -1,8 +1,7 @@
 mod algo;
 pub mod shapes;
 
-use cgmath::{Quaternion, Vector3};
-use faer::linalg::zip::kind::Col;
+use cgmath::Vector3;
 use std::cmp::Ordering;
 use crate::physics::{RigidBody, collisions::shapes::ObjectData};
 use algo::ColliderType;

@@ -29,8 +29,6 @@ pub struct CubeGrid {
     data: [u16; (CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize],
     /// Offset of the chunk from the rigid body center (i.e. the center of mass)
     pub global_pos: Vector3<f32>,
-    /// Offset of the chunk in rotation from the rigid body axis (i.e. this quaternion rotates to the principal axes)
-    pub global_ori: Quaternion<f32>,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     n_indices: u32,
@@ -59,7 +57,6 @@ impl CubeGrid {
         Self {
             data,
             global_pos: Vector3::new(0., 0., 0.),
-            global_ori: Quaternion::new(1., 0., 0., 0.),
             vertex_buffer,
             index_buffer,
             n_indices: 0,
@@ -200,7 +197,7 @@ impl CubeGrid {
 
     pub fn update_buffer(&self, graphics: &Graphics, pos: Vector3<f32>, ori: Quaternion<f32>, camera: &Camera) {
         let model = Matrix4::from_translation(pos + ori * self.global_pos - camera.pos)
-            * Matrix4::from(ori * self.global_ori);
+            * Matrix4::from(ori);
         let uniform = ModelUniform::new(model);
         self.buffer.write(graphics, uniform);
     }

@@ -10,7 +10,7 @@ pub struct ShipLoader {
 }
 impl ShipLoader {
     pub(super) fn load_all(&self, graphics: &crate::graphics::Graphics) -> (Vec<(i32, i32, i32)>, Vec<Chunk>) {
-        let chunk_coord = (-1, 0, -1);
+        let chunk_coord = (0, 0, -1);
         let pos = Vector3::new(
             chunk_coord.0 as f32 * CHUNK_SIZE as f32,
             chunk_coord.1 as f32 * CHUNK_SIZE as f32,

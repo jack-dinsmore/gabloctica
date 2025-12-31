@@ -109,7 +109,7 @@ impl<'a> ColliderIterator<'a> {
 
     pub fn collider(&self) -> ColliderType {
         match self {
-            ColliderIterator::BoxIterator { data } => todo!(),
+            ColliderIterator::BoxIterator { data } => unimplemented!(),
             ColliderIterator::ObjectIterator { data, chunk_index, start_x, start_y, start_z, width_x, width_y, width_z, .. } => ColliderType::Box {
                 center: Vector3::new(
                     data.coords[*chunk_index].0 as f64*CHUNK_SIZE as f64 + (*start_x as f64 + *width_x as f64 / 2.),
@@ -120,7 +120,7 @@ impl<'a> ColliderIterator<'a> {
                     *width_x as f64 / 2.,
                     *width_y as f64 / 2.,
                     *width_z as f64 / 2.,
-                )
+                ),
             },
             ColliderIterator::RayIterator { data } => ColliderType::Ray {
                 start: data.pos,

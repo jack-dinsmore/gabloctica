@@ -1,5 +1,4 @@
-use cgmath::{InnerSpace, Quaternion, Rad, Rotation, Rotation3, Vector3, Zero};
-use faer::Mat;
+use cgmath::{InnerSpace, Matrix3, Rotation, Vector3, Zero};
 
 use loader::{PlanetLoader, ShipLoader};
 use crate::graphics::{CHUNK_SIZE, Graphics};
@@ -34,6 +33,7 @@ impl Object {
     pub fn new(graphics: &Graphics, physics: &mut Physics, loader: ObjectLoader, character_pos: Vector3<f64>) -> Self {
         let initial_data = RigidBodyInit {
             collider: Some(Collider::empty_object()),
+            ang_vel: Vector3::new(0., 0., 1.),
             ..Default::default()
         };
         let body = RigidBody::new(physics, initial_data);
@@ -48,50 +48,30 @@ impl Object {
         out
     }
 
-    pub fn update_rigid_body(&mut self, chunk_pos: (i32, i32, i32)) {
+    /// Update the rigid body. If only some chunks were changed, pass a vector of chunk positions. Otherwise, pass an empty vector
+    pub fn update_rigid_body(&mut self, coord_vec: Vec<(i32, i32, i32)>) {
         let mut mass_m0 = 0.;
         let mut mass_m1 = Vector3::zero();
-        let mut mass_m2 = Mat::zeros(3,3);
+        let mut mass_m2 = Matrix3::zero();
         let collider = self.body.get_object_collider_mut();
         for (i, coord) in self.coords.iter().enumerate() {
-            if *coord == chunk_pos {
+            if coord_vec.is_empty() || coord_vec.contains(coord) {
                 self.chunks[i].update_rigid_body(&mut collider.chunks[i]);
             }
             mass_m0 += self.chunks[i].mass_m0;
             mass_m1 += self.chunks[i].mass_m1;
-            mass_m2 += &self.chunks[i].mass_m2;
+            mass_m2 += self.chunks[i].mass_m2;
         }
 
         // Set the rigid body data
         mass_m1 /= mass_m0;
         mass_m2 /= mass_m0;
-        let moi = (mass_m2.clone() - faer::mat![
-            [mass_m1.x*mass_m1.x + 0.1666666666, mass_m1.x*mass_m1.y, mass_m1.x*mass_m1.z],
-            [mass_m1.y*mass_m1.x, mass_m1.y*mass_m1.y + 0.1666666666, mass_m1.y*mass_m1.z],
-            [mass_m1.z*mass_m1.x, mass_m1.z*mass_m1.y, mass_m1.z*mass_m1.z + 0.1666666666],
-        ]) * mass_m0;
-
-        // TODO ensure that the block doesn't get rotated by a switch in the order of eivengectors
-        let eigen = moi.eigen().unwrap();
-        let evecs = eigen.U();
-        let evals = eigen.S();
-        let moi = Vector3::new(evals[0].re, evals[1].re, evals[2].re);
-        
-        let global_ori = {
-            // Get the rotation quaternion of the eigenvector matrix, which is a rotation matrix
-            let eigen = evecs.eigen().unwrap();
-            let rot_evals = eigen.S();
-            let args = [rot_evals[0].arg(), rot_evals[1].arg(), rot_evals[2].arg()];
-            let mut indices = vec![0, 1, 2];
-            indices.sort_by(|a, b| args[*a].partial_cmp(&args[*b]).unwrap());
-            let angle = args[indices[2]];
-            let axis = Vector3::new(evecs[(indices[1],0)].re, evecs[(indices[1],1)].re, evecs[(indices[1],2)].re);
-            Quaternion::from_axis_angle(axis, Rad(angle))
-        };
-        let global_pos: Vector3<f64> = -mass_m1.cast().unwrap(); // Center of mass
-
-        // Update all the blocks to shift their orientations and positions
-        // TODO
+        self.body.com_pos = mass_m1.cast().unwrap(); // Center of mass
+        self.body.moi = crate::physics::MoI::new_matrix((mass_m2.clone() - Matrix3::new(
+            mass_m1.x*mass_m1.x - 0.1666666666, mass_m1.x*mass_m1.y, mass_m1.x*mass_m1.z,
+            mass_m1.y*mass_m1.x, mass_m1.y*mass_m1.y - 0.1666666666, mass_m1.y*mass_m1.z,
+            mass_m1.z*mass_m1.x, mass_m1.z*mass_m1.y, mass_m1.z*mass_m1.z - 0.1666666666,
+        )) * mass_m0);
     }
 
     pub fn update(&mut self, graphics: &Graphics, character_pos: Vector3<f64>) {
@@ -119,8 +99,8 @@ impl Object {
                         for i in 0..self.chunks.len() {
                             collider.chunks.push([0; (CHUNK_SIZE*CHUNK_SIZE) as usize]);
                             collider.coords.push(self.coords[i]);
-                            self.chunks[i].update_rigid_body(&mut collider.chunks[i]);
                         }
+                        self.update_rigid_body(Vec::new());
                     }
                 } else {
                     // Check if all chunks are outside render distance
@@ -162,6 +142,7 @@ impl Object {
                 }
 
                 // Load new chunks
+                let mut new_coords = Vec::new();
                 for dx in (-RENDER_DISTANCE)..RENDER_DISTANCE {
                     for dy in (-RENDER_DISTANCE)..RENDER_DISTANCE {
                         for dz in (-RENDER_DISTANCE)..RENDER_DISTANCE {
@@ -170,14 +151,14 @@ impl Object {
                             if let Some(c) = l.load_chunk(graphics, coord) {
                                 self.chunks.push(c);
                                 self.coords.push(coord);
+                                new_coords.push(coord);
                                 collider.chunks.push([0; (CHUNK_SIZE*CHUNK_SIZE) as usize]);
                                 collider.coords.push(coord);
-                                let i = self.chunks.len()-1;
-                                self.chunks[i].update_rigid_body(&mut collider.chunks[i]);
                             }
                         }
                     }
                 }
+                self.update_rigid_body(new_coords);
                 self.last_load = std::time::Instant::now();
             },
         }
@@ -228,7 +209,7 @@ impl Object {
         let chunk = &mut self.chunks[found_chunk_index.unwrap()];
         chunk.grid[updated_block] = typ;
         chunk.grid.update_model(graphics);
-        self.update_rigid_body(updated_chunk);
+        self.update_rigid_body(vec![updated_chunk]);
     }
 }
 

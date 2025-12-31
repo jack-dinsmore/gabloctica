@@ -1,6 +1,38 @@
-use cgmath::{InnerSpace, Quaternion, Vector3, Zero};
+use cgmath::{InnerSpace, Matrix3, Quaternion, SquareMatrix, Vector3, Zero};
 
 use crate::physics::{Physics, collisions::Collider};
+
+#[derive(Clone, Debug)]
+pub enum MoI {
+    Diagonal{ moi: Vector3<f64>, reciprocals: Vector3<f64> },
+    Matrix{ moi: Matrix3<f64>, inverse: Matrix3<f64>},
+}
+impl MoI {
+    pub fn new_diagonal(moi: Vector3<f64>) -> Self {
+        let reciprocals = Vector3::new(
+            (moi.y - moi.z) / moi.x,
+            (moi.z - moi.x) / moi.y,
+            (moi.x - moi.y) / moi.z,
+        );
+        Self::Diagonal { moi, reciprocals }
+    }
+    pub fn new_matrix(moi: Matrix3<f64>) -> Self {
+        Self::Matrix { inverse: moi.invert().unwrap(),  moi }
+    }
+    /// Get the angular acceleration for torque `torque` and angular velocity `omega`.
+    pub fn get_omega_dot(&self, torque: Vector3<f64>, omega: Vector3<f64>) -> Vector3<f64> {
+        match self {
+            MoI::Diagonal { moi, reciprocals } => Vector3::new(
+                torque.x / moi.x + omega.y*omega.z * reciprocals.x,
+                torque.y / moi.y + omega.z*omega.x * reciprocals.y,
+                torque.z / moi.z + omega.x*omega.y * reciprocals.z,
+            ),
+            MoI::Matrix { moi, inverse } => {
+                inverse * (torque - omega.cross(moi * omega))
+            },
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct RigidBody {
@@ -35,13 +67,9 @@ impl RigidBody {
         let index = physics.bodies.len();
 
         // Initialize data
-        let moi_div = Vector3::new(
-            (init.moi.y - init.moi.z) / init.moi.x,
-            (init.moi.z - init.moi.x) / init.moi.y,
-            (init.moi.x - init.moi.y) / init.moi.z,
-        );
         let data = RigidBodyData {
             pos: init.pos,
+            com_pos: init.com_pos,
             vel: init.vel,
             ori: init.ori,
             ang_vel: init.ang_vel,
@@ -51,7 +79,6 @@ impl RigidBody {
             kinetic_coeff: init.kinetic_coeff,
             collider: init.collider,
             
-            moi_div,
             contacts: Vec::new(),
             forces: Vector3::zero(),
             torques: Vector3::zero(),
@@ -64,9 +91,6 @@ impl RigidBody {
         }
         if data.mass < 0. {
             panic!("Mass must be non-negative");
-        }
-        if data.moi.x < 0. || data.moi.y < 0. || data.moi.z < 0. {
-            panic!("MoI must be non-negative");
         }
         physics.bodies.push(data);
 
@@ -92,25 +116,17 @@ impl RigidBody {
         }
         panic!("The collider was not type Object.")
     }
-    
-    pub(crate) fn get_object_collider(&self) -> &super::collisions::shapes::ObjectData {
-        if let Some(c) = &self.collider {
-            if let Collider::Object(d) = c {
-                return d;
-            }
-        }
-        panic!("The collider was not type Object.")
-    }
 }
 
 pub struct RigidBodyInit {
     pub pos: Vector3<f64>,
+    pub com_pos: Vector3<f64>,
     pub vel: Vector3<f64>,
     /// Orientation rotates FROM body TO inertial
     pub ori: Quaternion<f64>,
     pub ang_vel: Vector3<f64>,
     pub mass: f64,
-    pub moi: Vector3<f64>,
+    pub moi: MoI,
     pub static_coeff: f64,
     pub kinetic_coeff: f64,
     pub collider: Option<Collider>,
@@ -119,31 +135,36 @@ impl Default for RigidBodyInit {
     fn default() -> Self {
         Self {
             pos: Vector3::zero(),
+            com_pos: Vector3::zero(),
             vel: Vector3::zero(),
             ori: Quaternion::new(0., 0., 0., 1.),
             ang_vel: Vector3::zero(),
             mass: 1.,
             static_coeff: 0.5,
             kinetic_coeff: 0.3,
-            moi: Vector3::new(1., 1., 1.),
+            moi: MoI::new_diagonal(Vector3::new(1., 1., 1.)),
             collider: None,
         }
     }
 }
 
 #[derive(Debug, Clone)]
+/// A point at position x on the RB is at inertial pos `pos + ori*(x-com_pos)`
 pub struct RigidBodyData {
+    /// Points to the center of mass
     pub pos: Vector3<f64>,
+    /// Points from the body origin to the center of mass
+    pub com_pos: Vector3<f64>,
     pub vel: Vector3<f64>,
+    /// Rotates from the body to global
     pub ori: Quaternion<f64>,
     pub ang_vel: Vector3<f64>,
     pub mass: f64,
-    moi: Vector3<f64>,
+    pub moi: MoI,
     pub static_coeff: f64,
     pub kinetic_coeff: f64,
     pub collider: Option<Collider>,
 
-    moi_div: Vector3<f64>,
     contacts: Vec<RigidBody>,
     forces: Vector3<f64>,
     torques: Vector3<f64>,
@@ -161,21 +182,9 @@ impl RigidBodyData {
         self.add_force(force);
         self.add_torque(offset.cross(force));
     }
-    pub fn set_moi(&mut self, moi: Vector3<f64>) {
-        self.moi = moi;
-        self.moi_div = Vector3::new(
-            (moi.y - moi.z) / moi.x,
-            (moi.z - moi.x) / moi.y,
-            (moi.x - moi.y) / moi.z,
-        );
-    }
     pub(super) fn update(&mut self, delta_t: f64) {
         let rotated_torques = self.ori * self.torques;
-        self.ang_vel += Vector3::new(
-            rotated_torques.x / self.moi.x + self.ang_vel.y*self.ang_vel.z * self.moi_div.x,
-            rotated_torques.y / self.moi.y + self.ang_vel.z*self.ang_vel.x * self.moi_div.y,
-            rotated_torques.z / self.moi.z + self.ang_vel.x*self.ang_vel.y * self.moi_div.z,
-        ) * delta_t;
+        self.ang_vel += self.moi.get_omega_dot(rotated_torques, self.ang_vel) * delta_t;
         let vel_quat = Quaternion::from_sv(0., self.ang_vel);
         self.ori += 0.5 * vel_quat * self.ori * delta_t;
         self.ori.normalize();

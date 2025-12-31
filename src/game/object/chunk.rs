@@ -1,5 +1,4 @@
-use cgmath::{Vector3, Zero};
-use faer::Mat;
+use cgmath::{Matrix3, Vector3, Zero};
 
 use crate::{graphics::{CHUNK_SIZE, Camera, CubeGrid, Graphics}, physics::RigidBody};
 
@@ -7,7 +6,7 @@ pub(super) struct Chunk {
     pub(super) grid: CubeGrid,
     pub mass_m0: f64,
     pub mass_m1: Vector3<f64>,
-    pub mass_m2: Mat<f64>,
+    pub mass_m2: Matrix3<f64>,
 }
 
 impl Chunk {
@@ -18,7 +17,7 @@ impl Chunk {
             grid,
             mass_m0: 0.,
             mass_m1: Vector3::zero(),
-            mass_m2: Mat::zeros(3, 3),
+            mass_m2: Matrix3::zero(),
         }
     }
 
@@ -27,7 +26,7 @@ impl Chunk {
         // Update the collider
         self.mass_m0 = 0.;
         self.mass_m1 = Vector3::zero();
-        self.mass_m2 = faer::Mat::zeros(3,3);
+        self.mass_m2 = Matrix3::zero();
 
         for z in 0..CHUNK_SIZE {
             for y in 0..CHUNK_SIZE {
@@ -41,15 +40,15 @@ impl Chunk {
                         self.mass_m1.x += x as f64 * block_mass;
                         self.mass_m1.y += y as f64 * block_mass;
                         self.mass_m1.z += z as f64 * block_mass;
-                        self.mass_m2[(0, 0)] += (x*x) as f64 * block_mass;
-                        self.mass_m2[(0, 1)] += (x*y) as f64 * block_mass;
-                        self.mass_m2[(0, 2)] += (x*z) as f64 * block_mass;
-                        self.mass_m2[(1, 0)] += (y*x) as f64 * block_mass;
-                        self.mass_m2[(1, 1)] += (y*y) as f64 * block_mass;
-                        self.mass_m2[(1, 2)] += (y*z) as f64 * block_mass;
-                        self.mass_m2[(2, 0)] += (z*x) as f64 * block_mass;
-                        self.mass_m2[(2, 1)] += (z*y) as f64 * block_mass;
-                        self.mass_m2[(2, 2)] += (z*z) as f64 * block_mass;
+                        self.mass_m2.x[0]+= (x*x) as f64 * block_mass;
+                        self.mass_m2.x[1] += (x*y) as f64 * block_mass;
+                        self.mass_m2.x[2] += (x*z) as f64 * block_mass;
+                        self.mass_m2.y[0] += (y*x) as f64 * block_mass;
+                        self.mass_m2.y[1] += (y*y) as f64 * block_mass;
+                        self.mass_m2.y[2] += (y*z) as f64 * block_mass;
+                        self.mass_m2.z[0] += (z*x) as f64 * block_mass;
+                        self.mass_m2.z[1] += (z*y) as f64 * block_mass;
+                        self.mass_m2.z[2] += (z*z) as f64 * block_mass;
                     }
                 }
                 blocks[(y+CHUNK_SIZE*z) as usize] = block;
@@ -61,7 +60,7 @@ impl Chunk {
     pub fn update_buffer(&mut self, body: &RigidBody, graphics: &Graphics, camera: &Camera) {
         self.grid.update_buffer(
             graphics,
-            body.pos.cast().unwrap(),
+            (body.pos - body.ori * body.com_pos).cast().unwrap(),
             body.ori.cast().unwrap(),
             camera
         );

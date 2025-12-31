@@ -1,7 +1,7 @@
 mod rigid_body;
 mod collisions;
 
-pub use rigid_body::{RigidBody, RigidBodyInit};
+pub use rigid_body::{RigidBody, RigidBodyInit, MoI};
 pub use collisions::{Collider, CollisionReport};
 
 use cgmath::InnerSpace;
