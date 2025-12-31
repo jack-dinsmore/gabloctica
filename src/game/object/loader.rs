@@ -1,7 +1,6 @@
-use cgmath::{Vector3, Zero};
-use faer::Mat;
+use cgmath::Vector3;
 
-use crate::{game::object::chunk, graphics::{CHUNK_SIZE, CubeGrid}};
+use crate::graphics::CHUNK_SIZE;
 
 use super::Chunk;
 

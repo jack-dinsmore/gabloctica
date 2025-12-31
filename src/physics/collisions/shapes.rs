@@ -76,8 +76,8 @@ impl<'a> ColliderIterator<'a> {
         let mut copy = self.clone();
         match &copy {
             ColliderIterator::ObjectIterator {xyz_index, ..} => {
-                // TODO check if the collision report is inside a block. If it is, return an empty vector
                 // Descend deeper into the chunk
+                // OPTIMIZE check if the collision report is inside a block. If it is, return an empty vector
                 let mut output = Vec::new();
                 let old_xyz_index = *xyz_index;
 
