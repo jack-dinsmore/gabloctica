@@ -101,7 +101,9 @@ impl Game {
                 let mut collided_object = None;
 
                 for object in &mut self.objects {
+                    // The collision function should always pick some over None, but choose the one with the smallest distance to the target otherwise.
                     let new_report = Collider::check_collision(&self.player, &object.body);
+
                     if new_report > report {
                         report = new_report;
                         collided_object = Some(object);
@@ -116,6 +118,7 @@ impl Game {
                         }
                         CollisionReport::None => unreachable!(),
                     };
+                    dbg!(place_pos);
                     o.insert_block(&self.graphics, 1, place_pos);
                 }
 

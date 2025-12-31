@@ -2,13 +2,14 @@ mod algo;
 pub mod shapes;
 
 use cgmath::{Quaternion, Vector3};
+use faer::linalg::zip::kind::Col;
 use std::cmp::Ordering;
 use crate::physics::{RigidBody, collisions::shapes::ObjectData};
 use algo::ColliderType;
 use shapes::ColliderIterator;
 
 /// Note: Greater reports are collided more deeply
-#[derive(Debug)]
+#[derive(Debug,PartialEq)]
 pub enum CollisionReport {
     None,
     Some {
@@ -33,31 +34,13 @@ impl CollisionReport {
         !self.is_some()
     }
 }
-
 impl PartialOrd for CollisionReport {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (self, other) {
             (CollisionReport::None, CollisionReport::None) => Some(Ordering::Equal),
-            (CollisionReport::Some { depth: depth1, .. }, CollisionReport::Some { depth: depth2, .. }) => {
-                depth1.partial_cmp(&depth2)
-            },
             (CollisionReport::None, CollisionReport::Some { .. }) => Some(Ordering::Less),
             (CollisionReport::Some { .. }, CollisionReport::None) => Some(Ordering::Greater),
-        }
-    }
-}
-impl PartialEq for CollisionReport {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (CollisionReport::None, CollisionReport::None) => true,
-            (CollisionReport::Some {
-                depth: depth1, normal: normal1, p1: p11, p2: p21
-            }, CollisionReport::Some {
-                depth: depth2, normal: normal2, p1: p12, p2: p22
-            }) => {
-                normal1 == normal2 && depth1 == depth2 && p11 == p12 && p21 == p22
-            },
-            _ => false
+            (CollisionReport::Some { depth: d1, .. }, CollisionReport::Some { depth: d2, .. }) => d1.partial_cmp(&d2),
         }
     }
 }
@@ -70,6 +53,7 @@ pub enum Collider {
 }
 
 impl Collider {
+    /// Check for a collision between two rigid bodies.
     pub fn check_collision(a: &RigidBody, b: &RigidBody) -> CollisionReport {
         match (&a.collider, &b.collider) {
             (Some(ac), Some(bc)) => {

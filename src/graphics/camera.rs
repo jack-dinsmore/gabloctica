@@ -77,8 +77,8 @@ impl Camera {
 
     pub fn get_right(&self) -> Vector3<f32> {
         Vector3::new(
-            self.theta.sin() * self.phi.sin(),
-            self.theta.sin() * -self.phi.cos(),
+            self.phi.sin(),
+            -self.phi.cos(),
             0.,
         )
     }

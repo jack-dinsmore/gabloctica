@@ -77,15 +77,12 @@ impl ColliderType {
                 let normals = get_normals(b.ori);// TODO WRONG if the grid is rotated using global_ori
                 let endpoints = [a.ori * start, a.ori * stop];
 
-                let mut min_sepn = f64::INFINITY;
+                let mut best_alpha = f64::INFINITY; // Distance of collision point from end of ray
                 let mut best_sepax = Vector3::zero();
                 for sepax in [
                     normals[0],
                     normals[1],
                     normals[2],
-                    // normals[0].cross(*dir),
-                    // normals[1].cross(*dir),
-                    // normals[2].cross(*dir),
                 ] {
                     let dots_cube = [
                         normals[0].dot(sepax)*edges.x,
@@ -100,20 +97,22 @@ impl ColliderType {
                     let dots_ray = endpoints.map(|v| (v + b.pos).dot(sepax));
                     match get_sepn(&dots_cube, &dots_ray) {
                         Some(sepn) => {
-                            min_sepn = min_sepn.min(sepn);
-                            best_sepax = sepax;
+                            // Since this is a ray-box collision, use the normal with the closest collision point. That is, minimize alpha = sepn / |sepax.dir|.
+                            let alpha = sepn / sepax.dot(*dir).abs();
+                            if alpha < best_alpha {
+                                best_alpha = alpha;
+                                best_sepax = sepax;
+                            }
                         },
                         None => return CollisionReport::None,
                     }
                 }
                 
                 // A collision occurred
-                let cosine = best_sepax.dot(*dir);
-                let collision_pos = stop - dir * min_sepn / cosine.abs();
-
+                let collision_pos = stop - dir * best_alpha;
                 CollisionReport::Some {
                     normal: best_sepax,
-                    depth: min_sepn,
+                    depth: best_alpha,
                     p1: a.ori.invert() * (collision_pos - a.pos),
                     p2: b.ori.invert() * (collision_pos - b.pos),
                 }

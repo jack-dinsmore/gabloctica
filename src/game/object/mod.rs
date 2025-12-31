@@ -216,9 +216,12 @@ impl Object {
         }
         if let None = found_chunk_index {
             // Make a new chunk
-            let pos = Vector3::new(updated_chunk.0 as f32, updated_chunk.1 as f32, updated_chunk.2 as f32);
+            let pos = Vector3::new(updated_chunk.0 as f32, updated_chunk.1 as f32, updated_chunk.2 as f32)*CHUNK_SIZE as f32;
             let new_chunk = Chunk::empty(graphics, pos);
             self.chunks.push(new_chunk);
+            self.coords.push(updated_chunk);
+            self.body.get_object_collider_mut().chunks.push([0; (CHUNK_SIZE*CHUNK_SIZE) as usize]);
+            self.body.get_object_collider_mut().coords.push(updated_chunk);
             found_chunk_index = Some(self.chunks.len()-1);
         }
         // Set the block
