@@ -92,6 +92,15 @@ impl RigidBody {
         }
         panic!("The collider was not type Object.")
     }
+    
+    pub(crate) fn get_object_collider(&self) -> &super::collisions::shapes::ObjectData {
+        if let Some(c) = &self.collider {
+            if let Collider::Object(d) = c {
+                return d;
+            }
+        }
+        panic!("The collider was not type Object.")
+    }
 }
 
 pub struct RigidBodyInit {

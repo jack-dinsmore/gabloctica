@@ -110,11 +110,11 @@ impl Game {
 
                 if let Some(o) = collided_object {
                     let place_pos = match report {
-                        CollisionReport::None => todo!(),
-                        CollisionReport::Some { normal, depth, p1, p2 } => {
+                        CollisionReport::Some { p2, .. } => {
                             let offset = o.body.ori.invert() * forward;
-                            p2 - forward*0.001
+                            p2 - offset*0.001
                         }
+                        CollisionReport::None => unreachable!(),
                     };
                     o.insert_block(&self.graphics, 1, place_pos);
                 }

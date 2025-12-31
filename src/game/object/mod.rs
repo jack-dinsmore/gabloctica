@@ -18,8 +18,8 @@ pub enum ObjectLoader {
 }
 impl ObjectLoader {
     pub fn demo() -> Self {
-        Self::MultiShot(PlanetLoader {})
-        // Self::OneShot(ShipLoader {})
+        // Self::MultiShot(PlanetLoader {})
+        Self::OneShot(ShipLoader {})
     }
 }
 
@@ -198,14 +198,14 @@ impl Object {
     /// Insert a block into the cell containg position pos. Pos is in body coordinates.
     pub(crate) fn insert_block(&mut self, graphics: &Graphics, typ: u16, pos: Vector3<f64>) {
         let updated_chunk = (
-            pos.x as i32 / CHUNK_SIZE as i32,
-            pos.y as i32 / CHUNK_SIZE as i32,
-            pos.z as i32 / CHUNK_SIZE as i32,
+            (pos.x/CHUNK_SIZE as f64).floor() as i32,
+            (pos.y/CHUNK_SIZE as f64).floor() as i32,
+            (pos.z/CHUNK_SIZE as f64).floor() as i32,
         );
         let updated_block = (
-            (pos.x as i32 % CHUNK_SIZE as i32) as u32,
-            (pos.y as i32 % CHUNK_SIZE as i32) as u32,
-            (pos.z as i32 % CHUNK_SIZE as i32) as u32,
+            my_fmod(pos.x, CHUNK_SIZE as f64) as u32,
+            my_fmod(pos.y, CHUNK_SIZE as f64) as u32,
+            my_fmod(pos.z, CHUNK_SIZE as f64) as u32,
         );
 
         let mut found_chunk_index = None;
@@ -219,12 +219,17 @@ impl Object {
             let pos = Vector3::new(updated_chunk.0 as f32, updated_chunk.1 as f32, updated_chunk.2 as f32);
             let new_chunk = Chunk::empty(graphics, pos);
             self.chunks.push(new_chunk);
-            found_chunk_index = Some(self.chunks.len());
+            found_chunk_index = Some(self.chunks.len()-1);
         }
         // Set the block
         let chunk = &mut self.chunks[found_chunk_index.unwrap()];
         chunk.grid[updated_block] = typ;
-
+        chunk.grid.update_model(graphics);
         self.update_rigid_body(updated_chunk);
     }
+}
+
+fn my_fmod(f: f64, l: f64) -> f64 {
+    let phase = f / l;
+    (phase - phase.floor()) * l
 }

@@ -53,6 +53,10 @@ fn vs_main(
         f32((vert.data>>20) & 0xf) / TEXTURE_SIZE
     );
 
+    if (vert.data>>24 & 1) != 0 { out.position.x += 16.; }
+    if (vert.data>>25 & 1) != 0 { out.position.y += 16.; }
+    if (vert.data>>26 & 1) != 0 { out.position.z += 16.; }
+
     let rotation = mat3x3(
         model.model[0].xyz,
         model.model[1].xyz,

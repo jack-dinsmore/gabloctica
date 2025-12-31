@@ -49,9 +49,9 @@ impl Camera {
         let buffer = Buffer::new(graphics);
 
         Self {
-            pos: Vector3::new(-30., -30., -30.),
-            theta: 1.,
-            phi: 1.,
+            pos: Vector3::new(0., 0., 0.),
+            theta: 1.57,
+            phi: 0.,
             up,
             fovy: 45., // Degrees
             

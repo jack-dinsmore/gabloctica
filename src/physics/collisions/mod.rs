@@ -1,7 +1,7 @@
 mod algo;
 pub mod shapes;
 
-use cgmath::Vector3;
+use cgmath::{Quaternion, Vector3};
 use std::cmp::Ordering;
 use crate::physics::{RigidBody, collisions::shapes::ObjectData};
 use algo::ColliderType;
@@ -74,23 +74,41 @@ impl Collider {
         match (&a.collider, &b.collider) {
             (Some(ac), Some(bc)) => {
                 let mut report = CollisionReport::None;
-                let mut col_stack = vec![(ac.iter(), bc.iter())];
+                let mut col_stack = Vec::new();
+                let a_children = ac.iter();
+                let b_children = bc.iter();
+                for a_child in &a_children {
+                    for b_child in &b_children {
+                        col_stack.push((a_child.clone(), b_child.clone()));
+                    }
+                }
+
                 loop {
                     match col_stack.pop() {
                         Some((ai, bi)) => {
-                            let this_report = ColliderType::check_collision(&ai.collider(), &bi.collider());
-                            if this_report.is_some() && this_report > report {
-                                report = this_report;
-                                let a_children = ai.next();
-                                let b_children = bi.next();
-                                for a_child in &a_children {
-                                    for b_child in &b_children {
-                                        col_stack.push((a_child.clone(), b_child.clone()));
+                            let this_report = ColliderType::check_collision(&ai.collider(), &bi.collider(), a, b);
+                            if this_report.is_some() {
+                                if ai.is_leaf() && bi.is_leaf() {
+                                    // This was the last collision in the tree and it was a success
+                                    if this_report > report {
+                                        report = this_report;
+                                    }
+                                } else {
+                                    // The collision was a success but it wasn't the last
+                                    let a_children = ai.next();
+                                    let b_children = bi.next();
+                                    for a_child in &a_children {
+                                        for b_child in &b_children {
+                                            col_stack.push((a_child.clone(), b_child.clone()));
+                                        }
                                     }
                                 }
                             }
                         },
-                        None => break,
+                        None => {
+                            // The queue ended
+                            break
+                        },
                     }
                 }
                 report
@@ -99,11 +117,11 @@ impl Collider {
         }
     }
 
-    fn iter(&self) -> ColliderIterator<'_> {
+    fn iter(&self) -> Vec<ColliderIterator<'_>> {
         match self {
-            Collider::Ray(d) => ColliderIterator::new_ray(d),
-            Collider::Box(d) => ColliderIterator::new_box(d),
-            Collider::Object(d) => ColliderIterator::new_object(d),
+            Collider::Ray(d) => vec![ColliderIterator::new_ray(d)],
+            Collider::Box(d) => vec![ColliderIterator::new_box(d)],
+            Collider::Object(d) => (0..d.chunks.len()).map(|i| ColliderIterator::new_object(d, i)).collect(),
         }
     }
     

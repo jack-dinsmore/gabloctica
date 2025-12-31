@@ -22,7 +22,7 @@ impl ModelUniform {
     }
 }
 
-pub const CHUNK_SIZE: u32 = 15;
+pub const CHUNK_SIZE: u32 = 16;
 const VERTEX_CAPACITY: usize = 0x10000;
 
 pub struct CubeGrid {
@@ -71,8 +71,8 @@ impl CubeGrid {
     pub fn demo(&mut self, graphics: &Graphics) {
         for x in 0..CHUNK_SIZE {
             for y in 0..CHUNK_SIZE {
-                for z in 0..CHUNK_SIZE {
-                    self[(x,y,z)] = ((x+y+z)%2) as u16 + 1;
+                for z in 2..(CHUNK_SIZE-2) {
+                    self[(x,y,z)] = 2;
                 }
             }
         }
@@ -91,18 +91,23 @@ impl CubeGrid {
                     let typ = self[(x,y,z)];
                     if typ == 0 {continue;}
 
-                    let mut vertex_offset = 0;
-                    vertex_offset += x;
-                    vertex_offset += y << 4;
-                    vertex_offset += z << 8;
-                    vertex_offset += (typ as u32) << 16;
+                    let x0 = x;
+                    let x1 = ((x+1) % 16) | (((x+1)/16) << 24);
+                    let y0 = y << 4;
+                    let y1 = (((y+1) % 16) << 4) | (((y+1)/16) << 25);
+                    let z0 = z << 8;
+                    let z1 = (((z+1) % 16) << 8) | (((z+1)/16) << 26);
+                    let u0 = (typ as u32 & 0xf) << 16;
+                    let u1 = ((typ as u32 & 0xf) + 1) << 16;
+                    let v0 = ((typ as u32 >> 4) & 0xf) << 20;
+                    let v1 = (((typ as u32 >> 4) & 0xf) + 1) << 20;
 
-                    //00_uv_n_zyx
                     if x == CHUNK_SIZE-1 || self[(x+1,y,z)] == 0 {
-                        vertices.push(Vertex {data: 0x00_00_0_001 + vertex_offset});
-                        vertices.push(Vertex {data: 0x00_01_0_011 + vertex_offset});
-                        vertices.push(Vertex {data: 0x00_11_0_111 + vertex_offset});
-                        vertices.push(Vertex {data: 0x00_10_0_101 + vertex_offset});
+                        let face = x1; // Normal or constant face
+                        vertices.push(Vertex {data: u0|v0|y0|z0|face});
+                        vertices.push(Vertex {data: u0|v1|y1|z0|face});
+                        vertices.push(Vertex {data: u1|v1|y1|z1|face});
+                        vertices.push(Vertex {data: u1|v0|y0|z1|face});
                         indices.push(0+index_offset);
                         indices.push(1+index_offset);
                         indices.push(2+index_offset);
@@ -112,10 +117,11 @@ impl CubeGrid {
                         index_offset += 4;
                     }
                     if x == 0 || self[(x-1,y,z)] == 0 {
-                        vertices.push(Vertex {data: 0x00_00_1_000 + vertex_offset});
-                        vertices.push(Vertex {data: 0x00_01_1_010 + vertex_offset});
-                        vertices.push(Vertex {data: 0x00_11_1_110 + vertex_offset});
-                        vertices.push(Vertex {data: 0x00_10_1_100 + vertex_offset});
+                        let face = x0 | (1 << 12);
+                        vertices.push(Vertex {data: u0|v0|y0|z0|face});
+                        vertices.push(Vertex {data: u0|v1|y1|z0|face});
+                        vertices.push(Vertex {data: u1|v1|y1|z1|face});
+                        vertices.push(Vertex {data: u1|v0|y0|z1|face});
                         indices.push(0+index_offset);
                         indices.push(2+index_offset);
                         indices.push(1+index_offset);
@@ -125,10 +131,11 @@ impl CubeGrid {
                         index_offset += 4;
                     }
                     if y == CHUNK_SIZE-1 || self[(x,y+1,z)] == 0 {
-                        vertices.push(Vertex {data: 0x00_00_2_010 + vertex_offset});
-                        vertices.push(Vertex {data: 0x00_01_2_011 + vertex_offset});
-                        vertices.push(Vertex {data: 0x00_11_2_111 + vertex_offset});
-                        vertices.push(Vertex {data: 0x00_10_2_110 + vertex_offset});
+                        let face = y1 | (2 << 12);
+                        vertices.push(Vertex {data: u0|v0|x0|z0|face});
+                        vertices.push(Vertex {data: u0|v1|x1|z0|face});
+                        vertices.push(Vertex {data: u1|v1|x1|z1|face});
+                        vertices.push(Vertex {data: u1|v0|x0|z1|face});
                         indices.push(0+index_offset);
                         indices.push(2+index_offset);
                         indices.push(1+index_offset);
@@ -138,10 +145,11 @@ impl CubeGrid {
                         index_offset += 4;
                     }
                     if y == 0 || self[(x,y-1,z)] == 0 {
-                        vertices.push(Vertex {data: 0x00_00_3_000 + vertex_offset});
-                        vertices.push(Vertex {data: 0x00_01_3_001 + vertex_offset});
-                        vertices.push(Vertex {data: 0x00_11_3_101 + vertex_offset});
-                        vertices.push(Vertex {data: 0x00_10_3_100 + vertex_offset});
+                        let face = y0 | (3 << 12);
+                        vertices.push(Vertex {data: u0|v0|x0|z0|face});
+                        vertices.push(Vertex {data: u0|v1|x1|z0|face});
+                        vertices.push(Vertex {data: u1|v1|x1|z1|face});
+                        vertices.push(Vertex {data: u1|v0|x0|z1|face});
                         indices.push(0+index_offset);
                         indices.push(1+index_offset);
                         indices.push(2+index_offset);
@@ -151,10 +159,11 @@ impl CubeGrid {
                         index_offset += 4;
                     }
                     if z == CHUNK_SIZE-1 || self[(x,y,z+1)] == 0 {
-                        vertices.push(Vertex {data: 0x00_00_4_100 + vertex_offset});
-                        vertices.push(Vertex {data: 0x00_01_4_101 + vertex_offset});
-                        vertices.push(Vertex {data: 0x00_11_4_111 + vertex_offset});
-                        vertices.push(Vertex {data: 0x00_10_4_110 + vertex_offset});
+                        let face = z1 | (4 << 12);
+                        vertices.push(Vertex {data: u0|v0|x0|y0|face});
+                        vertices.push(Vertex {data: u0|v1|x1|y0|face});
+                        vertices.push(Vertex {data: u1|v1|x1|y1|face});
+                        vertices.push(Vertex {data: u1|v0|x0|y1|face});
                         indices.push(0+index_offset);
                         indices.push(1+index_offset);
                         indices.push(2+index_offset);
@@ -164,10 +173,11 @@ impl CubeGrid {
                         index_offset += 4;
                     }
                     if z == 0 || self[(x,y,z-1)] == 0 {
-                        vertices.push(Vertex {data: 0x00_00_5_000 + vertex_offset});
-                        vertices.push(Vertex {data: 0x00_01_5_001 + vertex_offset});
-                        vertices.push(Vertex {data: 0x00_11_5_011 + vertex_offset});
-                        vertices.push(Vertex {data: 0x00_10_5_010 + vertex_offset});
+                        let face = z0 | (5 << 12);
+                        vertices.push(Vertex {data: u0|v0|x0|y0|face});
+                        vertices.push(Vertex {data: u0|v1|x1|y0|face});
+                        vertices.push(Vertex {data: u1|v1|x1|y1|face});
+                        vertices.push(Vertex {data: u1|v0|x0|y1|face});
                         indices.push(0+index_offset);
                         indices.push(2+index_offset);
                         indices.push(1+index_offset);

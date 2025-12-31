@@ -34,7 +34,7 @@ impl Chunk {
                 let mut block: u16 = 0;
                 for x in 0..CHUNK_SIZE {
                     if self.grid[(x,y,z)] != 0 {
-                        block |= 1 << z;
+                        block |= 1 << x;
 
                         let block_mass = 1.;
                         self.mass_m0 += block_mass;
