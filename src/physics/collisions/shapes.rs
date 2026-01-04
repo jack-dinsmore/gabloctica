@@ -1,4 +1,5 @@
 use cgmath::{InnerSpace, Vector3};
+use rustc_hash::FxHashMap;
 
 use crate::graphics::CHUNK_SIZE;
 
@@ -19,8 +20,7 @@ pub struct BoxData {
 
 #[derive(Debug, Clone)]
 pub struct ObjectData {
-    pub chunks: Vec<[u16; (CHUNK_SIZE*CHUNK_SIZE) as usize]>,
-    pub coords: Vec<(i32, i32, i32)>,
+    pub chunks: FxHashMap<(i32, i32, i32), [u16; (CHUNK_SIZE*CHUNK_SIZE) as usize]>,
 }
 
 
@@ -31,7 +31,7 @@ pub(super) enum ColliderIterator<'a> {
     },
     ObjectIterator {
         data: &'a ObjectData,
-        chunk_index: usize,
+        chunk_coord: (i32, i32, i32),
         start_x: u16,
         start_y: u16,
         start_z: u16,
@@ -51,10 +51,10 @@ impl<'a> ColliderIterator<'a> {
         }
     }
 
-    pub fn new_object(data: &'a ObjectData, index: usize) -> Self {
+    pub fn new_object(data: &'a ObjectData, coord: (i32, i32, i32)) -> Self {
         Self::ObjectIterator {
             data,
-            chunk_index: index,
+            chunk_coord: coord,
             start_x: 0,
             start_y: 0,
             start_z: 0,
@@ -110,11 +110,11 @@ impl<'a> ColliderIterator<'a> {
     pub fn collider(&self) -> ColliderType {
         match self {
             ColliderIterator::BoxIterator { data } => unimplemented!(),
-            ColliderIterator::ObjectIterator { data, chunk_index, start_x, start_y, start_z, width_x, width_y, width_z, .. } => ColliderType::Box {
+            ColliderIterator::ObjectIterator { data, chunk_coord, start_x, start_y, start_z, width_x, width_y, width_z, .. } => ColliderType::Box {
                 center: Vector3::new(
-                    data.coords[*chunk_index].0 as f64*CHUNK_SIZE as f64 + (*start_x as f64 + *width_x as f64 / 2.),
-                    data.coords[*chunk_index].1 as f64*CHUNK_SIZE as f64 + (*start_y as f64 + *width_y as f64 / 2.),
-                    data.coords[*chunk_index].2 as f64*CHUNK_SIZE as f64 + (*start_z as f64 + *width_z as f64 / 2.),
+                    chunk_coord.0 as f64*CHUNK_SIZE as f64 + (*start_x as f64 + *width_x as f64 / 2.),
+                    chunk_coord.1 as f64*CHUNK_SIZE as f64 + (*start_y as f64 + *width_y as f64 / 2.),
+                    chunk_coord.2 as f64*CHUNK_SIZE as f64 + (*start_z as f64 + *width_z as f64 / 2.),
                 ),
                 edges: Vector3::new(
                     *width_x as f64 / 2.,
@@ -142,10 +142,10 @@ impl<'a> ColliderIterator<'a> {
     /// Returns true if the iterator contains blocks. This is a helper function for object iterators only
     fn contains_blocks(&self) -> bool {
         match self {
-            ColliderIterator::ObjectIterator { data, chunk_index, start_x, start_y, start_z, width_x, width_y, width_z, .. } => {
+            ColliderIterator::ObjectIterator { data, chunk_coord, start_x, start_y, start_z, width_x, width_y, width_z, .. } => {
                 for z in *start_z..(*start_z + *width_z) {
                     for y in *start_y..(*start_y + *width_y) {
-                        let row = data.chunks[*chunk_index][(y + z * CHUNK_SIZE as u16) as usize];
+                        let row = data.chunks[&chunk_coord][(y + z * CHUNK_SIZE as u16) as usize];
                         for x in *start_x..(*start_x + *width_x) {
                             if row & (1 << x) != 0 {return true;}
                         }

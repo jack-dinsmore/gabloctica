@@ -2,6 +2,7 @@ mod algo;
 pub mod shapes;
 
 use cgmath::Vector3;
+use rustc_hash::FxHashMap;
 use std::cmp::Ordering;
 use crate::physics::{RigidBody, collisions::shapes::ObjectData};
 use algo::ColliderType;
@@ -104,14 +105,13 @@ impl Collider {
         match self {
             Collider::Ray(d) => vec![ColliderIterator::new_ray(d)],
             Collider::Box(d) => vec![ColliderIterator::new_box(d)],
-            Collider::Object(d) => (0..d.chunks.len()).map(|i| ColliderIterator::new_object(d, i)).collect(),
+            Collider::Object(d) => d.chunks.keys().map(|c| ColliderIterator::new_object(d, *c)).collect(),
         }
     }
     
     pub fn empty_object() -> Self {
         Self::Object(ObjectData {
-            chunks: Vec::new(),
-            coords: Vec::new(),
+            chunks: FxHashMap::default(),
         })
     }
     

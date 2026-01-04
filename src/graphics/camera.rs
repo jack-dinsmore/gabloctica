@@ -56,7 +56,7 @@ impl Camera {
             fovy: 45., // Degrees
             
             znear: 0.1,
-            zfar: 100.,
+            zfar: 1000.,
             aspect,
 
             buffer,

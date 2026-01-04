@@ -5,7 +5,7 @@ mod camera;
 mod resource;
 mod lighting;
 
-pub use grid::{CubeGrid, CHUNK_SIZE};
+pub use grid::{CubeGrid, GridTexture, CHUNK_SIZE};
 pub use camera::Camera;
 pub use lighting::Lighting;
 pub use shader::Shader;

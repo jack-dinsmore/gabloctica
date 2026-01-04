@@ -1,4 +1,4 @@
-use crate::{game::object::Object, graphics::{Camera, Graphics, Lighting, Shader, Texture}, physics::{Collider, CollisionReport, Physics, RigidBody, RigidBodyInit}};
+use crate::{game::object::Object, graphics::{Camera, Graphics, GridTexture, Lighting, Shader, Texture}, physics::{Collider, CollisionReport, Physics, RigidBody, RigidBodyInit}};
 use cgmath::Rotation;
 use rustc_hash::FxHashSet;
 use winit::{
@@ -41,7 +41,7 @@ pub struct Game {
     key_state: KeyState,
     camera: Camera,
     lighting: Lighting,
-    texture: Texture,
+    texture: GridTexture,
     objects: Vec<Object>,
     mouse_motion: (f32, f32)
 }
@@ -68,7 +68,7 @@ impl Game {
         graphics.window.set_cursor_position(center).unwrap();
 
         // Load block texture
-        let texture = Texture::new(&graphics, include_bytes!("../../assets/texture.png"));
+        let texture = GridTexture::new(&graphics, include_bytes!("../../assets/texture.png"));
         
         Self {
             graphics,
@@ -182,7 +182,7 @@ impl Game {
             self.shader.bind(render_pass);
             self.camera.bind(render_pass);
             self.lighting.bind(render_pass);
-            self.texture.bind(render_pass);
+            self.texture.bind(render_pass, 1);//TODO
             for object in &self.objects {
                 object.draw(render_pass)
             }

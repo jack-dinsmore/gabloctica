@@ -1,7 +1,7 @@
 use wgpu::Device;
 use crate::graphics::Graphics;
 use super::{TEXTURE_GROUP, DEPTH_FORMAT};
-use image::GenericImageView;
+use image::{GenericImageView, ImageBuffer, Rgba};
 
 pub struct Texture {
     texture: wgpu::Texture,
@@ -9,11 +9,12 @@ pub struct Texture {
 }
 
 impl Texture {
-    pub fn new(graphics: &Graphics, image_bytes: &[u8]) -> Self {
+    pub fn from_bytes(graphics: &Graphics, image_bytes: &[u8]) -> Self {
         let loaded_image = image::load_from_memory(image_bytes).unwrap();
-        let rgba = loaded_image.to_rgba8();
-        let dimensions = loaded_image.dimensions();
+        Self::from_image(graphics, &loaded_image.to_rgba8(), loaded_image.dimensions())
+    }
 
+    pub fn from_image(graphics: &Graphics, rgba: &ImageBuffer<Rgba<u8>, Vec<u8>>, dimensions: (u32, u32)) -> Self {
         let texture_size = wgpu::Extent3d {
             width: dimensions.0,
             height: dimensions.1,

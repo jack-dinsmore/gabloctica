@@ -1,6 +1,7 @@
 use cgmath::{InnerSpace, Matrix3, Rotation, Vector3, Zero};
 
 use loader::{PlanetLoader, ShipLoader};
+use rustc_hash::FxHashMap;
 use crate::graphics::{CHUNK_SIZE, Graphics};
 use crate::physics::{Collider, Physics, RigidBody, RigidBodyInit};
 
@@ -8,7 +9,7 @@ mod chunk;
 mod loader;
 use chunk::Chunk;
 
-const RENDER_DISTANCE: i32 = 4; // Units of chunks
+const RENDER_DISTANCE: i32 = 12; // Units of chunks // TODO change back
 const LOAD_TIME: u128 = 250; // Millseconds
 
 pub enum ObjectLoader {
@@ -17,14 +18,13 @@ pub enum ObjectLoader {
 }
 impl ObjectLoader {
     pub fn demo() -> Self {
-        // Self::MultiShot(PlanetLoader {})
-        Self::OneShot(ShipLoader {})
+        Self::MultiShot(PlanetLoader {})
+        // Self::OneShot(ShipLoader {})
     }
 }
 
 pub struct Object {
-    chunks: Vec<Chunk>,
-    coords: Vec<(i32, i32, i32)>,
+    chunks: FxHashMap<(i32, i32, i32), Chunk>,
     loader: ObjectLoader,
     pub body: RigidBody,
     last_load: std::time::Instant,
@@ -33,13 +33,11 @@ impl Object {
     pub fn new(graphics: &Graphics, physics: &mut Physics, loader: ObjectLoader, character_pos: Vector3<f64>) -> Self {
         let initial_data = RigidBodyInit {
             collider: Some(Collider::empty_object()),
-            ang_vel: Vector3::new(0., 0., 1.),
             ..Default::default()
         };
         let body = RigidBody::new(physics, initial_data);
         let mut out = Self {
-            chunks: Vec::new(),
-            coords: Vec::new(),
+            chunks: FxHashMap::default(),
             loader: loader,
             body,
             last_load: std::time::Instant::now(),
@@ -48,19 +46,46 @@ impl Object {
         out
     }
 
-    /// Update the rigid body. If only some chunks were changed, pass a vector of chunk positions. Otherwise, pass an empty vector
-    pub fn update_rigid_body(&mut self, coord_vec: Vec<(i32, i32, i32)>) {
+    /// Update the model buffers and rigid body. If only some chunks were changed, pass a vector of chunk positions. Otherwise, pass an empty vector. This will update the passed chunks, and neighbors if the neighbors now become visible.
+    pub fn update_chunk_info(&mut self, graphics: &Graphics, coord_vec: Vec<(i32, i32, i32)>) {
         let mut mass_m0 = 0.;
         let mut mass_m1 = Vector3::zero();
         let mut mass_m2 = Matrix3::zero();
         let collider = self.body.get_object_collider_mut();
-        for (i, coord) in self.coords.iter().enumerate() {
-            if coord_vec.is_empty() || coord_vec.contains(coord) {
-                self.chunks[i].update_rigid_body(&mut collider.chunks[i]);
+        if coord_vec.is_empty() {
+            for (coord, chunk) in &mut self.chunks {
+                chunk.update_metadata(collider.chunks.get_mut(coord).unwrap());
+                mass_m0 += chunk.mass_m0;
+                mass_m1 += chunk.mass_m1;
+                mass_m2 += chunk.mass_m2;
             }
-            mass_m0 += self.chunks[i].mass_m0;
-            mass_m1 += self.chunks[i].mass_m1;
-            mass_m2 += self.chunks[i].mass_m2;
+        } else {
+            for coord in coord_vec.iter() {
+                self.chunks.get_mut(coord).unwrap().update_metadata(collider.chunks.get_mut(coord).unwrap());
+                mass_m0 += self.chunks[coord].mass_m0;
+                mass_m1 += self.chunks[coord].mass_m1;
+                mass_m2 += self.chunks[coord].mass_m2;
+            }
+        }
+
+        // Update the buffers
+        let mut exposed_map = FxHashMap::default();
+        if coord_vec.is_empty() {
+            for coord in self.chunks.keys() {
+                Chunk::update_exposed(*coord, &self.chunks, &mut exposed_map);
+            }
+        } else {
+            for coord in coord_vec.iter() {
+                Chunk::update_exposed(*coord, &self.chunks, &mut exposed_map);
+            }
+        }
+        for (coord, chunk) in &mut self.chunks {
+            if let Some(new_exposed) = exposed_map.get(coord) {
+                if *new_exposed != chunk.exposed {
+                    chunk.exposed = *new_exposed;
+                    chunk.update_model(graphics);
+                }
+            }
         }
 
         // Set the rigid body data
@@ -91,20 +116,19 @@ impl Object {
 
         match &self.loader {
             ObjectLoader::OneShot(l) => {
-                if self.coords.is_empty() {
+                if self.chunks.is_empty() {
                     let dist = (character_pos - self.body.pos).magnitude();
                     let collider = self.body.get_object_collider_mut();
                     if dist < (RENDER_DISTANCE * CHUNK_SIZE as i32) as f64 * 1.5 {
-                        (self.coords, self.chunks) = l.load_all(graphics);
-                        for i in 0..self.chunks.len() {
-                            collider.chunks.push([0; (CHUNK_SIZE*CHUNK_SIZE) as usize]);
-                            collider.coords.push(self.coords[i]);
+                        self.chunks = l.load_all(graphics);
+                        for coord in self.chunks.keys() {
+                            collider.chunks.insert(*coord, [0; (CHUNK_SIZE*CHUNK_SIZE) as usize]);
                         }
-                        self.update_rigid_body(Vec::new());
+                        self.update_chunk_info(graphics, Vec::new());
                     }
                 } else {
                     // Check if all chunks are outside render distance
-                    for chunk_coord in &self.coords {
+                    for chunk_coord in self.chunks.keys() {
                         if (chunk_coord.0 - character_chunk.0).abs() < RENDER_DISTANCE
                         && (chunk_coord.1 - character_chunk.1).abs() < RENDER_DISTANCE
                         && (chunk_coord.2 - character_chunk.2).abs() < RENDER_DISTANCE {
@@ -115,30 +139,31 @@ impl Object {
         
                     // Unload everything
                     l.unload_all();
-                    self.coords.clear();
                     self.chunks.clear();
                     let collider = self.body.get_object_collider_mut();
-                    collider.coords.clear();
                     collider.chunks.clear();
                 }
             },
             ObjectLoader::MultiShot(l) => {
+                
                 let collider = self.body.get_object_collider_mut();
                 // Unload old chunks
-                let mut delete_indices = Vec::new();
-                for (i, chunk_coord) in self.coords.iter().enumerate() {
-                    if (chunk_coord.0 - character_chunk.0).abs() > RENDER_DISTANCE
-                    || (chunk_coord.1 - character_chunk.1).abs() > RENDER_DISTANCE
-                    || (chunk_coord.2 - character_chunk.2).abs() > RENDER_DISTANCE {
-                        l.unload_chunk(*chunk_coord, &self.chunks[i]);
-                        delete_indices.push(i);
+                let mut delete_coords = Vec::new();
+                for (coord, chunk) in &mut self.chunks {
+                    let detail = get_detail(coord.0 - character_chunk.0, coord.1 - character_chunk.1,coord.2 - character_chunk.2,);
+                    if detail == 0 {
+                        dbg!();
+                        l.unload_chunk(*coord, chunk);
+                        delete_coords.push(*coord);
+                    } else if detail != chunk.detail {
+                        dbg!();
+                        chunk.detail = detail;
+                        chunk.update_model(graphics); // Update the model with the new detail
                     }
                 }
-                for j in delete_indices.into_iter().rev() {
-                    self.coords.swap_remove(j);
-                    self.chunks.swap_remove(j);
-                    collider.coords.swap_remove(j);
-                    collider.chunks.swap_remove(j);
+                for coord in delete_coords.into_iter().rev() {
+                    self.chunks.remove(&coord);
+                    collider.chunks.remove(&coord);
                 }
 
                 // Load new chunks
@@ -146,32 +171,36 @@ impl Object {
                 for dx in (-RENDER_DISTANCE)..RENDER_DISTANCE {
                     for dy in (-RENDER_DISTANCE)..RENDER_DISTANCE {
                         for dz in (-RENDER_DISTANCE)..RENDER_DISTANCE {
-                            let coord = (character_chunk.0 + dx, character_chunk.1 + dy, character_chunk.2 + dz);
-                            if self.coords.contains(&coord) { continue; }
-                            if let Some(c) = l.load_chunk(graphics, coord) {
-                                self.chunks.push(c);
-                                self.coords.push(coord);
-                                new_coords.push(coord);
-                                collider.chunks.push([0; (CHUNK_SIZE*CHUNK_SIZE) as usize]);
-                                collider.coords.push(coord);
+                        let coord = (character_chunk.0 + dx, character_chunk.1 + dy, character_chunk.2 + dz);
+                        if let None = self.chunks.get(&coord) {
+                            if let Some(mut chunk) = l.load_chunk(graphics, coord) {
+                                    chunk.detail = get_detail(dx, dy, dz);
+                                    self.chunks.insert(coord, chunk);
+                                    collider.chunks.insert(coord, [0; (CHUNK_SIZE*CHUNK_SIZE) as usize]);
+                                    new_coords.push(coord);
+                                }
                             }
                         }
                     }
                 }
-                self.update_rigid_body(new_coords);
+                if !new_coords.is_empty() {
+                    self.update_chunk_info(graphics, new_coords);
+                }
                 self.last_load = std::time::Instant::now();
             },
         }
     }
     
     pub fn draw(&self, render_pass: &mut wgpu::RenderPass<'_>) {
-        for chunk in &self.chunks {
-            chunk.draw(render_pass);
+        for chunk in self.chunks.values() {
+            if chunk.exposed != 63 {
+                chunk.draw(render_pass);
+            }
         }
     }
     
     pub fn update_buffer(&mut self, graphics: &Graphics, camera: &crate::graphics::Camera) {
-        for chunk in &mut self.chunks {
+        for chunk in self.chunks.values_mut() {
             chunk.update_buffer(&self.body, graphics, camera);
         }
     }
@@ -189,31 +218,33 @@ impl Object {
             my_fmod(pos.z, CHUNK_SIZE as f64) as u32,
         );
 
-        let mut found_chunk_index = None;
-        for (i, coord) in self.coords.iter().enumerate() {
-            if *coord == updated_chunk {
-                found_chunk_index = Some(i)
-            }
-        }
-        if let None = found_chunk_index {
+        if let None = self.chunks.get(&updated_chunk) {
             // Make a new chunk
             let pos = Vector3::new(updated_chunk.0 as f32, updated_chunk.1 as f32, updated_chunk.2 as f32)*CHUNK_SIZE as f32;
             let new_chunk = Chunk::empty(graphics, pos);
-            self.chunks.push(new_chunk);
-            self.coords.push(updated_chunk);
-            self.body.get_object_collider_mut().chunks.push([0; (CHUNK_SIZE*CHUNK_SIZE) as usize]);
-            self.body.get_object_collider_mut().coords.push(updated_chunk);
-            found_chunk_index = Some(self.chunks.len()-1);
+            self.chunks.insert(updated_chunk, new_chunk);
+            self.body.get_object_collider_mut().chunks.insert(updated_chunk, [0; (CHUNK_SIZE*CHUNK_SIZE) as usize]);
         }
         // Set the block
-        let chunk = &mut self.chunks[found_chunk_index.unwrap()];
+        let chunk = self.chunks.get_mut(&updated_chunk).unwrap();
         chunk.grid[updated_block] = typ;
-        chunk.grid.update_model(graphics);
-        self.update_rigid_body(vec![updated_chunk]);
+        chunk.update_model(graphics);
+        self.update_chunk_info(graphics, vec![updated_chunk]);
     }
 }
 
 fn my_fmod(f: f64, l: f64) -> f64 {
     let phase = f / l;
     (phase - phase.floor()) * l
+}
+
+fn get_detail(dx: i32, dy: i32, dz: i32) -> usize {
+    let dist = dx.abs().max(dy.abs().max(dz.abs()));
+    match dist {
+        0..4 => 1,
+        4..8 => 2,
+        8..12 => 3,
+        12.. => 4,
+        _ => 0, // Unloaded
+    }
 }
