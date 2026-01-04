@@ -1,4 +1,4 @@
-use crate::{game::object::Object, graphics::{Camera, Graphics, GridTexture, Lighting, Shader, Texture}, physics::{Collider, CollisionReport, Physics, RigidBody, RigidBodyInit}};
+use crate::{game::object::{Object, Planet, PlanetInit}, graphics::{Camera, Graphics, GridTexture, Lighting, Shader}, physics::{Collider, CollisionReport, Physics, RigidBody, RigidBodyInit}};
 use cgmath::Rotation;
 use rustc_hash::FxHashSet;
 use winit::{
@@ -52,8 +52,9 @@ impl Game {
         let key_state = KeyState::new();
         let shader = Shader::new(&graphics, include_str!("../shaders/shader.wgsl"));
         let camera = Camera::new(&graphics);
+        let planet = Planet::new(PlanetInit::default());
         let objects = vec![
-            Object::new(&graphics, &mut physics, object::ObjectLoader::demo(), camera.pos.cast().unwrap())
+            Object::new(&graphics, &mut physics, planet.loader(), camera.pos.cast().unwrap())
         ];
         let player = RigidBody::new(&mut physics, RigidBodyInit::default());
         let lighting = Lighting::new(&graphics);
@@ -135,7 +136,7 @@ impl Game {
 
         {
             // Move camera pos
-            const SPEED: f64 = 20.;
+            const SPEED: f64 = 200.;
             let forward = self.camera.get_forward();
             let up = self.camera.get_up();
             let right = self.camera.get_right();
@@ -161,7 +162,7 @@ impl Game {
 
         {
             // Move camera look
-            const SPEED: f64 = 0.3;
+            const SPEED: f64 = 0.2;
             self.camera.theta += (SPEED*delta_t) as f32*self.mouse_motion.1;
             self.camera.phi -= (SPEED*delta_t) as f32*self.mouse_motion.0;
             self.mouse_motion = (0., 0.);
@@ -182,9 +183,8 @@ impl Game {
             self.shader.bind(render_pass);
             self.camera.bind(render_pass);
             self.lighting.bind(render_pass);
-            self.texture.bind(render_pass, 1);//TODO
             for object in &self.objects {
-                object.draw(render_pass)
+                object.draw(render_pass, &self.texture)
             }
         });
     }

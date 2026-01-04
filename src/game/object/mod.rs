@@ -2,25 +2,21 @@ use cgmath::{InnerSpace, Matrix3, Rotation, Vector3, Zero};
 
 use loader::{PlanetLoader, ShipLoader};
 use rustc_hash::FxHashMap;
-use crate::graphics::{CHUNK_SIZE, Graphics};
+use crate::graphics::{CHUNK_SIZE, Graphics, GridTexture};
 use crate::physics::{Collider, Physics, RigidBody, RigidBodyInit};
+pub use planet::{Planet, PlanetInit};
 
 mod chunk;
+mod planet;
 mod loader;
 use chunk::Chunk;
 
-const RENDER_DISTANCE: i32 = 12; // Units of chunks // TODO change back
+const RENDER_DISTANCE: i32 = 50; // Units of chunks
 const LOAD_TIME: u128 = 250; // Millseconds
 
 pub enum ObjectLoader {
     OneShot(ShipLoader),
     MultiShot(PlanetLoader),
-}
-impl ObjectLoader {
-    pub fn demo() -> Self {
-        Self::MultiShot(PlanetLoader {})
-        // Self::OneShot(ShipLoader {})
-    }
 }
 
 pub struct Object {
@@ -145,18 +141,15 @@ impl Object {
                 }
             },
             ObjectLoader::MultiShot(l) => {
-                
                 let collider = self.body.get_object_collider_mut();
                 // Unload old chunks
                 let mut delete_coords = Vec::new();
                 for (coord, chunk) in &mut self.chunks {
                     let detail = get_detail(coord.0 - character_chunk.0, coord.1 - character_chunk.1,coord.2 - character_chunk.2,);
                     if detail == 0 {
-                        dbg!();
                         l.unload_chunk(*coord, chunk);
                         delete_coords.push(*coord);
                     } else if detail != chunk.detail {
-                        dbg!();
                         chunk.detail = detail;
                         chunk.update_model(graphics); // Update the model with the new detail
                     }
@@ -171,9 +164,9 @@ impl Object {
                 for dx in (-RENDER_DISTANCE)..RENDER_DISTANCE {
                     for dy in (-RENDER_DISTANCE)..RENDER_DISTANCE {
                         for dz in (-RENDER_DISTANCE)..RENDER_DISTANCE {
-                        let coord = (character_chunk.0 + dx, character_chunk.1 + dy, character_chunk.2 + dz);
-                        if let None = self.chunks.get(&coord) {
-                            if let Some(mut chunk) = l.load_chunk(graphics, coord) {
+                            let coord = (character_chunk.0 + dx, character_chunk.1 + dy, character_chunk.2 + dz);
+                            if let None = self.chunks.get(&coord) {
+                                if let Some(mut chunk) = l.load_chunk(graphics, coord) {
                                     chunk.detail = get_detail(dx, dy, dz);
                                     self.chunks.insert(coord, chunk);
                                     collider.chunks.insert(coord, [0; (CHUNK_SIZE*CHUNK_SIZE) as usize]);
@@ -191,10 +184,13 @@ impl Object {
         }
     }
     
-    pub fn draw(&self, render_pass: &mut wgpu::RenderPass<'_>) {
-        for chunk in self.chunks.values() {
-            if chunk.exposed != 63 {
-                chunk.draw(render_pass);
+    pub fn draw(&self, render_pass: &mut wgpu::RenderPass<'_>, texture: &GridTexture) {
+        for detail in 1..=4 {
+            texture.bind(render_pass, detail);
+            for chunk in self.chunks.values() {
+                if chunk.exposed != 63 && chunk.detail == detail {
+                    chunk.draw(render_pass);
+                }
             }
         }
     }
@@ -244,7 +240,8 @@ fn get_detail(dx: i32, dy: i32, dz: i32) -> usize {
         0..4 => 1,
         4..8 => 2,
         8..12 => 3,
-        12.. => 4,
+        12..RENDER_DISTANCE => 4,
+        // 16..RENDER_DISTANCE => 5, // TODO understand why it doesn't work
         _ => 0, // Unloaded
     }
 }

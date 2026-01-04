@@ -28,8 +28,13 @@ impl ApplicationHandler<Graphics> for Initializer {
             if let Some(proxy) = proxy.take() {
                 let mut win_attr = Window::default_attributes();
                 win_attr = win_attr.with_title("Gabloctica");
-
                 let window = event_loop.create_window(win_attr).expect("Create window error");
+
+                // let monitor = window.current_monitor().unwrap();
+                // let size = monitor.size();
+                // let _ = window.request_inner_size(size);
+                // window.set_outer_position(winit::dpi::PhysicalPosition::new(0, 0));
+
                 pollster::block_on(Graphics::create(window, proxy));
             }
         }
