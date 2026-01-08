@@ -1,7 +1,7 @@
 use cgmath::Vector3;
 use wgpu::RenderPass;
 use crate::graphics::{Camera, Graphics};
-use crate::graphics::resource::{Buffer, Uniform};
+use crate::graphics::resource::{UniformBuffer, Uniform};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -23,13 +23,13 @@ impl Uniform for LightUniform {
 
 pub struct Lighting {
     pos: Vector3<f32>,
-    buffer: Buffer<LightUniform>,
+    buffer: UniformBuffer<LightUniform>,
 }
 
 impl Lighting {
     pub fn new(graphics: &Graphics) -> Self {
-        let pos = Vector3::new(-5., -10., 10.);
-        let buffer = Buffer::new(graphics);
+        let pos = Vector3::new(-300., -500., 1000.);
+        let buffer = UniformBuffer::new(graphics);
         Self {
             pos,
             buffer,

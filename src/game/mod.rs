@@ -173,20 +173,29 @@ impl Game {
     }
 
     pub fn draw(&mut self) {
+        // OPTIMIZE avoid all calls of queue.write_buffer.
         self.camera.update_buffer(&self.graphics);
         self.lighting.update_buffer(&self.graphics, &self.camera);
-        for chunk in &mut self.objects {
-            chunk.update_buffer(&self.graphics, &self.camera);
+        for object in &mut self.objects {
+            object.update_buffer(&self.graphics, &self.camera)
         }
+        
+        self.graphics.draw(
+            |encoder| {
+                for object in &self.objects {
+                    object.copy_buffers(encoder);
+                }
+            },
 
-        self.graphics.draw(|render_pass| {
-            self.shader.bind(render_pass);
-            self.camera.bind(render_pass);
-            self.lighting.bind(render_pass);
-            for object in &self.objects {
-                object.draw(render_pass, &self.texture)
+            |render_pass| {
+                self.shader.bind(render_pass);
+                self.camera.bind(render_pass);
+                self.lighting.bind(render_pass);
+                for object in &self.objects {
+                    object.draw(render_pass, &self.texture)
+                }
             }
-        });
+        );
     }
 
     fn resized(&mut self, size: PhysicalSize<u32>) {

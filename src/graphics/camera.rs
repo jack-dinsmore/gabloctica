@@ -1,4 +1,4 @@
-use crate::graphics::{Graphics, resource::Buffer};
+use crate::graphics::{Graphics, resource::UniformBuffer};
 use crate::graphics::resource::Uniform;
 use cgmath::{EuclideanSpace, Matrix4, Point3, Vector3};
 
@@ -39,14 +39,14 @@ pub struct Camera {
     zfar: f32,
     aspect: f32,
 
-    buffer: Buffer<CameraUniform>,
+    buffer: UniformBuffer<CameraUniform>,
 }
 
 impl Camera {
     pub fn new(graphics: &Graphics) -> Self {
         let aspect = graphics.surface_config.width as f32 / graphics.surface_config.height as f32;
         let up = Vector3::new(0., 0., 1.);
-        let buffer = Buffer::new(graphics);
+        let buffer = UniformBuffer::new(graphics);
 
         Self {
             pos: Vector3::new(0., 0., (8.+8.)*16.),

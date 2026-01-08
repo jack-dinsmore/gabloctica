@@ -5,7 +5,7 @@ mod buffer;
 mod texture;
 
 pub use texture::Texture;
-pub use buffer::Buffer;
+pub use buffer::{StorageBuffer, UniformBuffer};
 
 pub(super) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 pub(super) const TEXTURE_GROUP: u32 = 3;

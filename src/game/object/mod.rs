@@ -2,7 +2,7 @@ use cgmath::{InnerSpace, Matrix3, Rotation, Vector3, Zero};
 
 use loader::{PlanetLoader, ShipLoader};
 use rustc_hash::FxHashMap;
-use crate::graphics::{CHUNK_SIZE, Graphics, GridTexture};
+use crate::graphics::{CHUNK_SIZE, Graphics, GridTexture, ModelUniform, StorageBuffer};
 use crate::physics::{Collider, Physics, RigidBody, RigidBodyInit};
 pub use planet::{Planet, PlanetInit};
 
@@ -18,12 +18,18 @@ pub enum ObjectLoader {
     OneShot(ShipLoader),
     MultiShot(PlanetLoader),
 }
+impl ObjectLoader {
+    fn estimate_max_rendered_chunks(&self) -> usize {
+        8184//TODO
+    }
+}
 
 pub struct Object {
     chunks: FxHashMap<(i32, i32, i32), Chunk>,
     loader: ObjectLoader,
     pub body: RigidBody,
     last_load: std::time::Instant,
+    storage_buffer: StorageBuffer,
 }
 impl Object {
     pub fn new(graphics: &Graphics, physics: &mut Physics, loader: ObjectLoader, character_pos: Vector3<f64>) -> Self {
@@ -32,11 +38,14 @@ impl Object {
             ..Default::default()
         };
         let body = RigidBody::new(physics, initial_data);
+        let buffer_size = loader.estimate_max_rendered_chunks()*std::mem::size_of::<ModelUniform>();
+        let storage_buffer = StorageBuffer::new(graphics, buffer_size as usize);
         let mut out = Self {
             chunks: FxHashMap::default(),
             loader: loader,
             body,
             last_load: std::time::Instant::now(),
+            storage_buffer,
         };
         out.load_chunks(graphics, character_pos);
         out
@@ -196,8 +205,22 @@ impl Object {
     }
     
     pub fn update_buffer(&mut self, graphics: &Graphics, camera: &crate::graphics::Camera) {
+        let mut buffer = Vec::with_capacity(self.chunks.len());
         for chunk in self.chunks.values_mut() {
-            chunk.update_buffer(&self.body, graphics, camera);
+            if chunk.exposed != 63  {
+                buffer.push(chunk.get_uniform(&self.body, camera));
+            }
+        }
+        self.storage_buffer.write(graphics, buffer);
+    }
+    
+    pub(crate) fn copy_buffers(&self, encoder: &mut wgpu::CommandEncoder) {
+        let mut i = 0;
+        for chunk in self.chunks.values() {
+            if chunk.exposed != 63  {
+                chunk.copy_buffer(encoder, &self.storage_buffer, i);
+                i += 1;
+            }
         }
     }
     

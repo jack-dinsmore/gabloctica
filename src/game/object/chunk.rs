@@ -1,7 +1,7 @@
 use cgmath::{Matrix3, Vector3, Zero};
 use rustc_hash::FxHashMap;
 
-use crate::{graphics::{CHUNK_SIZE, Camera, CubeGrid, Graphics}, physics::RigidBody};
+use crate::{graphics::{CHUNK_SIZE, Camera, CubeGrid, Graphics, ModelUniform, StorageBuffer}, physics::RigidBody};
 
 pub(super) struct Chunk {
     pub(super) grid: CubeGrid,
@@ -172,16 +172,19 @@ impl Chunk {
     }
 
     /// Update the graphics buffer in the grid from the Rigid body.
-    pub fn update_buffer(&mut self, body: &RigidBody, graphics: &Graphics, camera: &Camera) {
-        self.grid.update_buffer(
-            graphics,
+    pub fn get_uniform(&mut self, body: &RigidBody, camera: &Camera) -> ModelUniform {
+        self.grid.get_uniform(
             (body.pos - body.ori * body.com_pos).cast().unwrap(),
             body.ori.cast().unwrap(),
             camera
-        );
+        )
     }
 
     pub fn draw(&self, render_pass: &mut wgpu::RenderPass) {
         self.grid.draw(render_pass);
+    }
+    
+    pub(crate) fn copy_buffer(&self, encoder: &mut wgpu::CommandEncoder, buffer: &StorageBuffer, index:u32) {
+        self.grid.buffer.copy_from_storage_buffer(encoder, buffer, index as u64 *std::mem::size_of::<ModelUniform>() as u64);
     }
 }

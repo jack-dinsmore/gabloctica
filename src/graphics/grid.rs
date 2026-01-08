@@ -4,12 +4,12 @@ use image::{GenericImageView, ImageBuffer, Rgba};
 use wgpu::util::DeviceExt;
 
 use crate::graphics::{Camera, Graphics, Texture};
-use crate::graphics::resource::{Buffer, Uniform};
+use crate::graphics::resource::{UniformBuffer, Uniform};
 use crate::graphics::vertex::Vertex;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub(super) struct ModelUniform {
+pub struct ModelUniform {
     model: [[f32; 4]; 4],
 }
 impl Uniform for ModelUniform {
@@ -34,7 +34,7 @@ pub struct CubeGrid {
     index_buffer: wgpu::Buffer,
     n_indices: u32,
 
-    buffer: Buffer<ModelUniform>,
+    pub buffer: UniformBuffer<ModelUniform>,
     detail: usize,
 }
 
@@ -54,7 +54,7 @@ impl CubeGrid {
             usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
         });
 
-        let buffer = Buffer::new(graphics);
+        let buffer = UniformBuffer::new(graphics);
 
         Self {
             data,
@@ -66,6 +66,10 @@ impl CubeGrid {
 
             buffer,
         }
+    }
+
+    pub fn set_data(&mut self, data: [u16; (CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize]) {
+        self.data = data
     }
 
     pub fn demo(&mut self) {
@@ -87,6 +91,9 @@ impl CubeGrid {
         let mut index_offset = 0u16;
         let detail_skip = 2u32.pow(detail as u32-1);
         let last = CHUNK_SIZE - detail_skip;
+        if detail_skip == 0 {
+            panic!("{}", detail); // TODO remove
+        }
         for x in (0..CHUNK_SIZE).step_by(detail_skip as usize) {
             for y in (0..CHUNK_SIZE).step_by(detail_skip as usize) {
                 for z in (0..CHUNK_SIZE).step_by(detail_skip as usize) {
@@ -201,11 +208,10 @@ impl CubeGrid {
         self.detail = detail;
     }
 
-    pub fn update_buffer(&self, graphics: &Graphics, pos: Vector3<f32>, ori: Quaternion<f32>, camera: &Camera) {
+    pub fn get_uniform(&self, pos: Vector3<f32>, ori: Quaternion<f32>, camera: &Camera) -> ModelUniform {
         let model = Matrix4::from_translation(pos + ori * self.global_pos - camera.pos)
             * Matrix4::from(ori);
-        let uniform = ModelUniform::new(model);
-        self.buffer.write(graphics, uniform);
+        ModelUniform::new(model)
     }
 
     pub fn draw(&self, render_pass: &mut wgpu::RenderPass) {
