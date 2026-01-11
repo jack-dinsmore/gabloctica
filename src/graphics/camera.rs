@@ -49,7 +49,7 @@ impl Camera {
         let buffer = UniformBuffer::new(graphics);
 
         Self {
-            pos: Vector3::new(0., 0., (8.+8.)*16.),
+            pos: Vector3::new(0., 0., (5.)*16.),
             theta: 1.57,
             phi: 0.,
             up,

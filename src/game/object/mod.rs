@@ -11,7 +11,7 @@ mod planet;
 mod loader;
 use chunk::Chunk;
 
-const RENDER_DISTANCE: i32 = 50; // Units of chunks
+const RENDER_DISTANCE: i32 = 12; // Units of chunks
 const LOAD_TIME: u128 = 250; // Millseconds
 
 pub enum ObjectLoader {
@@ -257,14 +257,13 @@ fn my_fmod(f: f64, l: f64) -> f64 {
     (phase - phase.floor()) * l
 }
 
+/// Return the detail of the cube given how far away it is
 fn get_detail(dx: i32, dy: i32, dz: i32) -> usize {
     let dist = dx.abs().max(dy.abs().max(dz.abs()));
     match dist {
-        0..4 => 1,
-        4..8 => 2,
-        8..12 => 3,
-        12..RENDER_DISTANCE => 4,
-        // 16..RENDER_DISTANCE => 5, // TODO understand why it doesn't work
+        0..8 => 1,
+        8..12 => 2,
+        // 12..RENDER_DISTANCE => 4,
         _ => 0, // Unloaded
     }
 }

@@ -59,6 +59,7 @@ impl Game {
         let player = RigidBody::new(&mut physics, RigidBodyInit::default());
         let lighting = Lighting::new(&graphics);
 
+        // let font = Font::new(include_bytes!("/System/Library/Fonts/Supplemental/Rockwell.ttc"));
 
         // Set cursor to center of screen
         let size = graphics.window.inner_size();

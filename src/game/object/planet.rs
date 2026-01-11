@@ -9,7 +9,7 @@ pub struct PlanetInit {
 impl Default for PlanetInit {
     fn default() -> Self {
         Self {
-            width: 16,
+            width: 4,
             seed: 79842121,
         }
     }
@@ -28,6 +28,6 @@ impl Planet {
     }
     pub fn loader(&self) -> ObjectLoader {
         let noise = Perlin::new(self.seed);
-        ObjectLoader::MultiShot(PlanetLoader::new(self.width/2, noise))
+        ObjectLoader::MultiShot(PlanetLoader::new(self.width as i32/2, noise))
     }
 }
