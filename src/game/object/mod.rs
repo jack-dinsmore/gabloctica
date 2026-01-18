@@ -2,7 +2,7 @@ use cgmath::{InnerSpace, Matrix3, Rotation, Vector3, Zero};
 
 use loader::{PlanetLoader, ShipLoader};
 use rustc_hash::FxHashMap;
-use crate::graphics::{CHUNK_SIZE, Graphics, GridTexture, ModelUniform, StorageBuffer};
+use crate::graphics::{CHUNK_SIZE, Graphics, GridTexture, ModelUniform, Renderer, StorageBuffer};
 use crate::physics::{Collider, Physics, RigidBody, RigidBodyInit};
 
 pub mod chunk;
@@ -195,12 +195,12 @@ impl Object {
         }
     }
     
-    pub fn draw(&self, render_pass: &mut wgpu::RenderPass<'_>, texture: &GridTexture) {
+    pub fn draw(&self, renderer: &mut Renderer, texture: &GridTexture) {
         for detail in 1..=4 {
-            texture.bind(render_pass, detail);
+            texture.bind(renderer, detail);
             for chunk in self.chunks.values() {
                 if chunk.exposed != 63 && chunk.detail == detail {
-                    chunk.draw(render_pass);
+                    chunk.draw(renderer);
                 }
             }
         }
@@ -216,11 +216,11 @@ impl Object {
         self.storage_buffer.write(graphics, buffer);
     }
     
-    pub(crate) fn copy_buffers(&self, encoder: &mut wgpu::CommandEncoder) {
+    pub(crate) fn copy_buffers(&self, renderer: &mut Renderer) {
         let mut i = 0;
         for chunk in self.chunks.values() {
             if chunk.exposed != 63  {
-                chunk.copy_buffer(encoder, &self.storage_buffer, i);
+                chunk.copy_buffer(renderer, &self.storage_buffer, i);
                 i += 1;
             }
         }

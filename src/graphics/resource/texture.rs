@@ -1,5 +1,5 @@
 use wgpu::Device;
-use crate::graphics::Graphics;
+use crate::graphics::{Graphics, Renderer};
 use super::{TEXTURE_GROUP, DEPTH_FORMAT};
 use image::{GenericImageView, ImageBuffer, Rgba};
 
@@ -122,7 +122,7 @@ impl Texture {
         view
     }
 
-    pub fn bind(&self, render_pass: &mut wgpu::RenderPass) {
-        render_pass.set_bind_group(TEXTURE_GROUP, &self.bind_group, &[]);
+    pub fn bind(&self, renderer: &mut Renderer) {
+        renderer.render_pass.as_mut().unwrap().set_bind_group(TEXTURE_GROUP, &self.bind_group, &[]);
     }
 }

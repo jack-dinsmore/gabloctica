@@ -1,3 +1,4 @@
+use crate::graphics::Renderer;
 use crate::graphics::{Graphics, resource::UniformBuffer};
 use crate::graphics::resource::Uniform;
 use cgmath::{EuclideanSpace, Matrix4, Point3, Vector3};
@@ -102,7 +103,7 @@ impl Camera {
         self.buffer.write(graphics, uniform);
     }
 
-    pub fn bind(&self, render_pass: &mut wgpu::RenderPass) {
-        self.buffer.bind(render_pass);
+    pub fn bind(&self, renderer: &mut Renderer) {
+        self.buffer.bind(renderer);
     }
 }

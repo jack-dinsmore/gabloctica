@@ -3,7 +3,7 @@ use cgmath::{Matrix4, Quaternion, Vector3};
 use image::{GenericImageView, ImageBuffer, Rgba};
 use wgpu::util::DeviceExt;
 
-use crate::graphics::{Camera, Graphics, Texture};
+use crate::graphics::{Camera, Graphics, Renderer, Texture};
 use crate::graphics::resource::{UniformBuffer, Uniform};
 use crate::graphics::vertex::Vertex;
 
@@ -214,8 +214,9 @@ impl CubeGrid {
         ModelUniform::new(model)
     }
 
-    pub fn draw(&self, render_pass: &mut wgpu::RenderPass) {
-        self.buffer.bind(render_pass);
+    pub fn draw(&self, renderer: &mut Renderer) {
+        self.buffer.bind(renderer);
+        let render_pass = renderer.render_pass.as_mut().unwrap();
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
         render_pass.draw_indexed(0..self.n_indices, 0, 0..1);
@@ -293,7 +294,7 @@ impl GridTexture {
         }
     }
 
-    pub fn bind(&self, render_pass: &mut wgpu::RenderPass, detail: usize) {
-        self.textures[detail-1].bind(render_pass);
+    pub fn bind(&self, renderer: &mut Renderer, detail: usize) {
+        self.textures[detail-1].bind(renderer);
     }
 }

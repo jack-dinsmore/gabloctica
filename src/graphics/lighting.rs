@@ -1,6 +1,5 @@
 use cgmath::Vector3;
-use wgpu::RenderPass;
-use crate::graphics::{Camera, Graphics};
+use crate::graphics::{Camera, Graphics, Renderer};
 use crate::graphics::resource::{UniformBuffer, Uniform};
 
 #[repr(C)]
@@ -41,7 +40,7 @@ impl Lighting {
         self.buffer.write(graphics, uniform);
     }
 
-    pub fn bind(&self, render_pass: &mut RenderPass) {
-        self.buffer.bind(render_pass);
+    pub fn bind(&self, renderer: &mut Renderer) {
+        self.buffer.bind(renderer);
     }
 }

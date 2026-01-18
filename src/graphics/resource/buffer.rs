@@ -1,3 +1,5 @@
+use crate::graphics::Renderer;
+
 use super::*;
 use bytemuck::NoUninit;
 use wgpu::util::DeviceExt;
@@ -43,12 +45,12 @@ impl<T: Uniform> UniformBuffer<T> {
         graphics.queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(&[data]));
     }
 
-    pub fn copy_from_storage_buffer(&self, encoder: &mut wgpu::CommandEncoder, storage_buffer: &StorageBuffer, offset: u64) {
-        encoder.copy_buffer_to_buffer(&storage_buffer.buffer, offset, &self.buffer, 0, std::mem::size_of::<T>() as u64);
+    pub fn copy_from_storage_buffer(&self, renderer: &mut Renderer, storage_buffer: &StorageBuffer, offset: u64) {
+        renderer.encoder().copy_buffer_to_buffer(&storage_buffer.buffer, offset, &self.buffer, 0, std::mem::size_of::<T>() as u64);
     }
 
-    pub fn bind(&self, render_pass: &mut wgpu::RenderPass) {
-        render_pass.set_bind_group(T::GROUP, &self.bind_group, &[]);
+    pub fn bind(&self, renderer: &mut Renderer) {
+        renderer.render_pass.as_mut().unwrap().set_bind_group(T::GROUP, &self.bind_group, &[]);
     }
 }
 

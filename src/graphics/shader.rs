@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 use crate::graphics::{
-    Graphics, camera::CameraUniform, grid::ModelUniform, lighting::LightUniform, resource::{TEXTURE_GROUP, Uniform}, vertex::Vertex
+    Graphics, Renderer, camera::CameraUniform, grid::ModelUniform, lighting::LightUniform, resource::{TEXTURE_GROUP, Uniform}, vertex::Vertex
 };
-use wgpu::{BindGroupLayoutDescriptor, Device, RenderPass};
+use wgpu::{BindGroupLayoutDescriptor, Device};
 
 
 #[derive(Debug)]
@@ -175,7 +175,7 @@ impl Shader {
         }
     }
 
-    pub fn bind(&self, render_pass: &mut RenderPass) {
-        render_pass.set_pipeline(&self.render_pipeline);
+    pub fn bind(&self, renderer: &mut Renderer) {
+        renderer.render_pass.as_mut().unwrap().set_pipeline(&self.render_pipeline);
     }
 }

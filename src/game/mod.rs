@@ -184,20 +184,25 @@ impl Game {
         }
         
         self.graphics.draw(
-            |encoder| {
+            |mut renderer| {
+                // Update buffers
                 for object in &self.objects {
-                    object.copy_buffers(encoder);
+                    object.copy_buffers(&mut renderer);
+                }
+
+                renderer.start();
+                // Draw skybox
+
+                renderer.clear();
+
+                // Draw main game
+                self.shader.bind(&mut renderer);
+                self.camera.bind(&mut renderer);
+                self.lighting.bind(&mut renderer);
+                for object in &self.objects {
+                    object.draw(&mut renderer, &self.texture)
                 }
             },
-
-            |render_pass| {
-                self.shader.bind(render_pass);
-                self.camera.bind(render_pass);
-                self.lighting.bind(render_pass);
-                for object in &self.objects {
-                    object.draw(render_pass, &self.texture)
-                }
-            }
         );
     }
 

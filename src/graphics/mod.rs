@@ -92,42 +92,96 @@ impl Graphics {
         // TODO resize the depth texture
     }
 
-    pub fn draw(&mut self, buffer_pipeline: impl FnOnce(&mut wgpu::CommandEncoder), render_pipeline: impl FnOnce(&mut wgpu::RenderPass)) {
-        let frame = self.surface.get_current_texture() .expect("Failed to acquire next swap chain texture.");
-        let view = frame.texture.create_view(&TextureViewDescriptor::default());
+    pub fn draw(&self, render: impl FnOnce(Renderer)) {
+        let frame = self.surface.get_current_texture().expect("Failed to acquire next swap chain texture.");
+        let frame_view = frame.texture.create_view(&TextureViewDescriptor::default());
         let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor { label: None });
 
-        buffer_pipeline(&mut encoder);
-        
-        {
-            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: Some("Render pass"),
-                color_attachments: &[Some(RenderPassColorAttachment {
-                    view: &view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: Operations {
-                        load: LoadOp::Clear(Color::GREEN),
-                        store: StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.depth_texture_view,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: wgpu::StoreOp::Store,
-                    }),
-                    stencil_ops: None,
-                }),
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-            
-            render_pipeline(&mut render_pass);
-        } 
+        let renderer = Renderer::new(&self, &mut encoder, frame_view);
+        render(renderer);
 
         self.queue.submit(Some(encoder.finish()));
         frame.present();
         self.window.request_redraw();
+    }
+}
+
+pub struct Renderer<'a> {
+    encoder_ptr: *mut wgpu::CommandEncoder,
+    frame_view: wgpu::TextureView,
+    render_pass: Option<wgpu::RenderPass<'a>>,
+    depth_texture_view: &'a wgpu::TextureView,
+}
+impl<'a> Renderer<'a> {
+    pub fn new(graphics: &'a Graphics, encoder: &'a mut wgpu::CommandEncoder, frame_view: wgpu::TextureView) -> Self {
+        let encoder_ptr = encoder as *mut _;
+
+        Self {
+            render_pass: None,
+            frame_view,
+            encoder_ptr,
+            depth_texture_view: &graphics.depth_texture_view,
+        }
+    }
+
+    pub fn start(&mut self) {
+        self.render_pass.take();
+        let encoder_ref = self.encoder();
+        self.render_pass = Some(encoder_ref.begin_render_pass(&RenderPassDescriptor {
+            label: Some("Render pass"),
+            color_attachments: &[Some(RenderPassColorAttachment {
+                view: &self.frame_view,
+                depth_slice: None,
+                resolve_target: None,
+                ops: Operations {
+                    load: LoadOp::Clear(Color::GREEN),
+                    store: StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &self.depth_texture_view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        }));
+    }
+
+    pub fn clear(&mut self) {
+        self.render_pass.take();
+        let encoder_ref = self.encoder();
+        self.render_pass = Some(encoder_ref.begin_render_pass(&RenderPassDescriptor {
+            label: Some("Render pass"),
+            color_attachments: &[Some(RenderPassColorAttachment {
+                view: &self.frame_view,
+                depth_slice: None,
+                resolve_target: None,
+                ops: Operations {
+                    load: LoadOp::Load,
+                    store: StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &self.depth_texture_view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        }));
+    }
+
+    fn encoder(&mut self) -> &'a mut wgpu::CommandEncoder {
+        if let Some(_) = &self.render_pass {
+            panic!("You cannot access the encoder when a renderpass is open");
+        }
+        unsafe {&mut *self.encoder_ptr}
     }
 }
