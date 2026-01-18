@@ -1,6 +1,7 @@
 mod graphics;
 mod physics;
 mod game;
+mod util;
 
 use std::time::Instant;
 

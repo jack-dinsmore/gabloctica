@@ -1,14 +1,14 @@
 # Todo
 
 ## Planets
-* Fix the bug that is causing some solid cubes to appear, perhaps when altitude goes negative
-* Update terrain buffers in the encoder, not with the queue
-* Some more advanced blocks
-* Terrain
+* Continential drift
+* Wind
 
 ## Collisions
 * Box-box collisions
+* Walking on planets
 * Rigid body reaction to collisions
 
 ## Graphics: 
+* Update terrain buffers in the encoder, not with the queue
 * Sky box

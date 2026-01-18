@@ -1,12 +1,14 @@
-use crate::{game::object::{Object, Planet, PlanetInit}, graphics::{Camera, Graphics, GridTexture, Lighting, Shader}, physics::{Collider, CollisionReport, Physics, RigidBody, RigidBodyInit}};
+pub mod object;
+pub mod planet;
+
+use crate::{game::object::Object, graphics::{Camera, Graphics, GridTexture, Lighting, Shader}, physics::{Collider, CollisionReport, Physics, RigidBody, RigidBodyInit}};
+use planet::{Planet, PlanetInit};
 use cgmath::Rotation;
 use rustc_hash::FxHashSet;
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
     event::{KeyEvent, WindowEvent}, keyboard::{KeyCode, PhysicalKey},
 };
-
-mod object;
 
 struct KeyState {
     down_set: FxHashSet<KeyCode>

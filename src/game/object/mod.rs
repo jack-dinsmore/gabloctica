@@ -4,15 +4,13 @@ use loader::{PlanetLoader, ShipLoader};
 use rustc_hash::FxHashMap;
 use crate::graphics::{CHUNK_SIZE, Graphics, GridTexture, ModelUniform, StorageBuffer};
 use crate::physics::{Collider, Physics, RigidBody, RigidBodyInit};
-pub use planet::{Planet, PlanetInit};
 
-mod chunk;
-mod planet;
-mod loader;
+pub mod chunk;
+pub mod loader;
 use chunk::Chunk;
 
 const RENDER_DISTANCE: i32 = 12; // Units of chunks
-const LOAD_TIME: u128 = 250; // Millseconds
+const LOAD_TIME: u128 = 25000; // Millseconds
 
 pub enum ObjectLoader {
     OneShot(ShipLoader),
@@ -28,7 +26,7 @@ pub struct Object {
     chunks: FxHashMap<(i32, i32, i32), Chunk>,
     loader: ObjectLoader,
     pub body: RigidBody,
-    last_load: std::time::Instant,
+    last_load: Option<std::time::Instant>,
     storage_buffer: StorageBuffer,
 }
 impl Object {
@@ -44,7 +42,7 @@ impl Object {
             chunks: FxHashMap::default(),
             loader: loader,
             body,
-            last_load: std::time::Instant::now(),
+            last_load: None,
             storage_buffer,
         };
         out.load_chunks(graphics, character_pos);
@@ -109,7 +107,11 @@ impl Object {
     }
 
     fn load_chunks(&mut self, graphics: &Graphics, character_pos: Vector3<f64>) {
-        if self.last_load.elapsed().as_millis() < LOAD_TIME {return;}
+        if let Some(l) = self.last_load {
+            if l.elapsed().as_millis() < LOAD_TIME {
+                return;
+            }
+        }
 
         // Get the current chunk
         let pos_body = self.body.ori.invert() * (character_pos - self.body.pos);
@@ -188,7 +190,7 @@ impl Object {
                 if !new_coords.is_empty() {
                     self.update_chunk_info(graphics, new_coords);
                 }
-                self.last_load = std::time::Instant::now();
+                self.last_load = Some(std::time::Instant::now());
             },
         }
     }

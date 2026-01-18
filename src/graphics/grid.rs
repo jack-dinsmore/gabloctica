@@ -76,7 +76,7 @@ impl CubeGrid {
         for x in 0..CHUNK_SIZE {
             for y in 0..CHUNK_SIZE {
                 for z in 0..CHUNK_SIZE {
-                    self[(x,y,z)] = 7;
+                    self[(x,y,z)] = 1;
                 }
             }
         }

@@ -8,7 +8,8 @@ use cgmath::InnerSpace;
 use crate::physics::rigid_body::RigidBodyData;
 
 
-const NEWTON_G: f64 = 1.;
+pub const NEWTON_G: f64 = 1.;
+pub const K_B: f64 = 1.;
 const GRAVITY_THRESH: f64 = 1e6;
 
 pub struct Physics {
