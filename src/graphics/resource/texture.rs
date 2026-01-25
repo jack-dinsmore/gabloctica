@@ -1,6 +1,6 @@
 use wgpu::Device;
-use crate::graphics::{Graphics, Renderer};
-use super::{TEXTURE_GROUP, DEPTH_FORMAT};
+use crate::graphics::{Graphics, Renderer, ResourceType};
+use super::DEPTH_FORMAT;
 use image::{GenericImageView, ImageBuffer, Rgba};
 
 pub struct Texture {
@@ -22,7 +22,6 @@ impl Texture {
             // by setting depth to 1.
             depth_or_array_layers: 1,
         };
-
         let desc = wgpu::TextureDescriptor {
             label: Some("Texture"),
             size: texture_size,
@@ -53,7 +52,7 @@ impl Texture {
         );
 
         // Create bind group
-        let layout = &graphics.shader_layout.layouts[TEXTURE_GROUP as usize];
+        let layout = &graphics.get_layout(ResourceType::Texture);
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         let sampler = graphics.device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -67,7 +66,7 @@ impl Texture {
 
         let bind_group = graphics.device.create_bind_group(
             &wgpu::BindGroupDescriptor {
-                layout: &layout.layout,
+                layout,
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
@@ -123,6 +122,7 @@ impl Texture {
     }
 
     pub fn bind(&self, renderer: &mut Renderer) {
-        renderer.render_pass.as_mut().unwrap().set_bind_group(TEXTURE_GROUP, &self.bind_group, &[]);
+        let group = renderer.get_group(ResourceType::Texture);
+        renderer.render_pass.as_mut().unwrap().set_bind_group(group, &self.bind_group, &[]);
     }
 }

@@ -1,139 +1,41 @@
 use std::borrow::Cow;
 use crate::graphics::{
-    Graphics, Renderer, camera::CameraUniform, grid::ModelUniform, lighting::LightUniform, resource::{TEXTURE_GROUP, Uniform}, vertex::Vertex
+    Graphics, Renderer, resource::ResourceType, vertex::Vertex
 };
-use wgpu::{BindGroupLayoutDescriptor, Device};
-
-
-#[derive(Debug)]
-pub(super) struct ResourceLayout {
-    pub(super) layout: wgpu::BindGroupLayout,
-}
-impl ResourceLayout {
-    pub(super) fn new(device: &Device, i: u32) -> Option<Self> {
-        let desc = match i {
-            CameraUniform::GROUP => BindGroupLayoutDescriptor {
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-                label: Some("camera_bind_group_layout"),
-            },
-            ModelUniform::GROUP => BindGroupLayoutDescriptor {
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-                label: Some("model_bind_group_layout"),
-            },
-            LightUniform::GROUP => BindGroupLayoutDescriptor {
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-                label: Some("light_bind_group_layout"),
-            },
-            TEXTURE_GROUP => BindGroupLayoutDescriptor {
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            multisampled: false,
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                        count: None,
-                    },
-                ],
-                label: Some("texture_bind_group_layout"),
-            },
-            _ => return None,
-        };
-
-        Some(Self {
-            layout: device.create_bind_group_layout(&desc),
-        })
-    }
-}
-
-
-
-pub(super) struct ShaderLayout {
-    pub(super) layouts: Vec<ResourceLayout>,
-    layout: wgpu::PipelineLayout,
-}
-impl ShaderLayout {
-    pub fn new(device: &Device) -> Self {
-        // Create a list of components ordered by binding
-        let mut i = 0;
-        let mut layouts = Vec::new();
-        loop {
-            match ResourceLayout::new(device, i) {
-                Some(l) => layouts.push(l),
-                None => break,
-            }
-            i += 1;
-        }
-
-        let layouts_ref = layouts.iter().map(|l| &l.layout).collect::<Vec<_>>();
-        let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Render Pipeline Layout"),
-            bind_group_layouts: &layouts_ref,
-            push_constant_ranges: &[],
-        });
-
-        Self {
-            layout,
-            layouts,
-        }
-    }
-}
-
-
 
 pub struct Shader {
     render_pipeline: wgpu::RenderPipeline,
+    layout: wgpu::PipelineLayout,
+    resources: Vec<ResourceType>,
 }
 
 impl Shader {
-    pub fn new(graphics: &Graphics, source: &'static str) -> Self {
+    pub fn new<V: Vertex>(graphics: &mut Graphics, source: &'static str, resources: Vec<ResourceType>) -> Self {
         let shader = graphics.device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
             source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(source)),
         });
-    
+
+        // Create shader layout
+        for r in &resources {
+            graphics.make_layout(*r);
+        }
+        let layouts = resources.iter().map(|r| graphics.get_layout(*r)).collect::<Vec<_>>();
+
+        let layout = graphics.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Render Pipeline Layout"),
+            bind_group_layouts: &layouts,
+            push_constant_ranges: &[],
+        });
+
+        // Create shader    
         let render_pipeline = graphics.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render pipeline"),
-            layout: Some(&graphics.shader_layout.layout),
+            layout: Some(&layout),
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[Vertex::desc()],
+                buffers: &[V::desc()],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -142,8 +44,8 @@ impl Shader {
                 targets: &[Some(wgpu::ColorTargetState {
                     format: graphics.surface_config.format,
                     blend: Some(wgpu::BlendState {
-                        color: wgpu::BlendComponent::REPLACE,
-                        alpha: wgpu::BlendComponent::REPLACE,
+                        color: wgpu::BlendComponent::OVER,
+                        alpha: wgpu::BlendComponent::OVER,
                     }),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -172,10 +74,15 @@ impl Shader {
 
         Self {
             render_pipeline,
+            layout,
+            resources,
         }
     }
 
     pub fn bind(&self, renderer: &mut Renderer) {
         renderer.render_pass.as_mut().unwrap().set_pipeline(&self.render_pipeline);
+        for (i, resource) in self.resources.iter().enumerate() {
+            renderer.group_map[*resource as usize] = i as u32;
+        }
     }
 }

@@ -1,4 +1,4 @@
-use crate::graphics::Renderer;
+use crate::graphics::{Renderer, ResourceType};
 use crate::graphics::{Graphics, resource::UniformBuffer};
 use crate::graphics::resource::Uniform;
 use cgmath::{EuclideanSpace, Matrix4, Point3, Vector3};
@@ -17,7 +17,7 @@ pub(super) struct CameraUniform {
     view_proj: [[f32; 4]; 4],
 }
 impl Uniform for CameraUniform {
-    const GROUP: u32 = 0;
+    const TYPE: ResourceType = ResourceType::Camera;
 }
 impl CameraUniform {
     fn new(view_proj: Matrix4<f32>) -> Self {

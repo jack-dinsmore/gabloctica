@@ -1,11 +1,9 @@
 use std::ops::{Index, IndexMut};
 use cgmath::{Matrix4, Quaternion, Vector3};
 use image::{GenericImageView, ImageBuffer, Rgba};
-use wgpu::util::DeviceExt;
 
-use crate::graphics::{Camera, Graphics, Renderer, Texture};
-use crate::graphics::resource::{UniformBuffer, Uniform};
-use crate::graphics::vertex::Vertex;
+use crate::graphics::{BlockVertex, Camera, Graphics, Renderer, ResourceType, Texture};
+use crate::graphics::resource::{IndexBuffer, VertexBuffer, UniformBuffer, Uniform};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -13,10 +11,10 @@ pub struct ModelUniform {
     model: [[f32; 4]; 4],
 }
 impl Uniform for ModelUniform {
-    const GROUP: u32 = 1;
+    const TYPE: ResourceType = ResourceType::Model;
 }
 impl ModelUniform {
-    fn new(mat: Matrix4<f32>) -> Self {
+    pub fn new(mat: Matrix4<f32>) -> Self {
         Self {
             model: mat.into()
         }
@@ -24,14 +22,14 @@ impl ModelUniform {
 }
 
 pub const CHUNK_SIZE: u32 = 16;
-const VERTEX_CAPACITY: usize = 0x10000;
+const VERTEX_CAPACITY: usize = 0x10000;//TODO
 
 pub struct CubeGrid {
     data: [u16; (CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize],
     /// Offset of the chunk from the rigid body center (i.e. the center of mass)
     pub global_pos: Vector3<f32>,
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
+    vertex_buffer: VertexBuffer<BlockVertex>,
+    index_buffer: IndexBuffer,
     n_indices: u32,
 
     pub buffer: UniformBuffer<ModelUniform>,
@@ -40,20 +38,10 @@ pub struct CubeGrid {
 
 impl CubeGrid {
     pub fn new(graphics: &Graphics) -> Self {
-        const INDEX_CAPACITY: usize = (VERTEX_CAPACITY/4) * 6;
         let data = [0; (CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize];
 
-        let vertex_buffer = graphics.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(&[Vertex { data: 0}; VERTEX_CAPACITY]),
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-        });
-        let index_buffer = graphics.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(&[0; INDEX_CAPACITY]),
-            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
-        });
-
+        let vertex_buffer = VertexBuffer::new(graphics, VERTEX_CAPACITY);
+        let index_buffer = IndexBuffer::new(graphics, VERTEX_CAPACITY/4*6);
         let buffer = UniformBuffer::new(graphics);
 
         Self {
@@ -113,10 +101,10 @@ impl CubeGrid {
 
                     if x == 0 || self[(x-detail_skip,y,z)] == 0 {
                         let face = x0 | (1 << 12);
-                        vertices.push(Vertex {data: u0|v0|y0|z0|face});
-                        vertices.push(Vertex {data: u0|v1|y1|z0|face});
-                        vertices.push(Vertex {data: u1|v1|y1|z1|face});
-                        vertices.push(Vertex {data: u1|v0|y0|z1|face});
+                        vertices.push(BlockVertex {data: u0|v0|y0|z0|face});
+                        vertices.push(BlockVertex {data: u0|v1|y1|z0|face});
+                        vertices.push(BlockVertex {data: u1|v1|y1|z1|face});
+                        vertices.push(BlockVertex {data: u1|v0|y0|z1|face});
                         indices.push(0+index_offset);
                         indices.push(2+index_offset);
                         indices.push(1+index_offset);
@@ -127,10 +115,10 @@ impl CubeGrid {
                     }
                     if y == 0 || self[(x,y-detail_skip,z)] == 0 {
                         let face = y0 | (3 << 12);
-                        vertices.push(Vertex {data: u0|v0|x0|z0|face});
-                        vertices.push(Vertex {data: u0|v1|x1|z0|face});
-                        vertices.push(Vertex {data: u1|v1|x1|z1|face});
-                        vertices.push(Vertex {data: u1|v0|x0|z1|face});
+                        vertices.push(BlockVertex {data: u0|v0|x0|z0|face});
+                        vertices.push(BlockVertex {data: u0|v1|x1|z0|face});
+                        vertices.push(BlockVertex {data: u1|v1|x1|z1|face});
+                        vertices.push(BlockVertex {data: u1|v0|x0|z1|face});
                         indices.push(0+index_offset);
                         indices.push(1+index_offset);
                         indices.push(2+index_offset);
@@ -141,10 +129,10 @@ impl CubeGrid {
                     }
                     if z == 0 || self[(x,y,z-detail_skip)] == 0 {
                         let face = z0 | (5 << 12);
-                        vertices.push(Vertex {data: u0|v0|x0|y0|face});
-                        vertices.push(Vertex {data: u0|v1|x1|y0|face});
-                        vertices.push(Vertex {data: u1|v1|x1|y1|face});
-                        vertices.push(Vertex {data: u1|v0|x0|y1|face});
+                        vertices.push(BlockVertex {data: u0|v0|x0|y0|face});
+                        vertices.push(BlockVertex {data: u0|v1|x1|y0|face});
+                        vertices.push(BlockVertex {data: u1|v1|x1|y1|face});
+                        vertices.push(BlockVertex {data: u1|v0|x0|y1|face});
                         indices.push(0+index_offset);
                         indices.push(2+index_offset);
                         indices.push(1+index_offset);
@@ -155,10 +143,10 @@ impl CubeGrid {
                     }
                     if x == last || self[(x+detail_skip,y,z)] == 0 {
                         let face = x1; // Normal or constant face
-                        vertices.push(Vertex {data: u0|v0|y0|z0|face});
-                        vertices.push(Vertex {data: u0|v1|y1|z0|face});
-                        vertices.push(Vertex {data: u1|v1|y1|z1|face});
-                        vertices.push(Vertex {data: u1|v0|y0|z1|face});
+                        vertices.push(BlockVertex {data: u0|v0|y0|z0|face});
+                        vertices.push(BlockVertex {data: u0|v1|y1|z0|face});
+                        vertices.push(BlockVertex {data: u1|v1|y1|z1|face});
+                        vertices.push(BlockVertex {data: u1|v0|y0|z1|face});
                         indices.push(0+index_offset);
                         indices.push(1+index_offset);
                         indices.push(2+index_offset);
@@ -169,10 +157,10 @@ impl CubeGrid {
                     }
                     if y == last || self[(x,y+detail_skip,z)] == 0 {
                         let face = y1 | (2 << 12);
-                        vertices.push(Vertex {data: u0|v0|x0|z0|face});
-                        vertices.push(Vertex {data: u0|v1|x1|z0|face});
-                        vertices.push(Vertex {data: u1|v1|x1|z1|face});
-                        vertices.push(Vertex {data: u1|v0|x0|z1|face});
+                        vertices.push(BlockVertex {data: u0|v0|x0|z0|face});
+                        vertices.push(BlockVertex {data: u0|v1|x1|z0|face});
+                        vertices.push(BlockVertex {data: u1|v1|x1|z1|face});
+                        vertices.push(BlockVertex {data: u1|v0|x0|z1|face});
                         indices.push(0+index_offset);
                         indices.push(2+index_offset);
                         indices.push(1+index_offset);
@@ -183,10 +171,10 @@ impl CubeGrid {
                     }
                     if z == last || self[(x,y,z+detail_skip)] == 0 {
                         let face = z1 | (4 << 12);
-                        vertices.push(Vertex {data: u0|v0|x0|y0|face});
-                        vertices.push(Vertex {data: u0|v1|x1|y0|face});
-                        vertices.push(Vertex {data: u1|v1|x1|y1|face});
-                        vertices.push(Vertex {data: u1|v0|x0|y1|face});
+                        vertices.push(BlockVertex {data: u0|v0|x0|y0|face});
+                        vertices.push(BlockVertex {data: u0|v1|x1|y0|face});
+                        vertices.push(BlockVertex {data: u1|v1|x1|y1|face});
+                        vertices.push(BlockVertex {data: u1|v0|x0|y1|face});
                         indices.push(0+index_offset);
                         indices.push(1+index_offset);
                         indices.push(2+index_offset);
@@ -202,8 +190,8 @@ impl CubeGrid {
             panic!("too many vertices");
         }
 
-        graphics.queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&vertices));
-        graphics.queue.write_buffer(&self.index_buffer, 0, bytemuck::cast_slice(&indices));
+        graphics.queue.write_buffer(&self.vertex_buffer.buffer, 0, bytemuck::cast_slice(&vertices));
+        graphics.queue.write_buffer(&self.index_buffer.buffer, 0, bytemuck::cast_slice(&indices));
         self.n_indices = indices.len() as u32;
         self.detail = detail;
     }
@@ -216,9 +204,9 @@ impl CubeGrid {
 
     pub fn draw(&self, renderer: &mut Renderer) {
         self.buffer.bind(renderer);
+        self.vertex_buffer.bind(renderer);
+        self.index_buffer.bind(renderer);
         let render_pass = renderer.render_pass.as_mut().unwrap();
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
         render_pass.draw_indexed(0..self.n_indices, 0, 0..1);
     }
 }

@@ -1,5 +1,9 @@
 # Todo
 
+## Graphics
+* Text
+* Player controls
+
 ## Planets
 * Continential drift
 * Wind

@@ -213,7 +213,7 @@ impl Object {
                 buffer.push(chunk.get_uniform(&self.body, camera));
             }
         }
-        self.storage_buffer.write(graphics, buffer);
+        self.storage_buffer.write(graphics, &buffer);
     }
     
     pub(crate) fn copy_buffers(&self, renderer: &mut Renderer) {

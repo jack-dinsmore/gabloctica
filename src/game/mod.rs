@@ -1,7 +1,9 @@
 pub mod object;
 pub mod planet;
 
-use crate::{game::object::Object, graphics::{Camera, Graphics, GridTexture, Lighting, Shader}, physics::{Collider, CollisionReport, Physics, RigidBody, RigidBodyInit}};
+use crate::graphics::*;
+use crate::physics::*;
+use object::Object;
 use planet::{Planet, PlanetInit};
 use cgmath::Rotation;
 use rustc_hash::FxHashSet;
@@ -39,20 +41,33 @@ pub struct Game {
     graphics: Graphics,
     physics: Box<Physics>,
     player: RigidBody,
-    shader: Shader,
+    block_shader: Shader,
+    flat_shader: Shader,
     key_state: KeyState,
     camera: Camera,
     lighting: Lighting,
     texture: GridTexture,
     objects: Vec<Object>,
-    mouse_motion: (f32, f32)
+    mouse_motion: (f32, f32),
+    font: Font,
+    fps_counter: FpsCounter,
 }
 
 impl Game {
-    pub fn new(graphics: Graphics) -> Self {
+    pub fn new(mut graphics: Graphics) -> Self {
         let mut physics = Box::new(Physics::new());
         let key_state = KeyState::new();
-        let shader = Shader::new(&graphics, include_str!("../shaders/shader.wgsl"));
+        let block_shader = Shader::new::<BlockVertex>(&mut graphics, include_str!("../shaders/block.wgsl"), vec![
+            ResourceType::Camera,
+            ResourceType::Model,
+            ResourceType::Lighting,
+            ResourceType::Texture,
+        ]);
+        let flat_shader = Shader::new::<FlatVertex>(&mut graphics, include_str!("../shaders/flat.wgsl"), vec![
+            ResourceType::Camera,
+            ResourceType::Model,
+            ResourceType::Texture,
+        ]);
         let camera = Camera::new(&graphics);
         let planet = Planet::new(PlanetInit::default());
         let objects = vec![
@@ -73,6 +88,8 @@ impl Game {
 
         // Load block texture
         let texture = GridTexture::new(&graphics, include_bytes!("../../assets/texture.png"));
+
+        let font = Font::new(&mut graphics, include_bytes!("../../assets/Rockwell.ttc"));
         
         Self {
             graphics,
@@ -82,9 +99,12 @@ impl Game {
             mouse_motion: (0., 0.),
             lighting,
             texture,
-            shader,
+            block_shader,
+            flat_shader,
             physics,
             player,
+            font,
+            fps_counter: FpsCounter::new(),
         }
     }
 
@@ -136,6 +156,7 @@ impl Game {
         for object in &mut self.objects {
             object.update(&self.graphics, self.camera.pos.cast().unwrap());
         }
+        self.fps_counter.update(delta_t);
 
         {
             // Move camera pos
@@ -182,6 +203,8 @@ impl Game {
         for object in &mut self.objects {
             object.update_buffer(&self.graphics, &self.camera)
         }
+        self.font.text(&format!("FPS {}", self.fps_counter.get()), 0., 0.12);
+        self.font.update(&self.graphics);
         
         self.graphics.draw(
             |mut renderer| {
@@ -189,19 +212,27 @@ impl Game {
                 for object in &self.objects {
                     object.copy_buffers(&mut renderer);
                 }
+                self.font.copy_buffers(&mut renderer);
+
 
                 renderer.start();
+                self.flat_shader.bind(&mut renderer);
                 // Draw skybox
-
+                
                 renderer.clear();
 
                 // Draw main game
-                self.shader.bind(&mut renderer);
+                self.block_shader.bind(&mut renderer);
                 self.camera.bind(&mut renderer);
                 self.lighting.bind(&mut renderer);
                 for object in &self.objects {
                     object.draw(&mut renderer, &self.texture)
                 }
+
+                renderer.clear();
+
+                // Draw text
+                self.font.render(&mut renderer, &self.camera, &self.lighting);
             },
         );
     }
@@ -245,5 +276,34 @@ impl Game {
             _ => ()
         };
         false
+    }
+}
+
+struct FpsCounter {
+    data: [f64; 64],
+    cursor: usize,
+}
+impl FpsCounter {
+    fn new() -> Self {
+        Self {
+            data: [-1.; 64],
+            cursor: 0,
+        }
+    }
+
+    fn update(&mut self, delta_t: f64) {
+        self.data[self.cursor] = delta_t;
+        self.cursor = (self.cursor + 1) % 64;
+    }
+
+    fn get(&self) -> i32 {
+        let mut value = 0.;
+        let mut total = 0;
+        for item in &self.data {
+            if *item == -1. {continue;}
+            total += 1;
+            value += item;
+        }
+        (total as f64 / value).round() as i32
     }
 }

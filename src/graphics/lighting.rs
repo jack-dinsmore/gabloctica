@@ -1,5 +1,5 @@
 use cgmath::Vector3;
-use crate::graphics::{Camera, Graphics, Renderer};
+use crate::graphics::{Camera, Graphics, Renderer, ResourceType};
 use crate::graphics::resource::{UniformBuffer, Uniform};
 
 #[repr(C)]
@@ -16,7 +16,7 @@ impl LightUniform {
     }
 }
 impl Uniform for LightUniform {
-    const GROUP: u32 = 2;
+    const TYPE: ResourceType = ResourceType::Lighting;
 }
 
 

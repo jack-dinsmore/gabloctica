@@ -1,7 +1,7 @@
 use cgmath::Vector3;
 use rustc_hash::FxHashMap;
 
-use crate::{game::planet::terrain::Terrain, graphics::{CHUNK_SIZE, Graphics}};
+use crate::{game::planet::{Atmosphere, Terrain}, graphics::{CHUNK_SIZE, Graphics}};
 
 use super::Chunk;
 
@@ -30,12 +30,14 @@ impl ShipLoader {
 
 pub struct PlanetLoader {
     terrain: Terrain,
+    atmosphere: Atmosphere,
     halfwidth: f32,
 }
 impl PlanetLoader {
-    pub fn new(halfwidth: u32, terrain: &Terrain) -> Self {
+    pub fn new(halfwidth: u32, terrain: &Terrain, atmosphere: &Atmosphere) -> Self {
         Self {
             terrain: terrain.clone(),
+            atmosphere: atmosphere.clone(),
             halfwidth: halfwidth as f32,
         }
     }
@@ -74,6 +76,8 @@ impl PlanetLoader {
         let recip = 1. / CHUNK_SIZE as f32;
         if intersecting_faces.len() == 1 {
             let (face_index, chunk_alt) = intersecting_faces[0];
+            let biome = self.atmosphere.get_biome(chunk_coord_f, face_index);
+
             for u in 0..CHUNK_SIZE {
                 let ux = u as f32 * recip;
                 for v in 0..CHUNK_SIZE {
@@ -84,16 +88,17 @@ impl PlanetLoader {
                         4|5 => Vector3::new(ux, vx, 0.),
                         _ => unreachable!()
                     };
-                    let local_height = ((self.terrain.get_altitude(block_coord, face_index) - chunk_alt) * CHUNK_SIZE as f32) as u32;
-
+                    let local_height = ((self.terrain.get_altitude(block_coord, face_index) - chunk_alt) * CHUNK_SIZE as f32).max(0.) as u32;
                     for t in 0..local_height.min(CHUNK_SIZE) {
+                        let depth = local_height - t - 1;
+                        let block = biome.get_block(depth as i32);
                         match face_index {
-                            0 => chunk.grid[(t,u,v)] = 1,
-                            1 => chunk.grid[(CHUNK_SIZE-1-t,u,v)] = 1,
-                            2 => chunk.grid[(u,t,v)] = 1,
-                            3 => chunk.grid[(u,CHUNK_SIZE-1-t,v)] = 1,
-                            4 => chunk.grid[(u,v,t)] = 1,
-                            5 => chunk.grid[(u,v,CHUNK_SIZE-1-t)] = 1,
+                            0 => chunk.grid[(t,u,v)] = block,
+                            1 => chunk.grid[(CHUNK_SIZE-1-t,u,v)] = block,
+                            2 => chunk.grid[(u,t,v)] = block,
+                            3 => chunk.grid[(u,CHUNK_SIZE-1-t,v)] = block,
+                            4 => chunk.grid[(u,v,t)] = block,
+                            5 => chunk.grid[(u,v,CHUNK_SIZE-1-t)] = block,
                             _ => unreachable!()
                         }
                     }
@@ -108,7 +113,8 @@ impl PlanetLoader {
                     for z in 0..CHUNK_SIZE {
                         let zx = z as f32 * recip;
                         let block_coord = chunk_coord_f + Vector3::new(xx, yx, zx);
-                        let mut outside = false;
+                        let mut min_depth = 32;
+                        let mut best_face_index = 0;
                         for (face_index, alt) in &intersecting_faces {
                             let block_alt = alt + match face_index {
                                 0 => xx,
@@ -120,14 +126,15 @@ impl PlanetLoader {
                                 _ => unreachable!()
                             };
                             // let block_alt = block_coord[0].abs().max(block_coord[1].abs().max(block_coord[2].abs())) - self.halfwidth as f64;
-                            if block_alt > self.terrain.get_altitude(block_coord, *face_index) {
-                                // Outside
-                                outside = true;
-                                break;
+                            let depth = ((self.terrain.get_altitude(block_coord, *face_index) - block_alt) * 16.) as i32 - 1;
+                            if depth < min_depth {
+                                best_face_index = *face_index;
+                                min_depth = depth;
                             }
                         }
-                        if !outside {
-                            chunk.grid[(x,y,z)] = 1;
+                        if min_depth >= 0 {
+                            let biome = self.atmosphere.get_biome(pos, best_face_index);
+                            chunk.grid[(x,y,z)] = biome.get_block(min_depth);
                         }
                     }
                 }

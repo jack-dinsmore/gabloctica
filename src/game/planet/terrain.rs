@@ -5,6 +5,7 @@ use noise::{NoiseFn, Perlin};
 
 use crate::{game::planet::{atmosphere::Atmosphere, ocean::Ocean}, util::SphericalInterpolator};
 
+
 #[derive(Clone)]
 pub struct Terrain {
     pub halfwidth: f32,
@@ -74,7 +75,7 @@ impl Terrain {
             _ => unreachable!()
         }
         let posarray = [pos[0] as f64, pos[1] as f64, pos[2] as f64];
-        0.5 + self.get_divergence(pos) * self.noise.get(posarray) as f32
+        0.5 + self.get_divergence(pos).max(0.001) * self.noise.get(posarray) as f32
     }
 
     pub fn get_interpolator(&self, resolution: usize) -> SphericalInterpolator<f32> {

@@ -6,12 +6,13 @@ use crate::{game::planet::terrain::Terrain, util::SphericalInterpolator};
 /// Scale height of mountains deflecting wind around them
 const MOUNTAIN_SCALE: f32 = 1.;
 
+#[derive(Clone)]
 pub struct Atmosphere {
+    pub halfwidth: f32,
     wind_interp: SphericalInterpolator<Vector3<f32>>,
     humidity_interp: SphericalInterpolator<f32>,
     temp_interp: SphericalInterpolator<f32>,
     resolution: usize,
-
 }
 
 fn newton_iteration(iterations: usize, x0: &[f32], func: impl Fn(&[f32]) -> Vec<f32>, hess: impl Fn(&[f32]) -> Mat<f32>) -> Vec<f32> {
@@ -68,6 +69,7 @@ impl Atmosphere {
             temperatures[index]
         },  resolution);
         Self {
+            halfwidth: width as f32 / 2.,
             wind_interp,
             humidity_interp,
             temp_interp,
@@ -249,5 +251,37 @@ impl Atmosphere {
             }
             temp
         }, self.resolution);
+    }
+
+    pub fn get_biome(&self, mut pos: Vector3<f32>, face_index: u8) -> Biome {
+        match face_index {
+            0 => pos[0] = self.halfwidth as f32,
+            1 => pos[0] = -self.halfwidth as f32,
+            2 => pos[1] = self.halfwidth as f32,
+            3 => pos[1] = -self.halfwidth as f32,
+            4 => pos[2] = self.halfwidth as f32,
+            5 => pos[2] = -self.halfwidth as f32,
+            _ => unreachable!()
+        }
+        Biome::new(1)
+    }
+}
+pub struct Biome {
+    typ: u8,
+}
+
+impl Biome {
+    pub fn new(typ: u8) -> Self {
+        Self {
+            typ,
+        }
+    }
+
+    pub fn get_block(&self, depth: i32) -> u16 {
+        match self.typ {
+            0 => 1,
+            1 => 2,
+            _ => unreachable!()
+        }
     }
 }

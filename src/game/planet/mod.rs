@@ -1,10 +1,14 @@
 mod atmosphere;
 mod ocean;
-pub mod terrain;
+mod terrain;
+
+pub use terrain::Terrain;
+pub use atmosphere::Atmosphere;
+pub use ocean::Ocean;
 
 use cgmath::Vector3;
 
-use crate::game::{object::{ObjectLoader, loader::PlanetLoader}, planet::{atmosphere::Atmosphere, ocean::Ocean, terrain::Terrain}};
+use crate::game::object::{ObjectLoader, loader::PlanetLoader};
 
 pub struct PlanetInit {
     width: u32,
@@ -28,6 +32,7 @@ impl Default for PlanetInit {
 pub struct Planet {
     width: u32,
     terrain: Terrain,
+    atmosphere: Atmosphere,
 }
 impl Planet {
     pub fn new(data: PlanetInit) -> Self {
@@ -40,10 +45,11 @@ impl Planet {
 
         Self {
             width: data.width,
-            terrain: terrain,
+            terrain,
+            atmosphere,
         }
     }
     pub fn loader(&self) -> ObjectLoader {
-        ObjectLoader::MultiShot(PlanetLoader::new(self.width/2, &self.terrain))
+        ObjectLoader::MultiShot(PlanetLoader::new(self.width/2, &self.terrain, &self.atmosphere))
     }
 }

@@ -10,15 +10,15 @@ pub use grid::{CubeGrid, GridTexture, CHUNK_SIZE, ModelUniform};
 pub use camera::Camera;
 pub use lighting::Lighting;
 pub use shader::Shader;
-pub use resource::{Texture, StorageBuffer, UniformBuffer};
+pub use vertex::*;
+pub use font::Font;
+pub use resource::*;
 
 use std::sync::Arc;
 use winit::{dpi::PhysicalSize, event_loop::EventLoopProxy, window::Window};
 use wgpu::{
     Adapter, Color, CommandEncoderDescriptor, Device, DeviceDescriptor, Features, Instance, Limits, LoadOp, MemoryHints, Operations, PowerPreference, Queue, RenderPassColorAttachment, RenderPassDescriptor, RequestAdapterOptions, StoreOp, Surface, SurfaceConfiguration, TextureViewDescriptor
 };
-
-use crate::graphics::shader::ShaderLayout;
 
 pub struct Graphics {
     pub window: Arc<Window>,
@@ -29,7 +29,7 @@ pub struct Graphics {
     device: Device,
     queue: Queue,
     depth_texture_view: wgpu::TextureView,
-    shader_layout: ShaderLayout,
+    layouts: Vec<Option<wgpu::BindGroupLayout>>,
 }
 
 impl Graphics {
@@ -62,8 +62,6 @@ impl Graphics {
         let surface_config = surface.get_default_config(&adapter, width, height).unwrap();
         surface.configure(&device, &surface_config);
 
-        // ShaderLayout
-        let shader_layout = ShaderLayout::new(&device);
         let depth_texture_view = Texture::depth_view(&device, width, height);
     
         let output = Graphics {
@@ -74,8 +72,8 @@ impl Graphics {
             _adapter: adapter,
             device,
             queue,
-            shader_layout,
             depth_texture_view,
+            layouts: Vec::new(),
         };
     
         let _ = proxy.send_event(output);
@@ -104,6 +102,20 @@ impl Graphics {
         frame.present();
         self.window.request_redraw();
     }
+    
+    fn get_layout(&self, typ: ResourceType) -> &wgpu::BindGroupLayout {
+        self.layouts[typ as usize].as_ref().unwrap()
+    }
+    
+    fn make_layout(&mut self, r: ResourceType) {
+        while self.layouts.len() <= r as usize {
+            self.layouts.push(None);
+        }
+        if let None = self.layouts[r as usize] {
+            let layout = self.device.create_bind_group_layout(&r.get_descriptor());
+            self.layouts[r as usize] = Some(layout)
+        }
+    }
 }
 
 pub struct Renderer<'a> {
@@ -111,6 +123,7 @@ pub struct Renderer<'a> {
     frame_view: wgpu::TextureView,
     render_pass: Option<wgpu::RenderPass<'a>>,
     depth_texture_view: &'a wgpu::TextureView,
+    group_map: [u32; 4],
 }
 impl<'a> Renderer<'a> {
     pub fn new(graphics: &'a Graphics, encoder: &'a mut wgpu::CommandEncoder, frame_view: wgpu::TextureView) -> Self {
@@ -121,6 +134,7 @@ impl<'a> Renderer<'a> {
             frame_view,
             encoder_ptr,
             depth_texture_view: &graphics.depth_texture_view,
+            group_map: [0; 4],
         }
     }
 
@@ -183,5 +197,9 @@ impl<'a> Renderer<'a> {
             panic!("You cannot access the encoder when a renderpass is open");
         }
         unsafe {&mut *self.encoder_ptr}
+    }
+    
+    fn get_group(&self, typ: ResourceType) -> u32 {
+        self.group_map[typ as usize]
     }
 }
