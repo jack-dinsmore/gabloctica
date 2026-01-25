@@ -1,12 +1,10 @@
 # Todo
 
-## Graphics
-* Text
+## Gameplay
 * Player controls
 
 ## Planets
-* Continential drift
-* Wind
+* Biomes
 
 ## Collisions
 * Box-box collisions
