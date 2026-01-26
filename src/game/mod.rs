@@ -1,8 +1,11 @@
 pub mod object;
 pub mod planet;
 
+use crate::game::object::ObjectLoader;
+use crate::game::object::loader::ShipLoader;
 use crate::graphics::*;
 use crate::physics::*;
+use cgmath::InnerSpace;
 use object::Object;
 use planet::{Planet, PlanetInit};
 use cgmath::Rotation;
@@ -71,7 +74,8 @@ impl Game {
         let camera = Camera::new(&graphics);
         let planet = Planet::new(PlanetInit::default());
         let objects = vec![
-            Object::new(&graphics, &mut physics, planet.loader(), camera.pos.cast().unwrap())
+            Object::new(&graphics, &mut physics, planet.loader()),
+            Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{}))
         ];
         let player = RigidBody::new(&mut physics, RigidBodyInit::default());
         let lighting = Lighting::new(&graphics);
@@ -152,11 +156,30 @@ impl Game {
         }
     }
 
+    fn update_gravity(&mut self) {
+        let mut gravitating = Vec::new();
+        const GRAVITATING_THRESHOLD: f64 = 10.;
+        for object in &self.objects {
+            if object.body.mass > GRAVITATING_THRESHOLD {
+                gravitating.push((object.body.pos, object.body.mass));
+            }
+        }
+        for object in &mut self.objects {
+            for (pos, mass) in &gravitating {
+                let delta = object.body.pos - pos;
+                let grav = -delta * NEWTON_G * *mass * object.body.mass / delta.magnitude().powi(3);
+                object.body.add_force(grav);
+            }
+        }
+    }
+
     pub fn update(&mut self, delta_t: f64) {
         for object in &mut self.objects {
             object.update(&self.graphics, self.camera.pos.cast().unwrap());
         }
         self.fps_counter.update(delta_t);
+
+        self.update_gravity();
 
         {
             // Move camera pos
@@ -187,6 +210,7 @@ impl Game {
         {
             // Move camera look
             const SPEED: f64 = 0.2;
+            self.camera.pos = self.player.pos.cast().unwrap();
             self.camera.theta += (SPEED*delta_t) as f32*self.mouse_motion.1;
             self.camera.phi -= (SPEED*delta_t) as f32*self.mouse_motion.0;
             self.mouse_motion = (0., 0.);

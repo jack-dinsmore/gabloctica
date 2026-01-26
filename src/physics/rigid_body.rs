@@ -19,16 +19,55 @@ impl MoI {
     pub fn new_matrix(moi: Matrix3<f64>) -> Self {
         Self::Matrix { inverse: moi.invert().unwrap(),  moi }
     }
-    /// Get the angular acceleration for torque `torque` and angular velocity `omega`.
-    pub fn get_omega_dot(&self, torque: Vector3<f64>, omega: Vector3<f64>) -> Vector3<f64> {
+    /// Get the angular acceleration for angular velocity `omega`.
+    pub fn get_self_accel(&self, omega: Vector3<f64>) -> Vector3<f64> {
         match self {
-            MoI::Diagonal { moi, reciprocals } => Vector3::new(
-                torque.x / moi.x + omega.y*omega.z * reciprocals.x,
-                torque.y / moi.y + omega.z*omega.x * reciprocals.y,
-                torque.z / moi.z + omega.x*omega.y * reciprocals.z,
+            MoI::Diagonal { reciprocals, .. } => Vector3::new(
+                omega.y*omega.z * reciprocals.x,
+                omega.z*omega.x * reciprocals.y,
+                omega.x*omega.y * reciprocals.z,
             ),
             MoI::Matrix { moi, inverse } => {
-                inverse * (torque - omega.cross(moi * omega))
+                inverse * omega.cross(moi * omega)
+            },
+        }
+    }
+    /// Multiply a vector by the MOI
+    pub fn mul(&self, v: Vector3<f64>) -> Vector3<f64> {
+        match self {
+            MoI::Diagonal { moi, .. } => Vector3::new(
+                v.x * moi.x,
+                v.y * moi.y,
+                v.z * moi.z,
+            ),
+            MoI::Matrix { moi, .. } => {
+                moi * v
+            },
+        }
+    }
+    /// Multiply a vector by the MOI inverse
+    pub fn mul_inv(&self, v: Vector3<f64>) -> Vector3<f64> {
+        match self {
+            MoI::Diagonal { moi, .. } => Vector3::new(
+                v.x / moi.x,
+                v.y / moi.y,
+                v.z / moi.z,
+            ),
+            MoI::Matrix { inverse, .. } => {
+                inverse * v
+            },
+        }
+    }
+    
+    pub(crate) fn get_inv(&self) -> Matrix3<f64> {
+        match self {
+            MoI::Diagonal { moi, .. } => Matrix3::new(
+                1. / moi.x,0.,0.,
+                0.,1. / moi.y,0.,
+                0.,0.,1. / moi.z,
+            ),
+            MoI::Matrix { inverse, .. } => {
+                inverse.clone()
             },
         }
     }
@@ -37,7 +76,7 @@ impl MoI {
 #[derive(Debug, Clone, Copy)]
 pub struct RigidBody {
     physics: *mut Physics,
-    index: usize,
+    pub(super) index: usize,
 }
 impl std::ops::Deref for RigidBody {
     type Target = RigidBodyData;
@@ -78,8 +117,8 @@ impl RigidBody {
             static_coeff: init.static_coeff,
             kinetic_coeff: init.kinetic_coeff,
             collider: init.collider,
+            restitution: init.restitution,
             
-            contacts: Vec::new(),
             forces: Vector3::zero(),
             torques: Vector3::zero(),
         };
@@ -130,6 +169,7 @@ pub struct RigidBodyInit {
     pub static_coeff: f64,
     pub kinetic_coeff: f64,
     pub collider: Option<Collider>,
+    pub restitution: f64,
 }
 impl Default for RigidBodyInit {
     fn default() -> Self {
@@ -144,6 +184,7 @@ impl Default for RigidBodyInit {
             kinetic_coeff: 0.3,
             moi: MoI::new_diagonal(Vector3::new(1., 1., 1.)),
             collider: None,
+            restitution: 0.7,
         }
     }
 }
@@ -164,18 +205,16 @@ pub struct RigidBodyData {
     pub static_coeff: f64,
     pub kinetic_coeff: f64,
     pub collider: Option<Collider>,
+    pub restitution: f64,
 
-    contacts: Vec<RigidBody>,
-    forces: Vector3<f64>,
-    torques: Vector3<f64>,
+    pub(super) forces: Vector3<f64>,
+    pub(super) torques: Vector3<f64>,
 }
 impl RigidBodyData {
     pub fn add_force(&mut self, force: Vector3<f64>) {
-        // TODO transmit forces and torques when in contact with something
         self.forces += force;
     }
     pub fn add_torque(&mut self, torque: Vector3<f64>) {
-        // TODO transmit forces and torques when in contact with something
         self.torques += torque;
     }
     pub fn add_couple(&mut self, force: Vector3<f64>, offset: Vector3<f64>) {
@@ -184,7 +223,7 @@ impl RigidBodyData {
     }
     pub(super) fn update(&mut self, delta_t: f64) {
         let rotated_torques = self.ori * self.torques;
-        self.ang_vel += self.moi.get_omega_dot(rotated_torques, self.ang_vel) * delta_t;
+        self.ang_vel += self.moi.mul_inv(rotated_torques) * delta_t;
         let vel_quat = Quaternion::from_sv(0., self.ang_vel);
         self.ori += 0.5 * vel_quat * self.ori * delta_t;
         self.ori.normalize();

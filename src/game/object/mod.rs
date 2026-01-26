@@ -30,7 +30,7 @@ pub struct Object {
     storage_buffer: StorageBuffer,
 }
 impl Object {
-    pub fn new(graphics: &Graphics, physics: &mut Physics, loader: ObjectLoader, character_pos: Vector3<f64>) -> Self {
+    pub fn new(graphics: &Graphics, physics: &mut Physics, loader: ObjectLoader) -> Self {
         let initial_data = RigidBodyInit {
             collider: Some(Collider::empty_object()),
             ..Default::default()
@@ -38,15 +38,13 @@ impl Object {
         let body = RigidBody::new(physics, initial_data);
         let buffer_size = loader.estimate_max_rendered_chunks()*std::mem::size_of::<ModelUniform>();
         let storage_buffer = StorageBuffer::new(graphics, buffer_size as usize);
-        let mut out = Self {
+        Self {
             chunks: FxHashMap::default(),
             loader: loader,
             body,
             last_load: None,
             storage_buffer,
-        };
-        out.load_chunks(graphics, character_pos);
-        out
+        }
     }
 
     /// Update the model buffers and rigid body. If only some chunks were changed, pass a vector of chunk positions. Otherwise, pass an empty vector. This will update the passed chunks, and neighbors if the neighbors now become visible.
