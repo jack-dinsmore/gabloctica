@@ -11,7 +11,7 @@ pub struct ShipLoader {
 impl ShipLoader {
 
     pub(super) fn load_all(&self, graphics: &crate::graphics::Graphics) -> FxHashMap<(i32, i32, i32), Chunk> {
-        let chunk_coord = (0, 0, -1);
+        let chunk_coord = (0, 0, 0);
         let pos = Vector3::new(
             chunk_coord.0 as f32 * CHUNK_SIZE as f32,
             chunk_coord.1 as f32 * CHUNK_SIZE as f32,

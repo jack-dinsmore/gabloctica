@@ -1,3 +1,4 @@
+#![allow(dead_code, unused_variables)]
 mod graphics;
 mod physics;
 mod game;

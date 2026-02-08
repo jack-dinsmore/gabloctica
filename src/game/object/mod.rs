@@ -30,11 +30,8 @@ pub struct Object {
     storage_buffer: StorageBuffer,
 }
 impl Object {
-    pub fn new(graphics: &Graphics, physics: &mut Physics, loader: ObjectLoader) -> Self {
-        let initial_data = RigidBodyInit {
-            collider: Some(Collider::empty_object()),
-            ..Default::default()
-        };
+    pub fn new(graphics: &Graphics, physics: &mut Physics, loader: ObjectLoader, mut initial_data: RigidBodyInit) -> Self {
+        initial_data.collider = Some(Collider::empty_object());
         let body = RigidBody::new(physics, initial_data);
         let buffer_size = loader.estimate_max_rendered_chunks()*std::mem::size_of::<ModelUniform>();
         let storage_buffer = StorageBuffer::new(graphics, buffer_size as usize);

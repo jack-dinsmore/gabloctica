@@ -1,8 +1,6 @@
 mod rigid_body;
 mod collisions;
 
-use std::{collections::BTreeSet, ops::DerefMut};
-
 use faer::{Mat, Side, prelude::Solve};
 pub use rigid_body::{RigidBody, RigidBodyInit, MoI};
 pub use collisions::{Collider, CollisionReport};
@@ -76,8 +74,8 @@ impl Physics {
         for body in &mut self.bodies {
             body.add_torque(body.moi.get_self_accel(body.ang_vel));
         }
-        self.resolve_normal_forces();
-        self.resolve_normal_torques();
+        // self.resolve_normal_forces();
+        // self.resolve_normal_torques();
 
         // Force updates
         for body in &mut self.bodies {
@@ -127,10 +125,11 @@ impl Physics {
     }
 
     pub fn resolve_normal_torques(&mut self) {
+        let n_pairs = self.collision_normals.len();
         if self.collision_normals.is_empty() {return;}
-        let dimension = self.collision_normals.len()*3;
+        let dimension = n_pairs*3;
         let mut m: Mat<f64> = Mat::zeros(dimension, dimension);
-        let mut k = Mat::zeros(1,dimension);
+        let mut k = Mat::zeros(dimension,  1);
         let mut write_block = |i: usize, j: usize, mat: Matrix3<f64>| {
             for k in 0..3 {
                 for l in 0..3 {
@@ -139,18 +138,18 @@ impl Physics {
             }
         };
 
-        for i in 0..dimension {
+        for i in 0..n_pairs {
             let a = self.collision_pairs[i].0;
             let b = self.collision_pairs[i].1;
             let vec = a.moi.mul_inv(a.torques) - b.moi.mul_inv(b.torques / b.mass);
-            k[(0, 3*i+0)] = vec.x;
-            k[(0, 3*i+1)] = vec.y;
-            k[(0, 3*i+2)] = vec.z;
+            k[(3*i+0, 0)] = vec.x;
+            k[(3*i+1, 0)] = vec.y;
+            k[(3*i+2, 0)] = vec.z;
 
             let a_inv = a.moi.get_inv();
             let b_inv = b.moi.get_inv();
             write_block(i, i, a_inv + b_inv);
-            for j in (i+1)..dimension {
+            for j in (i+1)..n_pairs {
                 let c = self.collision_pairs[j].0;
                 let d = self.collision_pairs[j].1;
                 if a == c {
@@ -176,9 +175,9 @@ impl Physics {
         for (i, (a, b)) in self.collision_pairs.iter_mut().enumerate() {
             let normal = self.collision_normals[i];
             let mut accel = Vector3::new(
-                k[(0, 3*i+0)],
-                k[(0, 3*i+1)],
-                k[(0, 3*i+2)],
+                k[(3*i+0, 0)],
+                k[(3*i+1, 0)],
+                k[(3*i+2, 0)],
             );
             accel -= normal * normal.dot(accel);
             a.add_torque(accel);

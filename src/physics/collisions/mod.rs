@@ -33,6 +33,18 @@ impl CollisionReport {
     pub fn is_none(&self) -> bool {
         !self.is_some()
     }
+    
+    fn invert(&self) -> Self {
+        match self {
+            CollisionReport::None => CollisionReport::None,
+            CollisionReport::Some { normal, depth, p1, p2 } => CollisionReport::Some {
+                normal: -*normal,
+                depth: *depth,
+                p1: *p2,
+                p2: *p1,
+            },
+        }
+    }
 }
 impl PartialOrd for CollisionReport {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {

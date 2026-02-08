@@ -6,6 +6,7 @@ use crate::game::object::loader::ShipLoader;
 use crate::graphics::*;
 use crate::physics::*;
 use cgmath::InnerSpace;
+use cgmath::Vector3;
 use object::Object;
 use planet::{Planet, PlanetInit};
 use cgmath::Rotation;
@@ -74,13 +75,12 @@ impl Game {
         let camera = Camera::new(&graphics);
         let planet = Planet::new(PlanetInit::default());
         let objects = vec![
-            Object::new(&graphics, &mut physics, planet.loader()),
-            Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{}))
+            // Object::new(&graphics, &mut physics, planet.loader(), RigidBodyInit::default()),
+            Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{}), RigidBodyInit { pos:  Vector3::new(15., -9., 50.), ang_vel: Vector3::new(0., 0., -1.), ..Default::default()}),
+            Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{}), RigidBodyInit { pos:  Vector3::new(15., 9., 50.), ..Default::default()}),
         ];
-        let player = RigidBody::new(&mut physics, RigidBodyInit::default());
+        let player = RigidBody::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 50.), ..Default::default()});
         let lighting = Lighting::new(&graphics);
-
-        // let font = Font::new(include_bytes!("/System/Library/Fonts/Supplemental/Rockwell.ttc"));
 
         // Set cursor to center of screen
         let size = graphics.window.inner_size();
@@ -179,31 +179,31 @@ impl Game {
         }
         self.fps_counter.update(delta_t);
 
-        self.update_gravity();
+        // self.update_gravity();
 
         {
             // Move camera pos
-            const SPEED: f64 = 200.;
-            let forward = self.camera.get_forward();
-            let up = self.camera.get_up();
-            let right = self.camera.get_right();
+            const SPEED: f64 = 5000.;
+            let forward: Vector3<f64> = self.camera.get_forward().cast().unwrap();
+            let up: Vector3<f64> = self.camera.get_up().cast().unwrap();
+            let right: Vector3<f64> = self.camera.get_right().cast().unwrap();
             if self.key_state.get(KeyCode::KeyW) {
-                self.camera.pos += forward * (SPEED*delta_t) as f32;
+                self.player.add_force(forward * (SPEED*delta_t));
             }
             if self.key_state.get(KeyCode::KeyS) {
-                self.camera.pos -= forward * (SPEED*delta_t) as f32;
+                self.player.add_force(-forward * (SPEED*delta_t));
             }
             if self.key_state.get(KeyCode::KeyD) {
-                self.camera.pos += right * (SPEED*delta_t) as f32;
+                self.player.add_force(right * (SPEED*delta_t));
             }
             if self.key_state.get(KeyCode::KeyA){
-                self.camera.pos -= right * (SPEED*delta_t) as f32;
+                self.player.add_force(-right * (SPEED*delta_t));
             }
             if self.key_state.get(KeyCode::KeyQ) {
-                self.camera.pos += up * (SPEED*delta_t) as f32;
+                self.player.add_force(up * (SPEED*delta_t));
             }
             if self.key_state.get(KeyCode::KeyE){
-                self.camera.pos -= up * (SPEED*delta_t) as f32;
+                self.player.add_force(-up * (SPEED*delta_t));
             }
         }
 
@@ -211,8 +211,8 @@ impl Game {
             // Move camera look
             const SPEED: f64 = 0.2;
             self.camera.pos = self.player.pos.cast().unwrap();
-            self.camera.theta += (SPEED*delta_t) as f32*self.mouse_motion.1;
-            self.camera.phi -= (SPEED*delta_t) as f32*self.mouse_motion.0;
+            self.camera.theta += (SPEED*delta_t) as f32 *self.mouse_motion.1;
+            self.camera.phi -= (SPEED*delta_t) as f32 *self.mouse_motion.0;
             self.mouse_motion = (0., 0.);
             self.camera.theta = self.camera.theta.clamp(0.0001, 3.1415);
         }

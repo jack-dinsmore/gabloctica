@@ -39,26 +39,29 @@ impl Chunk {
         self.mass_m2 = Matrix3::zero();
 
         for z in 0..CHUNK_SIZE {
+            let zf = z as f64 + 0.5;
             for y in 0..CHUNK_SIZE {
+                let yf = y as f64 + 0.5;
                 let mut block: u16 = 0;
                 for x in 0..CHUNK_SIZE {
+                    let xf = x as f64 + 0.5;
                     if self.grid[(x,y,z)] != 0 {
                         block |= 1 << x;
 
                         let block_mass = 1.;
                         self.mass_m0 += block_mass;
-                        self.mass_m1.x += x as f64 * block_mass;
-                        self.mass_m1.y += y as f64 * block_mass;
-                        self.mass_m1.z += z as f64 * block_mass;
-                        self.mass_m2.x[0]+= (x*x) as f64 * block_mass;
-                        self.mass_m2.x[1] += (x*y) as f64 * block_mass;
-                        self.mass_m2.x[2] += (x*z) as f64 * block_mass;
-                        self.mass_m2.y[0] += (y*x) as f64 * block_mass;
-                        self.mass_m2.y[1] += (y*y) as f64 * block_mass;
-                        self.mass_m2.y[2] += (y*z) as f64 * block_mass;
-                        self.mass_m2.z[0] += (z*x) as f64 * block_mass;
-                        self.mass_m2.z[1] += (z*y) as f64 * block_mass;
-                        self.mass_m2.z[2] += (z*z) as f64 * block_mass;
+                        self.mass_m1.x += xf * block_mass;
+                        self.mass_m1.y += yf * block_mass;
+                        self.mass_m1.z += zf * block_mass;
+                        self.mass_m2.x[0]+= xf*xf * block_mass;
+                        self.mass_m2.x[1] += xf*yf * block_mass;
+                        self.mass_m2.x[2] += xf*zf * block_mass;
+                        self.mass_m2.y[0] += yf*xf * block_mass;
+                        self.mass_m2.y[1] += yf*yf * block_mass;
+                        self.mass_m2.y[2] += yf*zf * block_mass;
+                        self.mass_m2.z[0] += zf*xf * block_mass;
+                        self.mass_m2.z[1] += zf*yf * block_mass;
+                        self.mass_m2.z[2] += zf*zf * block_mass;
                     }
                 }
                 blocks[(y+CHUNK_SIZE*z) as usize] = block;
