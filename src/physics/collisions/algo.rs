@@ -157,13 +157,18 @@ impl ColliderType {
                         n_p2 += 1;
                     }
                 }
+                p1 /= n_p1 as f64;
+                p2 /= n_p2 as f64;
 
+                if p1.dot(best_sepax) < 0. {
+                    best_sepax *= -1.;
+                }
 
                 CollisionReport::Some {
                     normal: best_sepax,
                     depth: best_sepn,
-                    p1: a.ori.invert() * p1/(n_p1 as f64) + a.com_pos,
-                    p2: b.ori.invert() * p2/(n_p2 as f64) + b.com_pos,
+                    p1: a.ori.invert() * p1 + a.com_pos,
+                    p2: b.ori.invert() * p1 + b.com_pos,
                 }
             },
             (

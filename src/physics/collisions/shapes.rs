@@ -14,7 +14,10 @@ pub struct RayData {
 
 #[derive(Debug, Clone)]
 pub struct BoxData {
-    
+    /// Center of the box
+    pub center: Vector3<f64>,
+    /// Distance from the center of the box to the edges along the different axes
+    pub edges: Vector3<f64>,
 }
 
 
@@ -109,7 +112,10 @@ impl<'a> ColliderIterator<'a> {
 
     pub fn collider(&self) -> ColliderType {
         match self {
-            ColliderIterator::BoxIterator { data } => unimplemented!(),
+            ColliderIterator::BoxIterator { data } => ColliderType::Box {
+                center: data.center,
+                edges: data.edges,
+            },
             ColliderIterator::ObjectIterator { data, chunk_coord, start_x, start_y, start_z, width_x, width_y, width_z, .. } => ColliderType::Box {
                 center: Vector3::new(
                     chunk_coord.0 as f64*CHUNK_SIZE as f64 + (*start_x as f64 + *width_x as f64 / 2.),

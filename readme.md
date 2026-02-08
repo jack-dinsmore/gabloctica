@@ -1,16 +1,17 @@
 # Todo
 
-## Gameplay
-* Player controls
+## Graphics: 
+* Sky box
+* Fog
+* Color clamping?
 
 ## Planets
-* Biomes
+* HUD debugger
 
 ## Collisions
-* Box-box collisions
-* Walking on planets
-* Rigid body reaction to collisions
+* Fix the collision point. In particular, when multiple points collide, don't choose the middle as the offending point.
+* OPTIMIZE: break planets into multiple convex parts. Then only one collision needs to be saved in each convex part; the full tree doesn't need to be explored.
 
-## Graphics: 
-* Update terrain buffers in the encoder, not with the queue
-* Sky box
+## Player motion
+* Fix the player bouncing
+* Allow walking around on the planet without sliding

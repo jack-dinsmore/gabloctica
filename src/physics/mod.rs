@@ -3,14 +3,14 @@ mod collisions;
 
 use faer::{Mat, Side, prelude::Solve};
 pub use rigid_body::{RigidBody, RigidBodyInit, MoI};
-pub use collisions::{Collider, CollisionReport};
+pub use collisions::{shapes, Collider, CollisionReport};
 
 use cgmath::{InnerSpace, Matrix3, Vector3};
 use crate::physics::rigid_body::RigidBodyData;
 
 
-pub const NEWTON_G: f64 = 1.;
-const GRAVITY_THRESH: f64 = 1e6;
+pub const NEWTON_G: f64 = 5.;
+const GRAVITY_THRESH: f64 = 10.;
 
 pub struct Physics {
     bodies: Vec<RigidBodyData>,
@@ -58,11 +58,12 @@ impl Physics {
                     ;
                     let restitution = (a.restitution + b.restitution) / 2.;
                     let impulse = (1. + restitution) / denom;
-                    a.add_force(impulse / delta_t * normal);
-                    b.add_force(-impulse / delta_t * normal);
+                    a.add_force(-impulse / delta_t * normal);
+                    b.add_force(impulse / delta_t * normal);
 
-                    a.pos += normal*depth;
-                    b.pos -= normal*depth;
+                    let a_mass_frac = a.mass / (a.mass + b.mass);
+                    a.pos -= normal*depth * (1. - a_mass_frac);
+                    b.pos += normal*depth * a_mass_frac;
 
                     self.collision_pairs.push((a, b));
                     self.collision_normals.push(normal);
@@ -74,7 +75,7 @@ impl Physics {
         for body in &mut self.bodies {
             body.add_torque(body.moi.get_self_accel(body.ang_vel));
         }
-        // self.resolve_normal_forces();
+        // self.resolve_normal_forces(); // TODO
         // self.resolve_normal_torques();
 
         // Force updates
@@ -87,12 +88,12 @@ impl Physics {
         if self.collision_normals.is_empty() {return;}
         let dimension = self.collision_normals.len();
         let mut m: Mat<f64> = Mat::zeros(dimension, dimension);
-        let mut k = Mat::zeros(1,dimension);
+        let mut k = Mat::zeros(dimension, 1);
         for i in 0..dimension {
             let a = self.collision_pairs[i].0;
             let b = self.collision_pairs[i].1;
             let normal = self.collision_normals[i];
-            k[(0,i)] = (a.forces / a.mass - b.forces / b.mass).dot(normal);
+            k[(i, 0)] = (a.forces / a.mass - b.forces / b.mass).dot(normal);
             m[(i,i)] += 1./a.mass + 1./b.mass;
             for j in (i+1)..dimension {
                 let c = self.collision_pairs[j].0;
@@ -118,7 +119,7 @@ impl Physics {
         m.llt(Side::Upper).unwrap().solve_in_place(&mut k);
 
         for (i, (a, b)) in self.collision_pairs.iter_mut().enumerate() {
-            let normal = self.collision_normals[i] * k[(0,i)];
+            let normal = self.collision_normals[i] * k[(i, 0)];
             a.add_force(normal);
             b.add_force(-normal);
         }

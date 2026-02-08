@@ -6,10 +6,10 @@ use crate::{game::planet::{Atmosphere, Terrain}, graphics::{CHUNK_SIZE, Graphics
 use super::Chunk;
 
 pub struct ShipLoader {
-
+    pub pos: Vector3<f64>,
+    pub vel: Vector3<f64>,
 }
 impl ShipLoader {
-
     pub(super) fn load_all(&self, graphics: &crate::graphics::Graphics) -> FxHashMap<(i32, i32, i32), Chunk> {
         let chunk_coord = (0, 0, 0);
         let pos = Vector3::new(

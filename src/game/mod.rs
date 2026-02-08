@@ -1,12 +1,14 @@
 pub mod object;
 pub mod planet;
+pub mod entity;
 
+use crate::game::entity::Entity;
 use crate::game::object::ObjectLoader;
 use crate::game::object::loader::ShipLoader;
 use crate::graphics::*;
 use crate::physics::*;
-use cgmath::InnerSpace;
 use cgmath::Vector3;
+use cgmath::Zero;
 use object::Object;
 use planet::{Planet, PlanetInit};
 use cgmath::Rotation;
@@ -44,7 +46,7 @@ impl KeyState {
 pub struct Game {
     graphics: Graphics,
     physics: Box<Physics>,
-    player: RigidBody,
+    entities: Vec<Entity>,
     block_shader: Shader,
     flat_shader: Shader,
     key_state: KeyState,
@@ -75,11 +77,12 @@ impl Game {
         let camera = Camera::new(&graphics);
         let planet = Planet::new(PlanetInit::default());
         let objects = vec![
-            // Object::new(&graphics, &mut physics, planet.loader(), RigidBodyInit::default()),
-            Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{}), RigidBodyInit { pos:  Vector3::new(15., -9., 50.), ang_vel: Vector3::new(0., 0., -1.), ..Default::default()}),
-            Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{}), RigidBodyInit { pos:  Vector3::new(15., 9., 50.), ..Default::default()}),
+            Object::new(&graphics, &mut physics, planet.loader()),
+            Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos:  Vector3::new(24., 24., 46.), vel: Vector3::zero() })),
         ];
-        let player = RigidBody::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 50.), ..Default::default()});
+        let entities = vec![
+            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 33.), ..Default::default()}),
+        ];
         let lighting = Lighting::new(&graphics);
 
         // Set cursor to center of screen
@@ -106,9 +109,9 @@ impl Game {
             block_shader,
             flat_shader,
             physics,
-            player,
             font,
             fps_counter: FpsCounter::new(),
+            entities,
         }
     }
 
@@ -121,16 +124,17 @@ impl Game {
             winit::event::MouseButton::Left => {
                 // Replace the player's collider with its look ray temporarily
                 const LOOK_DIST: f64 = 5.;
-                let body_collider = self.player.collider.take();
+                let player = &mut self.entities[0];
+                let body_collider = player.body.collider.take();
                 let forward = self.camera.get_forward().cast().unwrap();
-                self.player.collider = Some(Collider::new_ray(self.camera.pos.cast().unwrap(), forward*LOOK_DIST));
+                player.body.collider = Some(Collider::new_ray(self.camera.pos.cast().unwrap(), forward*LOOK_DIST));
 
                 let mut report = CollisionReport::None;
                 let mut collided_object = None;
 
                 for object in &mut self.objects {
                     // The collision function should always pick some over None, but choose the one with the smallest distance to the target otherwise.
-                    let new_report = Collider::check_collision(&self.player, &object.body);
+                    let new_report = Collider::check_collision(&player.body, &object.body);
 
                     if new_report > report {
                         report = new_report;
@@ -150,26 +154,9 @@ impl Game {
                 }
 
                 // Put the collider back
-                self.player.collider = body_collider;
+                player.body.collider = body_collider;
             },
             _ => (),
-        }
-    }
-
-    fn update_gravity(&mut self) {
-        let mut gravitating = Vec::new();
-        const GRAVITATING_THRESHOLD: f64 = 10.;
-        for object in &self.objects {
-            if object.body.mass > GRAVITATING_THRESHOLD {
-                gravitating.push((object.body.pos, object.body.mass));
-            }
-        }
-        for object in &mut self.objects {
-            for (pos, mass) in &gravitating {
-                let delta = object.body.pos - pos;
-                let grav = -delta * NEWTON_G * *mass * object.body.mass / delta.magnitude().powi(3);
-                object.body.add_force(grav);
-            }
         }
     }
 
@@ -179,38 +166,36 @@ impl Game {
         }
         self.fps_counter.update(delta_t);
 
-        // self.update_gravity();
-
         {
             // Move camera pos
-            const SPEED: f64 = 5000.;
+            const SPEED: f64 = 500.;
             let forward: Vector3<f64> = self.camera.get_forward().cast().unwrap();
             let up: Vector3<f64> = self.camera.get_up().cast().unwrap();
             let right: Vector3<f64> = self.camera.get_right().cast().unwrap();
             if self.key_state.get(KeyCode::KeyW) {
-                self.player.add_force(forward * (SPEED*delta_t));
+                self.entities[0].walk(forward * (SPEED*delta_t));
             }
             if self.key_state.get(KeyCode::KeyS) {
-                self.player.add_force(-forward * (SPEED*delta_t));
+                self.entities[0].walk(-forward * (SPEED*delta_t));
             }
             if self.key_state.get(KeyCode::KeyD) {
-                self.player.add_force(right * (SPEED*delta_t));
+                self.entities[0].walk(right * (SPEED*delta_t));
             }
             if self.key_state.get(KeyCode::KeyA){
-                self.player.add_force(-right * (SPEED*delta_t));
+                self.entities[0].walk(-right * (SPEED*delta_t));
             }
             if self.key_state.get(KeyCode::KeyQ) {
-                self.player.add_force(up * (SPEED*delta_t));
+                self.entities[0].walk(up * (SPEED*delta_t));
             }
             if self.key_state.get(KeyCode::KeyE){
-                self.player.add_force(-up * (SPEED*delta_t));
+                self.entities[0].walk(-up * (SPEED*delta_t));
             }
         }
 
         {
             // Move camera look
             const SPEED: f64 = 0.2;
-            self.camera.pos = self.player.pos.cast().unwrap();
+            self.camera.pos = self.entities[0].body.pos.cast::<f32>().unwrap() + 0.7f32 * Vector3::unit_z();
             self.camera.theta += (SPEED*delta_t) as f32 *self.mouse_motion.1;
             self.camera.phi -= (SPEED*delta_t) as f32 *self.mouse_motion.0;
             self.mouse_motion = (0., 0.);

@@ -3,7 +3,7 @@ use cgmath::{InnerSpace, Matrix3, Rotation, Vector3, Zero};
 use loader::{PlanetLoader, ShipLoader};
 use rustc_hash::FxHashMap;
 use crate::graphics::{CHUNK_SIZE, Graphics, GridTexture, ModelUniform, Renderer, StorageBuffer};
-use crate::physics::{Collider, Physics, RigidBody, RigidBodyInit};
+use crate::physics::{Collider, MoI, Physics, RigidBody, RigidBodyInit};
 
 pub mod chunk;
 pub mod loader;
@@ -20,6 +20,24 @@ impl ObjectLoader {
     fn estimate_max_rendered_chunks(&self) -> usize {
         8184//TODO
     }
+
+    fn get_initial_data(&self) -> RigidBodyInit {
+        match self {
+            ObjectLoader::OneShot(ship_loader) => RigidBodyInit {
+                pos: ship_loader.pos,
+                vel: ship_loader.vel,
+                ..Default::default()
+            },
+            ObjectLoader::MultiShot(planet_loader) => {
+                let mass = 1000.;
+                RigidBodyInit {
+                    mass,
+                    moi: MoI::new_diagonal(Vector3::new(mass, mass, mass)*1000.),
+                    ..Default::default()
+                }
+            },
+        }
+    }
 }
 
 pub struct Object {
@@ -30,7 +48,8 @@ pub struct Object {
     storage_buffer: StorageBuffer,
 }
 impl Object {
-    pub fn new(graphics: &Graphics, physics: &mut Physics, loader: ObjectLoader, mut initial_data: RigidBodyInit) -> Self {
+    pub fn new(graphics: &Graphics, physics: &mut Physics, loader: ObjectLoader) -> Self {
+        let mut initial_data = loader.get_initial_data();
         initial_data.collider = Some(Collider::empty_object());
         let body = RigidBody::new(physics, initial_data);
         let buffer_size = loader.estimate_max_rendered_chunks()*std::mem::size_of::<ModelUniform>();

@@ -12,14 +12,14 @@ use shapes::ColliderIterator;
 #[derive(Debug,PartialEq)]
 pub enum CollisionReport {
     None,
+    /// * Normal vector pointing out of body 1 in inertial space
+    /// * Depth of body 1 in body 2 along the normal vector
+    /// * Position of the collided vertex of body 1 in body space
+    /// * Position of the collided vertex of body 2 in body space
     Some {
-        /// Normal vector pointing out of body 1 in inertial space
         normal: Vector3<f64>,
-        /// Depth of body 1 in body 2 along the normal vector
         depth: f64,
-        /// Position of the collided vertex of body 1 in body space
         p1: Vector3<f64>,
-        /// Position of the collided vertex of body 2 in body space
         p2: Vector3<f64>,
     }
 }
