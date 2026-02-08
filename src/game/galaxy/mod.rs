@@ -10,7 +10,7 @@ use crate::graphics::{FlatVertex, Graphics, IndexBuffer, ModelUniform, Renderer,
 
 const MAX_STEPS: usize = 100;
 const MAX_RADIUS: f32 = 1e8;
-const NOISE_SCALE: f32 = 5e5;
+const NOISE_SCALE: f32 = 1e6;
 
 pub struct Galaxy {
     dust_noise: Perlin,
@@ -73,7 +73,7 @@ impl Galaxy {
         model_buffer.write(graphics, ModelUniform::new(Matrix4::identity()));
 
         let star_h = 2e6;
-        let dust_h = 3e6;
+        let dust_h = 5e6;
         let halflight_r = 3e6;
         let max_rho = MAX_RADIUS / halflight_r;
 
@@ -107,7 +107,6 @@ impl Galaxy {
     pub fn update_skybox(&mut self, graphics: &Graphics, camera: Vector3<f32>) {
         let size = 256;
         let mut image = ImageBuffer::from_pixel(3*size, 2*size, Rgba([0, 0, 0, 255]));
-        let mut colors = Vec::with_capacity(6*(size*size) as usize);
 
         // Partition the stars
         let mut star_map = FxHashMap::default();
@@ -138,7 +137,17 @@ impl Galaxy {
         }
 
         // Get colors
+        let mut index = 0;
         for face in 0..6 {
+            let (start_x, start_y) = match face {
+                0 => (0, 0),
+                1 => (size, 0),
+                2 => (2*size, 0),
+                3 => (0, size),
+                4 => (size, size),
+                5 => (2*size, size),
+                _ => unreachable!()
+            };
             for x in 0..size {
                 let xf = 2. * x as f32 / size as f32 - 1.;
                 for y in 0..size {
@@ -153,42 +162,15 @@ impl Galaxy {
                         _ => unreachable!()
                     }.normalize();
 
-                    let star_vec = star_map.get(&colors.len());
-                    colors.push(self.raytrace(camera, dir, star_vec));
+                    let star_vec = star_map.get(&index);
+                    let color = self.raytrace(camera, dir, star_vec);
+                    index += 1;
+
+                    image[(start_x + x, start_y + y)] = Rgba(get_color(color, 0.1));
                 }
             }
         }
 
-        let mut color_norm = 0f32;
-        for color in &colors {
-            color_norm = color_norm.max(color[0].max(color[1]).max(color[2]))
-        }
-
-        // Paint skybox
-        let mut colors = colors.into_iter();
-        for face in 0..6 {
-            let (start_x, start_y) = match face {
-                0 => (0, 0),
-                1 => (size, 0),
-                2 => (2*size, 0),
-                3 => (0, size),
-                4 => (size, size),
-                5 => (2*size, size),
-                _ => unreachable!()
-            };
-            for x in 0..size {
-                for y in 0..size {
-                    let color = colors.next().unwrap();
-                    image[(start_x + x, start_y + y)] = Rgba([
-                        (color[0]/color_norm*255.) as u8,
-                        (color[1]/color_norm*255.) as u8,
-                        (color[2]/color_norm*255.) as u8,
-                        255
-                    ]);
-                }
-            }
-        }
-        
         self.texture = Some(Texture::from_image(graphics, &image, (3*size, 2*size)));
     }
 
@@ -239,9 +221,9 @@ impl Galaxy {
             color[1] += brightness * 0.9 * d_step;
             color[2] += brightness * 0.8 * d_step;
 
-            color[0] *= 1. - dust * 1. * d_step;
-            color[1] *= 1. - dust * 1.5 * d_step;
-            color[2] *= 1. - dust * 2. * d_step;
+            color[0] *= 1. - dust * 1.5 * d_step;
+            color[1] *= 1. - dust * 2. * d_step;
+            color[2] *= 1. - dust * 2.5 * d_step;
         }
         color
     }
@@ -262,11 +244,23 @@ struct Star {
 }
 impl Star {
     pub fn new(pos: Vector3<f32>, rng: &mut ThreadRng) -> Self {
-        const MIN_LUM: f32 = 1e12;
+        const MIN_LUM: f32 = 5e12;
         let lum = MIN_LUM * rng.random::<f32>().powf(-0.5);
         Self {
             pos,
             lum,
         }
     }
+}
+
+fn get_color(rgb: [f32; 3], thresh: f32) -> [u8; 4] {
+    let out = [rgb[0]/thresh, rgb[1]/thresh, rgb[2]/thresh];
+    let delta = out[0].max(out[1].max(out[2].max(1.)));
+    let inv_delta = 1. / delta;
+    [
+        255 - (inv_delta * 255. * (1. - out[0].min(1.))) as u8,
+        255 - (inv_delta * 255. * (1. - out[1].min(1.))) as u8,
+        255 - (inv_delta * 255. * (1. - out[2].min(1.))) as u8,
+        255
+    ]
 }

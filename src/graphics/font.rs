@@ -3,6 +3,9 @@ use rusttype::{Scale, point};
 
 use crate::graphics::{Camera, Graphics, Lighting, Renderer, ResourceType, Shader, StorageBuffer, TextVertex, Texture, resource::{IndexBuffer, VertexBuffer}};
 
+#[include_wgsl_oil::include_wgsl_oil("../shaders/font.wgsl")]
+mod font_shader {}
+
 pub struct Font {
     shader: Shader,
     font: rusttype::Font<'static>,
@@ -23,7 +26,7 @@ const MAX_SIZE: usize = 1024;
 
 impl Font {
     pub fn new(graphics: &mut Graphics, bytes: &'static [u8]) -> Self {
-        let shader = Shader::new::<TextVertex>(graphics, include_str!("../shaders/font.wgsl"), vec![
+        let shader = Shader::new::<TextVertex>(graphics, font_shader::SOURCE, vec![
             ResourceType::Texture,
         ]);
         let font = rusttype::Font::try_from_bytes(bytes).unwrap();

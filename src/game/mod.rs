@@ -3,6 +3,11 @@ pub mod planet;
 pub mod entity;
 pub mod galaxy;
 
+#[include_wgsl_oil::include_wgsl_oil("../shaders/flat.wgsl")]
+mod flat_shader {}
+#[include_wgsl_oil::include_wgsl_oil("../shaders/block.wgsl")]
+mod block_shader {}
+
 use crate::game::entity::Entity;
 use crate::game::galaxy::Galaxy;
 use crate::game::object::ObjectLoader;
@@ -69,13 +74,13 @@ impl Game {
     pub fn new(mut graphics: Graphics) -> Self {
         let mut physics = Box::new(Physics::new());
         let key_state = KeyState::new();
-        let block_shader = Shader::new::<BlockVertex>(&mut graphics, include_str!("../shaders/block.wgsl"), vec![
+        let block_shader = Shader::new::<BlockVertex>(&mut graphics, block_shader::SOURCE, vec![
             ResourceType::Camera,
             ResourceType::Model,
             ResourceType::Lighting,
             ResourceType::Texture,
         ]);
-        let flat_shader = Shader::new::<FlatVertex>(&mut graphics, include_str!("../shaders/flat.wgsl"), vec![
+        let flat_shader = Shader::new::<FlatVertex>(&mut graphics, flat_shader::SOURCE, vec![
             ResourceType::Camera,
             ResourceType::Model,
             ResourceType::Texture,
