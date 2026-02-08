@@ -191,6 +191,10 @@ impl<'a> Renderer<'a> {
             occlusion_query_set: None,
         }));
     }
+    
+    pub fn draw_indices(&mut self, n_indices: u32) {
+        self.render_pass.as_mut().unwrap().draw_indexed(0..n_indices, 0, 0..1);
+    }
 
     fn encoder(&mut self) -> &'a mut wgpu::CommandEncoder {
         if let Some(_) = &self.render_pass {

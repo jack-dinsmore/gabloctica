@@ -1,8 +1,10 @@
 pub mod object;
 pub mod planet;
 pub mod entity;
+pub mod galaxy;
 
 use crate::game::entity::Entity;
+use crate::game::galaxy::Galaxy;
 use crate::game::object::ObjectLoader;
 use crate::game::object::loader::ShipLoader;
 use crate::graphics::*;
@@ -45,18 +47,22 @@ impl KeyState {
 
 pub struct Game {
     graphics: Graphics,
-    physics: Box<Physics>,
-    entities: Vec<Entity>,
     block_shader: Shader,
     flat_shader: Shader,
-    key_state: KeyState,
     camera: Camera,
-    lighting: Lighting,
     texture: GridTexture,
-    objects: Vec<Object>,
-    mouse_motion: (f32, f32),
+    lighting: Lighting,
     font: Font,
+
+    physics: Box<Physics>,
+    objects: Vec<Object>,
+    entities: Vec<Entity>,
+
+    key_state: KeyState,
     fps_counter: FpsCounter,
+    mouse_motion: (f32, f32),
+
+    galaxy: Galaxy,
 }
 
 impl Game {
@@ -97,6 +103,9 @@ impl Game {
         let texture = GridTexture::new(&graphics, include_bytes!("../../assets/texture.png"));
 
         let font = Font::new(&mut graphics, include_bytes!("../../assets/Rockwell.ttc"));
+
+        let mut galaxy = Galaxy::new(&graphics);
+        galaxy.update_skybox(&graphics, Vector3::new(-1e7, 0., 0.));
         
         Self {
             graphics,
@@ -112,6 +121,7 @@ impl Game {
             font,
             fps_counter: FpsCounter::new(),
             entities,
+            galaxy,
         }
     }
 
@@ -226,7 +236,8 @@ impl Game {
 
                 renderer.start();
                 self.flat_shader.bind(&mut renderer);
-                // Draw skybox
+                self.camera.bind(&mut renderer);
+                self.galaxy.draw_skybox(&mut renderer);
                 
                 renderer.clear();
 

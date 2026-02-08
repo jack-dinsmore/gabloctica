@@ -126,7 +126,7 @@ impl IndexBuffer {
         }
     }
 
-    pub fn write<T: NoUninit>(&self, graphics: &Graphics, data: Vec<T>) {
+    pub fn write(&self, graphics: &Graphics, data: Vec<u16>) {
         graphics.queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(&data));
     }
 

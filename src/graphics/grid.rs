@@ -206,8 +206,7 @@ impl CubeGrid {
         self.buffer.bind(renderer);
         self.vertex_buffer.bind(renderer);
         self.index_buffer.bind(renderer);
-        let render_pass = renderer.render_pass.as_mut().unwrap();
-        render_pass.draw_indexed(0..self.n_indices, 0, 0..1);
+        renderer.draw_indices(self.n_indices);
     }
 }
 

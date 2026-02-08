@@ -96,7 +96,7 @@ impl Font {
         self.texture.bind(renderer);
         self.vertex_buffer.bind(renderer);
         self.index_buffer.bind(renderer);
-        renderer.render_pass.as_mut().unwrap().draw_indexed(0..self.indices.len() as u32, 0, 0..1);
+        renderer.draw_indices(self.indices.len() as u32);
         self.indices.clear();
         self.vertices.clear();
     }
