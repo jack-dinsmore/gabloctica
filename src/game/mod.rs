@@ -7,15 +7,14 @@ pub mod galaxy;
 mod flat_shader {}
 #[include_wgsl_oil::include_wgsl_oil("../shaders/block.wgsl")]
 mod block_shader {}
+#[include_wgsl_oil::include_wgsl_oil("../shaders/shadow.wgsl")]
+mod shadow_shader {}
 
 use crate::game::entity::Entity;
 use crate::game::galaxy::Galaxy;
-use crate::game::object::ObjectLoader;
-use crate::game::object::loader::ShipLoader;
 use crate::graphics::*;
 use crate::physics::*;
 use cgmath::Vector3;
-use cgmath::Zero;
 use object::Object;
 use planet::{Planet, PlanetInit};
 use cgmath::Rotation;
@@ -54,6 +53,7 @@ pub struct Game {
     graphics: Graphics,
     block_shader: Shader,
     flat_shader: Shader,
+    shadow_shader: Shader,
     camera: Camera,
     texture: GridTexture,
     lighting: Lighting,
@@ -79,17 +79,22 @@ impl Game {
             ResourceType::Model,
             ResourceType::Lighting,
             ResourceType::Texture,
+            ResourceType::Shadows,
         ]);
         let flat_shader = Shader::new::<FlatVertex>(&mut graphics, flat_shader::SOURCE, vec![
             ResourceType::Camera,
             ResourceType::Model,
             ResourceType::Texture,
         ]);
+        let shadow_shader = Shader::new::<BlockVertex>(&mut graphics, shadow_shader::SOURCE, vec![
+            ResourceType::Camera,
+            ResourceType::Model,
+        ]);
         let camera = Camera::new(&graphics);
         let planet = Planet::new(PlanetInit::default());
         let objects = vec![
             Object::new(&graphics, &mut physics, planet.loader()),
-            Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos:  Vector3::new(24., 24., 46.), vel: Vector3::zero() })),
+            // Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos:  Vector3::new(24., 24., 46.), vel: Vector3::zero() })),
         ];
         let entities = vec![
             Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 33.), ..Default::default()}),
@@ -111,7 +116,7 @@ impl Game {
 
         let mut galaxy = Galaxy::new(&graphics);
         galaxy.update_skybox(&graphics, Vector3::new(-1e7, 0., 0.));
-        
+
         Self {
             graphics,
             key_state,
@@ -127,6 +132,7 @@ impl Game {
             fps_counter: FpsCounter::new(),
             entities,
             galaxy,
+            shadow_shader,
         }
     }
 
@@ -222,7 +228,7 @@ impl Game {
 
     pub fn draw(&mut self) {
         // OPTIMIZE avoid all calls of queue.write_buffer.
-        self.camera.update_buffer(&self.graphics);
+        self.camera.update_buffer(&self.graphics, &self.lighting);
         self.lighting.update_buffer(&self.graphics, &self.camera);
         for object in &mut self.objects {
             object.update_buffer(&self.graphics, &self.camera)
@@ -238,8 +244,14 @@ impl Game {
                 }
                 self.font.copy_buffers(&mut renderer);
 
-
+                renderer.start_shadow(&mut self.camera);
+                self.shadow_shader.bind(&mut renderer);
+                self.camera.bind(&mut renderer);
+                for object in &self.objects {
+                    object.draw_shadow(&mut renderer);
+                }
                 renderer.start();
+
                 self.flat_shader.bind(&mut renderer);
                 self.camera.bind(&mut renderer);
                 self.galaxy.draw_skybox(&mut renderer);
@@ -249,6 +261,7 @@ impl Game {
                 // Draw main game
                 self.block_shader.bind(&mut renderer);
                 self.camera.bind(&mut renderer);
+                self.camera.bind_shadows(&mut renderer);
                 self.lighting.bind(&mut renderer);
                 for object in &self.objects {
                     object.draw(&mut renderer, &self.texture)

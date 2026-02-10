@@ -209,9 +209,21 @@ impl Object {
         }
     }
     
+    /// Draw for the sake of the shadow buffer (in which case the texture need not be bound)
     pub fn draw(&self, renderer: &mut Renderer, texture: &GridTexture) {
         for detail in 1..=4 {
             texture.bind(renderer, detail);
+            for chunk in self.chunks.values() {
+                if chunk.exposed != 63 && chunk.detail == detail {
+                    chunk.draw(renderer);
+                }
+            }
+        }
+    }
+    
+    /// Draw for the sake of the shadow buffer (in which case the texture need not be bound)
+    pub fn draw_shadow(&self, renderer: &mut Renderer) {
+        for detail in 1..=4 {
             for chunk in self.chunks.values() {
                 if chunk.exposed != 63 && chunk.detail == detail {
                     chunk.draw(renderer);

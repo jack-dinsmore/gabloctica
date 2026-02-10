@@ -44,11 +44,13 @@ impl Graphics {
         }).await.expect("Could not get an adapter (GPU).");
     
         // Get device
+        let mut limits = Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits());
+        limits.max_bind_groups = 5;
         let (device, queue) = adapter.request_device(
             &DeviceDescriptor {
                 label: None,
                 required_features: Features::empty(),
-                required_limits: Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits()),
+                required_limits: limits,
                 memory_hints: MemoryHints::Performance,
                 trace: Default::default(),
             },
@@ -62,7 +64,7 @@ impl Graphics {
         let surface_config = surface.get_default_config(&adapter, width, height).unwrap();
         surface.configure(&device, &surface_config);
 
-        let depth_texture_view = Texture::depth_view(&device, width, height);
+        let depth_texture_view = Texture::depth(&device, (width, height)).1;
     
         let output = Graphics {
             window: window.clone(),
@@ -97,7 +99,6 @@ impl Graphics {
 
         let renderer = Renderer::new(&self, &mut encoder, frame_view);
         render(renderer);
-
         self.queue.submit(Some(encoder.finish()));
         frame.present();
         self.window.request_redraw();
@@ -123,7 +124,7 @@ pub struct Renderer<'a> {
     frame_view: wgpu::TextureView,
     render_pass: Option<wgpu::RenderPass<'a>>,
     depth_texture_view: &'a wgpu::TextureView,
-    group_map: [u32; 4],
+    group_map: [u32; 5],
 }
 impl<'a> Renderer<'a> {
     pub fn new(graphics: &'a Graphics, encoder: &'a mut wgpu::CommandEncoder, frame_view: wgpu::TextureView) -> Self {
@@ -134,8 +135,27 @@ impl<'a> Renderer<'a> {
             frame_view,
             encoder_ptr,
             depth_texture_view: &graphics.depth_texture_view,
-            group_map: [0; 4],
+            group_map: [0; 5],
         }
+    }
+
+    pub fn start_shadow(&mut self, camera: &Camera) {
+        self.render_pass.take();
+        let encoder_ref = self.encoder();
+        self.render_pass = Some(encoder_ref.begin_render_pass(&RenderPassDescriptor {
+            label: Some("Render pass"),
+            color_attachments: &[],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &camera.shadow_texture.view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        }));
     }
 
     pub fn start(&mut self) {

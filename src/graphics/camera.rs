@@ -1,4 +1,4 @@
-use crate::graphics::{Renderer, ResourceType};
+use crate::graphics::{Lighting, Renderer, ResourceType, Texture};
 use crate::graphics::{Graphics, resource::UniformBuffer};
 use crate::graphics::resource::Uniform;
 use cgmath::{EuclideanSpace, Matrix4, Point3, Vector3};
@@ -15,14 +15,16 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::from_co
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub(super) struct CameraUniform {
     view_proj: [[f32; 4]; 4],
+    shadow_proj: [[f32; 4]; 4],
 }
 impl Uniform for CameraUniform {
     const TYPE: ResourceType = ResourceType::Camera;
 }
 impl CameraUniform {
-    fn new(view_proj: Matrix4<f32>) -> Self {
+    fn new(view_proj: Matrix4<f32>, shadow_proj: Matrix4<f32>) -> Self {
         Self {
-            view_proj: (OPENGL_TO_WGPU_MATRIX * view_proj).into()
+            view_proj: (OPENGL_TO_WGPU_MATRIX * view_proj).into(),
+            shadow_proj: (OPENGL_TO_WGPU_MATRIX * shadow_proj).into(),
         }
     }
 }
@@ -41,6 +43,7 @@ pub struct Camera {
     aspect: f32,
 
     buffer: UniformBuffer<CameraUniform>,
+    pub(super) shadow_texture: Texture,
 }
 
 impl Camera {
@@ -48,6 +51,7 @@ impl Camera {
         let aspect = graphics.surface_config.width as f32 / graphics.surface_config.height as f32;
         let up = Vector3::new(0., 0., 1.);
         let buffer = UniformBuffer::new(graphics);
+        let shadow_texture = Texture::new_depth(graphics, (100, 100));
 
         Self {
             pos: Vector3::new(0., 0., (5.)*16.),
@@ -61,6 +65,7 @@ impl Camera {
             aspect,
 
             buffer,
+            shadow_texture: shadow_texture,
         }
     }
     
@@ -92,18 +97,33 @@ impl Camera {
         )
     }
 
-    pub fn update_buffer(&self, graphics: &Graphics) {
+    pub fn update_buffer(&self, graphics: &Graphics, lighting: &Lighting) {
         let view = cgmath::Matrix4::look_at_rh(
             Point3::new(0., 0., 0.),
             Point3::from_vec(self.get_forward()),
             self.up
         );
         let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
-        let uniform = CameraUniform::new(proj * view);
+        let view_proj = proj * view;
+
+        let view = cgmath::Matrix4::look_at_rh(
+            Point3::new(0., 0., 0.),
+            Point3::new(1.,1.,1.),
+            self.up
+        );
+        let proj = cgmath::ortho(-500., 500., -500., 500., self.znear, self.zfar);
+        let shadow_proj = proj * view;
+
+        let uniform = CameraUniform::new(view_proj, shadow_proj);
+
         self.buffer.write(graphics, uniform);
     }
 
     pub fn bind(&self, renderer: &mut Renderer) {
         self.buffer.bind(renderer);
+    }
+
+    pub fn bind_shadows(&self, renderer: &mut Renderer) {
+        self.shadow_texture.bind(renderer);
     }
 }

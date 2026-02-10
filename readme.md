@@ -1,9 +1,12 @@
 # Todo
 
 ## Graphics: 
-* Sky box
-* Fog
+* Shadows
+* Ground clutter
 * Color clamping?
+    * Tried this and didn't like it. Go back?
+* Fog
+* Chromatic aberration?
 
 ## Planets
 * HUD debugger

@@ -28,17 +28,8 @@ impl Shader {
             push_constant_ranges: &[],
         });
 
-        // Create shader    
-        let render_pipeline = graphics.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render pipeline"),
-            layout: Some(&layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                buffers: &[V::desc()],
-                compilation_options: Default::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
+        let fragment = if source.contains("@fragment") {
+            Some(wgpu::FragmentState {
                 module: &shader,
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
@@ -50,7 +41,22 @@ impl Shader {
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
                 compilation_options: Default::default(),
-            }),
+            })
+        } else {
+            None
+        };
+
+        // Create shader    
+        let render_pipeline = graphics.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render pipeline"),
+            layout: Some(&layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                buffers: &[V::desc()],
+                compilation_options: Default::default(),
+            },
+            fragment,
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 strip_index_format: None,

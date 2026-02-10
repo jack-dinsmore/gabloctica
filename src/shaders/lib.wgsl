@@ -1,5 +1,6 @@
 struct CameraUniform {
     view_proj: mat4x4<f32>,
+    shadow_proj: mat4x4<f32>,
 };
 struct ModelUniform {
     model: mat4x4<f32>,
@@ -7,6 +8,8 @@ struct ModelUniform {
 struct LightUniform {
     pos: vec4<f32>,
 };
+
+const TEXTURE_SIZE: f32 = 16.; // Blocks per texture
 
 fn rgb_to_hsl(c: vec3<f32>) -> vec3<f32> {
     let maxc = max(c.r, max(c.g, c.b));
@@ -67,7 +70,7 @@ fn hsl_to_rgb(c: vec3<f32>) -> vec3<f32> {
 
 fn clamp_color(c: vec4<f32>) -> vec4<f32> {
     var hsl = rgb_to_hsl(c.xyz);
-    hsl = round(hsl*32.) / 32.;
-    hsl.y = 1.;
+    // hsl = round(hsl*32.) / 32.;
+    // hsl.y = 1.;
     return vec4(hsl_to_rgb(hsl), c.w);
 }

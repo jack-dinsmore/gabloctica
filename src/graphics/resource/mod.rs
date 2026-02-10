@@ -19,6 +19,7 @@ pub enum ResourceType {
     Model = 1,
     Lighting = 2,
     Texture = 3,
+    Shadows = 4,
 }
 impl ResourceType {
     pub(super) fn get_descriptor(&self) -> wgpu::BindGroupLayoutDescriptor<'_> {
@@ -82,6 +83,27 @@ impl ResourceType {
                     },
                 ],
                 label: Some("texture_bind_group_layout"),
+            },
+            ResourceType::Shadows => wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Depth,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+                label: Some("shadow_bind_group_layout"),
             },
         }
     }

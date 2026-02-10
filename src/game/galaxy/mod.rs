@@ -105,7 +105,7 @@ impl Galaxy {
     }
 
     pub fn update_skybox(&mut self, graphics: &Graphics, camera: Vector3<f32>) {
-        let size = 256;
+        let size = 32;//512;
         let mut image = ImageBuffer::from_pixel(3*size, 2*size, Rgba([0, 0, 0, 255]));
 
         // Partition the stars
