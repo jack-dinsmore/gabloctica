@@ -1,7 +1,7 @@
 use crate::graphics::{Lighting, Renderer, ResourceType, Texture};
 use crate::graphics::{Graphics, resource::UniformBuffer};
 use crate::graphics::resource::Uniform;
-use cgmath::{EuclideanSpace, Matrix4, Point3, Vector3};
+use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, Vector3};
 
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::from_cols(
@@ -29,8 +29,6 @@ impl CameraUniform {
     }
 }
 
-
-
 pub struct Camera {
     pub pos: Vector3<f32>,
     pub theta: f32,
@@ -51,7 +49,7 @@ impl Camera {
         let aspect = graphics.surface_config.width as f32 / graphics.surface_config.height as f32;
         let up = Vector3::new(0., 0., 1.);
         let buffer = UniformBuffer::new(graphics);
-        let shadow_texture = Texture::new_depth(graphics, (100, 100));
+        let shadow_texture = Texture::new_depth(graphics, (1000, 1000));
 
         Self {
             pos: Vector3::new(0., 0., (5.)*16.),
@@ -99,19 +97,19 @@ impl Camera {
 
     pub fn update_buffer(&self, graphics: &Graphics, lighting: &Lighting) {
         let view = cgmath::Matrix4::look_at_rh(
+            Point3::from_vec(-self.get_forward()),
             Point3::new(0., 0., 0.),
-            Point3::from_vec(self.get_forward()),
             self.up
         );
         let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
         let view_proj = proj * view;
 
         let view = cgmath::Matrix4::look_at_rh(
+            Point3::from_vec(-lighting.pos.normalize()),
             Point3::new(0., 0., 0.),
-            Point3::new(1.,1.,1.),
             self.up
         );
-        let proj = cgmath::ortho(-500., 500., -500., 500., self.znear, self.zfar);
+        let proj = cgmath::ortho(-50., 50., -50., 50., self.znear, self.zfar);
         let shadow_proj = proj * view;
 
         let uniform = CameraUniform::new(view_proj, shadow_proj);

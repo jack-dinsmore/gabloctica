@@ -189,7 +189,7 @@ impl Game {
 
         {
             // Move camera pos
-            const SPEED: f64 = 500.;
+            const SPEED: f64 = 1000.;
             let forward: Vector3<f64> = self.camera.get_forward().cast().unwrap();
             let up: Vector3<f64> = self.camera.get_up().cast().unwrap();
             let right: Vector3<f64> = self.camera.get_right().cast().unwrap();

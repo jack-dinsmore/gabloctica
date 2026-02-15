@@ -70,14 +70,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var to_light = normalize(lights.pos - in.position);
 
     var shadow_coords = in.shadow_pos.xyz / in.shadow_pos.w;
-    shadow_coords = shadow_coords * 0.5 + 0.5; 
-    let closest_depth = textureSample(t_shadow, s_shadow, shadow_coords.xy);
-    let current_depth = shadow_coords.z;
-
-    var shadow = 0.;
-    if (current_depth - 0.005 > closest_depth) {shadow = 1.;} // max(current_depth, closest_depth)==current_depth; 
+    shadow_coords.y *= -1;
+    let closest_depth = textureSample(t_shadow, s_shadow, shadow_coords.xy * 0.5 + 0.5);
+    let shadow = step(closest_depth - 0.05, shadow_coords.z);
 
     var illum = (1. - shadow) * dot(in.normal, to_light);
+
     illum = max(illum, 0.1);
 
     color.x *= illum;
@@ -85,6 +83,4 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     color.z *= illum;
 
     return lib::clamp_color(color);
-
-    // return color;
 }

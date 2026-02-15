@@ -21,13 +21,13 @@ impl Uniform for LightUniform {
 
 
 pub struct Lighting {
-    pos: Vector3<f32>,
+    pub pos: Vector3<f32>,
     buffer: UniformBuffer<LightUniform>,
 }
 
 impl Lighting {
     pub fn new(graphics: &Graphics) -> Self {
-        let pos = Vector3::new(-300., -500., 1000.);
+        let pos = Vector3::new(0., 1000., 500.);
         let buffer = UniformBuffer::new(graphics);
         Self {
             pos,
