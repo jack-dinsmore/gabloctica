@@ -2,7 +2,7 @@ use std::ops::{Index, IndexMut};
 use cgmath::{Matrix4, Quaternion, Vector3};
 use image::{GenericImageView, ImageBuffer, Rgba};
 
-use crate::graphics::{BlockVertex, Camera, Graphics, Renderer, ResourceType, Texture};
+use crate::graphics::{Block, BlockVertex, Camera, Graphics, Renderer, ResourceType, Texture};
 use crate::graphics::resource::{IndexBuffer, VertexBuffer, UniformBuffer, Uniform};
 
 #[repr(C)]
@@ -25,7 +25,7 @@ pub const CHUNK_SIZE: u32 = 16;
 const VERTEX_CAPACITY: usize = 0x10000;//TODO
 
 pub struct CubeGrid {
-    data: [u16; (CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize],
+    data: [Block; (CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize],
     /// Offset of the chunk from the rigid body center (i.e. the center of mass)
     pub global_pos: Vector3<f64>,
     vertex_buffer: VertexBuffer<BlockVertex>,
@@ -38,7 +38,7 @@ pub struct CubeGrid {
 
 impl CubeGrid {
     pub fn new(graphics: &Graphics) -> Self {
-        let data = [0; (CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize];
+        let data = [Block{id: 0, ori: 0}; (CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize];
 
         let vertex_buffer = VertexBuffer::new(graphics, VERTEX_CAPACITY);
         let index_buffer = IndexBuffer::new(graphics, VERTEX_CAPACITY/4*6);
@@ -56,7 +56,7 @@ impl CubeGrid {
         }
     }
 
-    pub fn set_data(&mut self, data: [u16; (CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize]) {
+    pub fn set_data(&mut self, data: [Block; (CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize]) {
         self.data = data
     }
 
@@ -64,7 +64,7 @@ impl CubeGrid {
         for x in 0..CHUNK_SIZE {
             for y in 0..CHUNK_SIZE {
                 for z in 0..CHUNK_SIZE {
-                    self[(x,y,z)] = 1;
+                    self[(x,y,z)] = Block {id: 1, ori: 0};
                 }
             }
         }
@@ -85,8 +85,8 @@ impl CubeGrid {
         for x in (0..CHUNK_SIZE).step_by(detail_skip as usize) {
             for y in (0..CHUNK_SIZE).step_by(detail_skip as usize) {
                 for z in (0..CHUNK_SIZE).step_by(detail_skip as usize) {
-                    let typ = self[(x,y,z)];
-                    if typ == 0 {continue;}
+                    let block = self[(x,y,z)];
+                    if block.is_null() {continue;}
 
                     let x0 = x;
                     let x1 = ((x+detail_skip) % 16) | (((x+detail_skip)/16) << 24);
@@ -94,17 +94,14 @@ impl CubeGrid {
                     let y1 = (((y+detail_skip) % 16) << 4) | (((y+detail_skip)/16) << 25);
                     let z0 = z << 8;
                     let z1 = (((z+detail_skip) % 16) << 8) | (((z+detail_skip)/16) << 26);
-                    let u0 = (typ as u32 & 0xf) << 16;
-                    let u1 = ((typ as u32 & 0xf) + 1) << 16;
-                    let v0 = ((typ as u32 >> 4) & 0xf) << 20;
-                    let v1 = (((typ as u32 >> 4) & 0xf) + 1) << 20;
 
-                    if x == 0 || self[(x-detail_skip,y,z)] == 0 {
+                    if x == 0 || self[(x-detail_skip,y,z)].is_null() {
                         let face = x0 | (1 << 12);
-                        vertices.push(BlockVertex {data: u0|v0|y0|z0|face});
-                        vertices.push(BlockVertex {data: u0|v1|y1|z0|face});
-                        vertices.push(BlockVertex {data: u1|v1|y1|z1|face});
-                        vertices.push(BlockVertex {data: u1|v0|y0|z1|face});
+                        let uv = block.get_uv_forward();
+                        vertices.push(BlockVertex {data: uv.0|y0|z0|face});
+                        vertices.push(BlockVertex {data: uv.1|y1|z0|face});
+                        vertices.push(BlockVertex {data: uv.2|y1|z1|face});
+                        vertices.push(BlockVertex {data: uv.3|y0|z1|face});
                         indices.push(0+index_offset);
                         indices.push(2+index_offset);
                         indices.push(1+index_offset);
@@ -113,12 +110,13 @@ impl CubeGrid {
                         indices.push(2+index_offset);
                         index_offset += 4;
                     }
-                    if y == 0 || self[(x,y-detail_skip,z)] == 0 {
+                    if y == 0 || self[(x,y-detail_skip,z)].is_null() {
                         let face = y0 | (3 << 12);
-                        vertices.push(BlockVertex {data: u0|v0|x0|z0|face});
-                        vertices.push(BlockVertex {data: u0|v1|x1|z0|face});
-                        vertices.push(BlockVertex {data: u1|v1|x1|z1|face});
-                        vertices.push(BlockVertex {data: u1|v0|x0|z1|face});
+                        let uv = block.get_uv_left();
+                        vertices.push(BlockVertex {data: uv.0|x0|z0|face});
+                        vertices.push(BlockVertex {data: uv.1|x1|z0|face});
+                        vertices.push(BlockVertex {data: uv.2|x1|z1|face});
+                        vertices.push(BlockVertex {data: uv.3|x0|z1|face});
                         indices.push(0+index_offset);
                         indices.push(1+index_offset);
                         indices.push(2+index_offset);
@@ -127,12 +125,13 @@ impl CubeGrid {
                         indices.push(3+index_offset);
                         index_offset += 4;
                     }
-                    if z == 0 || self[(x,y,z-detail_skip)] == 0 {
+                    if z == 0 || self[(x,y,z-detail_skip)].is_null() {
                         let face = z0 | (5 << 12);
-                        vertices.push(BlockVertex {data: u0|v0|x0|y0|face});
-                        vertices.push(BlockVertex {data: u0|v1|x1|y0|face});
-                        vertices.push(BlockVertex {data: u1|v1|x1|y1|face});
-                        vertices.push(BlockVertex {data: u1|v0|x0|y1|face});
+                        let uv = block.get_uv_up();
+                        vertices.push(BlockVertex {data: uv.0|x0|y0|face});
+                        vertices.push(BlockVertex {data: uv.1|x1|y0|face});
+                        vertices.push(BlockVertex {data: uv.2|x1|y1|face});
+                        vertices.push(BlockVertex {data: uv.3|x0|y1|face});
                         indices.push(0+index_offset);
                         indices.push(2+index_offset);
                         indices.push(1+index_offset);
@@ -141,12 +140,13 @@ impl CubeGrid {
                         indices.push(2+index_offset);
                         index_offset += 4;
                     }
-                    if x == last || self[(x+detail_skip,y,z)] == 0 {
+                    if x == last || self[(x+detail_skip,y,z)].is_null() {
                         let face = x1; // Normal or constant face
-                        vertices.push(BlockVertex {data: u0|v0|y0|z0|face});
-                        vertices.push(BlockVertex {data: u0|v1|y1|z0|face});
-                        vertices.push(BlockVertex {data: u1|v1|y1|z1|face});
-                        vertices.push(BlockVertex {data: u1|v0|y0|z1|face});
+                        let uv = block.get_uv_backward();
+                        vertices.push(BlockVertex {data: uv.0|y0|z0|face});
+                        vertices.push(BlockVertex {data: uv.1|y1|z0|face});
+                        vertices.push(BlockVertex {data: uv.2|y1|z1|face});
+                        vertices.push(BlockVertex {data: uv.3|y0|z1|face});
                         indices.push(0+index_offset);
                         indices.push(1+index_offset);
                         indices.push(2+index_offset);
@@ -155,12 +155,13 @@ impl CubeGrid {
                         indices.push(3+index_offset);
                         index_offset += 4;
                     }
-                    if y == last || self[(x,y+detail_skip,z)] == 0 {
+                    if y == last || self[(x,y+detail_skip,z)].is_null() {
                         let face = y1 | (2 << 12);
-                        vertices.push(BlockVertex {data: u0|v0|x0|z0|face});
-                        vertices.push(BlockVertex {data: u0|v1|x1|z0|face});
-                        vertices.push(BlockVertex {data: u1|v1|x1|z1|face});
-                        vertices.push(BlockVertex {data: u1|v0|x0|z1|face});
+                        let uv = block.get_uv_right();
+                        vertices.push(BlockVertex {data: uv.0|x0|z0|face});
+                        vertices.push(BlockVertex {data: uv.1|x1|z0|face});
+                        vertices.push(BlockVertex {data: uv.2|x1|z1|face});
+                        vertices.push(BlockVertex {data: uv.3|x0|z1|face});
                         indices.push(0+index_offset);
                         indices.push(2+index_offset);
                         indices.push(1+index_offset);
@@ -169,12 +170,13 @@ impl CubeGrid {
                         indices.push(2+index_offset);
                         index_offset += 4;
                     }
-                    if z == last || self[(x,y,z+detail_skip)] == 0 {
+                    if z == last || self[(x,y,z+detail_skip)].is_null() {
                         let face = z1 | (4 << 12);
-                        vertices.push(BlockVertex {data: u0|v0|x0|y0|face});
-                        vertices.push(BlockVertex {data: u0|v1|x1|y0|face});
-                        vertices.push(BlockVertex {data: u1|v1|x1|y1|face});
-                        vertices.push(BlockVertex {data: u1|v0|x0|y1|face});
+                        let uv = block.get_uv_down();
+                        vertices.push(BlockVertex {data: uv.0|x0|y0|face});
+                        vertices.push(BlockVertex {data: uv.1|x1|y0|face});
+                        vertices.push(BlockVertex {data: uv.2|x1|y1|face});
+                        vertices.push(BlockVertex {data: uv.3|x0|y1|face});
                         indices.push(0+index_offset);
                         indices.push(1+index_offset);
                         indices.push(2+index_offset);
@@ -209,9 +211,8 @@ impl CubeGrid {
         renderer.draw_indices(self.n_indices);
     }
 }
-
 impl Index<(u32, u32, u32)> for CubeGrid {
-    type Output = u16;
+    type Output = Block;
 
     fn index(&self, index: (u32, u32, u32)) -> &Self::Output {
         &self.data[(index.0 + index.1*CHUNK_SIZE + index.2*CHUNK_SIZE*CHUNK_SIZE) as usize]

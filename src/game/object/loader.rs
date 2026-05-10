@@ -1,7 +1,7 @@
 use cgmath::Vector3;
 use rustc_hash::FxHashMap;
 
-use crate::{game::planet::{Atmosphere, Terrain}, graphics::{CHUNK_SIZE, Graphics}};
+use crate::{game::planet::{Atmosphere, Terrain}, graphics::{Block, CHUNK_SIZE, Graphics}};
 
 use super::Chunk;
 
@@ -18,7 +18,7 @@ impl ShipLoader {
             chunk_coord.2 as f64 * CHUNK_SIZE as f64,
         );
         let mut chunk = Chunk::empty(graphics, pos);
-        chunk.grid[(7,7,7)] = 1;
+        chunk.grid[(7,7,7)] = Block{id: 1, ori: 0};
         let mut out = FxHashMap::default();
         out.insert(chunk_coord, chunk);
         out
@@ -94,12 +94,12 @@ impl PlanetLoader {
                         let depth = local_height - t - 1;
                         let block = biome.get_block(depth as i32);
                         match face_index {
-                            0 => chunk.grid[(t,u,v)] = block,
-                            1 => chunk.grid[(CHUNK_SIZE-1-t,u,v)] = block,
-                            2 => chunk.grid[(u,t,v)] = block,
-                            3 => chunk.grid[(u,CHUNK_SIZE-1-t,v)] = block,
-                            4 => chunk.grid[(u,v,t)] = block,
-                            5 => chunk.grid[(u,v,CHUNK_SIZE-1-t)] = block,
+                            0 => chunk.grid[(t,u,v)].id = block,
+                            1 => chunk.grid[(CHUNK_SIZE-1-t,u,v)].id = block,
+                            2 => chunk.grid[(u,t,v)].id = block,
+                            3 => chunk.grid[(u,CHUNK_SIZE-1-t,v)].id = block,
+                            4 => chunk.grid[(u,v,t)].id = block,
+                            5 => chunk.grid[(u,v,CHUNK_SIZE-1-t)].id = block,
                             _ => unreachable!()
                         }
                     }
@@ -135,7 +135,7 @@ impl PlanetLoader {
                         }
                         if min_depth >= 0 {
                             let biome = self.atmosphere.get_biome(pos, best_face_index);
-                            chunk.grid[(x,y,z)] = biome.get_block(min_depth);
+                            chunk.grid[(x,y,z)].id = biome.get_block(min_depth);
                         }
                     }
                 }

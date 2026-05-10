@@ -105,7 +105,7 @@ impl Game {
         let post_info = PostInfo::new(&graphics, &camera);
 
         let mut planets: Vec<Planet> = vec![
-            Planet::new(PlanetInit::default()),
+            // Planet::new(PlanetInit::default()),
         ];
         let mut objects = vec![
             Rc::new(RefCell::new(Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos: Vector3::new(12., 7., 43.), vel: Vector3::new(0., 0., 0.) })))),

@@ -2,7 +2,7 @@ use cgmath::{InnerSpace, Matrix3, Rotation, Vector3, Zero};
 
 use loader::{PlanetLoader, ShipLoader};
 use rustc_hash::FxHashMap;
-use crate::graphics::{CHUNK_SIZE, Graphics, GridTexture, ModelUniform, Renderer, StorageBuffer};
+use crate::graphics::{Block, CHUNK_SIZE, Graphics, GridTexture, ModelUniform, Renderer, StorageBuffer};
 use crate::physics::{Collider, MoI, Physics, RigidBody, RigidBodyInit};
 
 pub mod chunk;
@@ -257,7 +257,7 @@ impl Object {
     }
     
     /// Insert a block into the cell containg position pos. Pos is in body coordinates.
-    pub(crate) fn insert_block(&mut self, graphics: &Graphics, typ: u16, pos: Vector3<f64>) {
+    pub(crate) fn insert_block(&mut self, graphics: &Graphics, typ: u8, pos: Vector3<f64>) {
         let updated_chunk = (
             (pos.x/CHUNK_SIZE as f64).floor() as i32,
             (pos.y/CHUNK_SIZE as f64).floor() as i32,
@@ -278,7 +278,7 @@ impl Object {
         }
         // Set the block
         let chunk = self.chunks.get_mut(&updated_chunk).unwrap();
-        chunk.grid[updated_block] = typ;
+        chunk.grid[updated_block] = Block{id: typ, ori: 0}; // TODO work out the orientation
         chunk.update_model(graphics);
         self.update_chunk_info(graphics, vec![updated_chunk]);
     }

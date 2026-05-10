@@ -45,7 +45,7 @@ impl Chunk {
                 let mut block: u16 = 0;
                 for x in 0..CHUNK_SIZE {
                     let xf = x as f64 + 0.5;
-                    if self.grid[(x,y,z)] != 0 {
+                    if !self.grid[(x,y,z)].is_null() {
                         block |= 1 << x;
 
                         let block_mass = 1.;
@@ -77,11 +77,11 @@ impl Chunk {
         let mut break_neg = false;
         for z in 0..CHUNK_SIZE {
             for y in 0..CHUNK_SIZE {
-                if self.grid[(0,y,z)] == 0 {
+                if self.grid[(0,y,z)].is_null() {
                     self.flush |= 1 << 0;
                     break_pos = true;
                 }
-                if self.grid[(CHUNK_SIZE-1,y,z)] == 0 {
+                if self.grid[(CHUNK_SIZE-1,y,z)].is_null() {
                     self.flush |= 1 << 1;
                     break_neg = true;
                 }
@@ -94,11 +94,11 @@ impl Chunk {
         let mut break_neg = false;
         for z in 0..CHUNK_SIZE {
             for x in 0..CHUNK_SIZE {
-                if self.grid[(x,0,z)] == 0 {
+                if self.grid[(x,0,z)].is_null() {
                     self.flush |= 1 << 2;
                     break_pos = true;
                 }
-                if self.grid[(x,CHUNK_SIZE-1,z)] == 0 {
+                if self.grid[(x,CHUNK_SIZE-1,z)].is_null() {
                     self.flush |= 1 << 3;
                     break_neg = true;
                 }
@@ -111,11 +111,11 @@ impl Chunk {
         let mut break_neg = false;
         for y in 0..CHUNK_SIZE {
             for x in 0..CHUNK_SIZE {
-                if self.grid[(x,y,0)] == 0 {
+                if self.grid[(x,y,0)].is_null() {
                     self.flush |= 1 << 4;
                     break_pos = true;
                 }
-                if self.grid[(x,y,CHUNK_SIZE-1)] == 0 {
+                if self.grid[(x,y,CHUNK_SIZE-1)].is_null() {
                     self.flush |= 1 << 5;
                     break_neg = true;
                 }

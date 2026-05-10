@@ -308,7 +308,7 @@ impl Biome {
         }
     }
 
-    pub fn get_block(&self, depth: i32) -> u16 {
+    pub fn get_block(&self, depth: i32) -> u8 {
         match self.typ {
             0 => 1,
             1 => 2,

@@ -11,7 +11,9 @@ pub struct BlockVertex {
     /// 4-7:    y pos
     /// 8-11:   z pos
     /// 12-14:  normal (0, 1, 2, 3, 4, or 5. Other bytes are unused)
-    /// 16-31:  id
+    /// 16-19:  u pos
+    /// 20-23:  v pos
+    /// 24-26:  x,y,z overflow bits
     pub data: u32,
 }
 
