@@ -17,7 +17,7 @@ pub(super) struct Chunk {
 }
 
 impl Chunk {
-    pub fn empty(graphics: &Graphics, pos: Vector3<f32>) -> Self {
+    pub fn empty(graphics: &Graphics, pos: Vector3<f64>) -> Self {
         let mut grid = CubeGrid::new(graphics);
         grid.global_pos = pos;
         Self {

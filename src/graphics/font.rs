@@ -3,9 +3,6 @@ use rusttype::{Scale, point};
 
 use crate::graphics::{Camera, Graphics, Lighting, Renderer, ResourceType, Shader, StorageBuffer, TextVertex, Texture, resource::{IndexBuffer, VertexBuffer}};
 
-#[include_wgsl_oil::include_wgsl_oil("../shaders/font.wgsl")]
-mod font_shader {}
-
 pub struct Font {
     shader: Shader,
     font: rusttype::Font<'static>,
@@ -14,6 +11,7 @@ pub struct Font {
     borders: Vec<f32>,
     width: u32, 
     height: u32,
+    y_info: (f32, f32),
 
     storage_buffer_vertex: StorageBuffer,
     storage_buffer_index: StorageBuffer,
@@ -25,34 +23,42 @@ pub struct Font {
 const MAX_SIZE: usize = 1024;
 
 impl Font {
-    pub fn new(graphics: &mut Graphics, bytes: &'static [u8]) -> Self {
-        let shader = Shader::new::<TextVertex>(graphics, font_shader::SOURCE, vec![
+    pub fn new(graphics: &mut Graphics, camera: &Camera, bytes: &'static [u8]) -> Self {
+        let shader = Shader::new::<TextVertex>(graphics, include_str!("../shaders/font.wgsl"), vec![
             ResourceType::Texture,
-        ]);
+        ], false);
         let font = rusttype::Font::try_from_bytes(bytes).unwrap();
         let scale = Scale { x: 32., y: 42. };
         let string: String = (0..255u8).map(|c| c as char).collect();
 
         let mut full_width = 0;
-        let mut full_height = 0;
+        let mut min_height = 0;
+        let mut max_height = 0;
         let mut starts = Vec::new();
         for g in font.layout(&string, scale, point(0., 0.)) {
             starts.push(full_width);
-            if let Some(bbox) = g.pixel_bounding_box() {
-                full_width += bbox.width() as u32;
-                full_height = full_height.max(bbox.height() as u32);
+            if g.id().0 != 0 {
+                if let Some(bbox) = g.pixel_bounding_box() {
+                    full_width += bbox.width() as u32;
+                    min_height = min_height.min(bbox.min.y);
+                    max_height = max_height.max(bbox.max.y);
+                }
             }
         };
+        let full_height = (max_height - min_height) as u32;
 
         let mut image = ImageBuffer::from_pixel(full_width, full_height, Rgba([0, 0, 0, 0]));
         for (g, offset_x) in font.layout(&string, scale, point(0., 0.)).zip(&starts) {
-            let g = g.into_unpositioned().positioned(point(0.,0.));
-            g.draw(|x,y,v| {
-                let vi = (v*255.) as u8;
-                image[(offset_x+x, y)] = Rgba([0, 0, 0, vi]);
-            });
+            if g.id().0 != 0 {
+                if let Some(bbox) = g.pixel_bounding_box() {
+                    g.draw(|x,y,v| {
+                        let vi = (v*255.) as u8;
+                        image[(*offset_x + x, (bbox.min.y - min_height) as u32 + y)] = Rgba([0, 0, 0, vi]);
+                    });
+                }
+            }
         }
-        let texture = Texture::from_image(graphics, &image, (full_width, full_height));
+        let texture = Texture::from_image(graphics, camera, &image, (full_width, full_height));
 
         let mut borders: Vec<f32> = starts.iter().map(|s| (*s as f32) / (full_width as f32)).collect();
         borders.push(1.);
@@ -79,7 +85,8 @@ impl Font {
             vertex_buffer,
             index_buffer,
             width,
-            height
+            height,
+            y_info: (min_height as f32 / height as f32, max_height as f32 / height as f32),
         }
     }
 
@@ -104,13 +111,13 @@ impl Font {
         self.vertices.clear();
     }
 
-    pub fn text(&mut self, text: &str, px: f32, py: f32) {
+    fn text_single_line(&mut self, text: &str, px: f32, py: f32) {
         for (g, c) in self.font.layout(text, self.scale, point(0., 0.)).zip(text.chars()) {
             if let Some(bbox) = g.pixel_bounding_box() {
                 let start = self.borders[c as usize];
                 let stop = self.borders[c as usize+1];
-                let min = (px + 2.*bbox.min.x as f32 / self.width as f32 - 1., -py - 2.*bbox.min.y as f32 / self.height as f32 + 1.);
-                let max = (px + 2.*bbox.max.x as f32 / self.width as f32 - 1., -py - 2.*bbox.max.y as f32 / self.height as f32 + 1.);
+                let min = (px + 2.*bbox.min.x as f32 / self.width as f32 - 1., -py - 2.*self.y_info.0 + 1.);
+                let max = (px + 2.*bbox.max.x as f32 / self.width as f32 - 1., -py - 2.*self.y_info.1 + 1.);
                 let i0 = self.vertices.len() as u16;
                 self.vertices.push(TextVertex {
                     x: [min.0, min.1],
@@ -135,6 +142,13 @@ impl Font {
                 self.indices.push(i0+3);
                 self.indices.push(i0+2);
             }
+        }
+    }
+
+    pub fn text(&mut self, text: &str, px: f32, py: f32) {
+        let dy = 2.* self.scale.y / self.height as f32;
+        for (i, line) in text.split('\n').enumerate() {
+            self.text_single_line(line, px, py+(dy*i as f32));
         }
     }
 

@@ -9,7 +9,7 @@ pub(super) struct LightUniform {
 }
 impl LightUniform {
     fn new(lighting: &Lighting, camera: &Camera) -> Self {
-        let shifted_pos = lighting.pos - camera.pos;
+        let shifted_pos = (lighting.pos - camera.pos).cast().unwrap();
         Self {
             pos: [shifted_pos.x, shifted_pos.y, shifted_pos.z, 0.],
         }
@@ -21,13 +21,13 @@ impl Uniform for LightUniform {
 
 
 pub struct Lighting {
-    pub pos: Vector3<f32>,
+    pub pos: Vector3<f64>,
     buffer: UniformBuffer<LightUniform>,
 }
 
 impl Lighting {
     pub fn new(graphics: &Graphics) -> Self {
-        let pos = Vector3::new(0., 1000., 500.);
+        let pos = Vector3::new(1., 1., 100.);
         let buffer = UniformBuffer::new(graphics);
         Self {
             pos,

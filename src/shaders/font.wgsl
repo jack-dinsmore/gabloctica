@@ -8,8 +8,6 @@ struct VertexOutput {
     @location(1) texpos: vec2<f32>,
 }
 
-const TEXTURE_SIZE: f32 = 16.; // Blocks per texture
-
 @group(0) @binding(0) var t_diffuse: texture_2d<f32>;
 @group(0) @binding(1) var s_diffuse: sampler;
 

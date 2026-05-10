@@ -4,7 +4,7 @@ use crate::graphics::Graphics;
 mod buffer;
 mod texture;
 
-pub use texture::Texture;
+pub use texture::*;
 pub use buffer::*;
 
 pub(super) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
@@ -19,12 +19,12 @@ pub enum ResourceType {
     Model = 1,
     Lighting = 2,
     Texture = 3,
-    Shadows = 4,
+    Post = 4,
 }
 impl ResourceType {
-    pub(super) fn get_descriptor(&self) -> wgpu::BindGroupLayoutDescriptor<'_> {
+    pub(crate) fn create_bind_group_layout(&self, device: &wgpu::Device) -> wgpu::BindGroupLayout{
         match self {
-            ResourceType::Camera => wgpu::BindGroupLayoutDescriptor {
+            ResourceType::Camera => device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::VERTEX,
@@ -36,8 +36,8 @@ impl ResourceType {
                     count: None,
                 }],
                 label: Some("camera_bind_group_layout"),
-            },
-            ResourceType::Model => wgpu::BindGroupLayoutDescriptor {
+            }),
+            ResourceType::Model => device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::VERTEX,
@@ -49,8 +49,8 @@ impl ResourceType {
                     count: None,
                 }],
                 label: Some("model_bind_group_layout"),
-            },
-            ResourceType::Lighting => wgpu::BindGroupLayoutDescriptor {
+            }),
+            ResourceType::Lighting => device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::FRAGMENT,
@@ -62,8 +62,8 @@ impl ResourceType {
                     count: None,
                 }],
                 label: Some("light_bind_group_layout"),
-            },
-            ResourceType::Texture => wgpu::BindGroupLayoutDescriptor {
+            }),
+            ResourceType::Texture => device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
@@ -81,13 +81,8 @@ impl ResourceType {
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
-                ],
-                label: Some("texture_bind_group_layout"),
-            },
-            ResourceType::Shadows => wgpu::BindGroupLayoutDescriptor {
-                entries: &[
                     wgpu::BindGroupLayoutEntry {
-                        binding: 0,
+                        binding: 2,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
                             multisampled: false,
@@ -97,14 +92,27 @@ impl ResourceType {
                         count: None,
                     },
                     wgpu::BindGroupLayoutEntry {
-                        binding: 1,
+                        binding: 3,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
                 ],
-                label: Some("shadow_bind_group_layout"),
-            },
+                label: Some("texture_bind_group_layout"),
+            }),
+            ResourceType::Post => device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+                label: Some("post_bind_group_layout"),
+            }),
         }
     }
 }

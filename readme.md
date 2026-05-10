@@ -1,11 +1,13 @@
 # Todo
 
+## Ships
+
 ## Graphics: 
-* Shadows
+* Fog
+
 * Ground clutter
 * Color clamping?
     * Tried this and didn't like it. Go back?
-* Fog
 * Chromatic aberration?
 * OPTIMIZE: Combine texture and shadow bind group into one, and lighting and camera. Then lower the bind group limit back to defaults.
 

@@ -15,13 +15,18 @@ pub struct Atmosphere {
     resolution: usize,
 }
 
-fn newton_iteration(iterations: usize, x0: &[f32], func: impl Fn(&[f32]) -> Vec<f32>, hess: impl Fn(&[f32]) -> Mat<f32>) -> Vec<f32> {
+fn newton_iteration(iterations: usize, x0: &[f64], func: impl Fn(&[f64]) -> Vec<f64>, hess: impl Fn(&[f64]) -> Mat<f64>) -> Vec<f64> {
     let mut x = ColRef::from_slice(x0).to_owned();
-    for _ in 0..iterations {
-        let x_owned: Vec<f32> = x.iter().copied().collect();
+    for iter in 0..iterations {
+        if x.iter().fold(false, |accum, c| accum || c.is_nan()) {
+            panic!("Nan at iteration {iter}");
+        }
+        let x_owned: Vec<f64> = x.iter().copied().collect();
         let f = ColRef::from_slice(&func(&x_owned)).to_owned();
         let h = hess(&x_owned);
-        x -= h.full_piv_lu().solve(&f);
+        dbg!(h.determinant());
+        let lu = h.full_piv_lu();
+        x -= lu.solve(&f);
     }
     x.iter().map(|v| *v).collect::<Vec<_>>()
 }
@@ -84,109 +89,122 @@ impl Atmosphere {
 
     /// Get the basic Hadley Cell flow
     pub fn get_basic_winds(temps: &[f32; 6]) -> [Vector3<f32>; 6] {
-        let output = newton_iteration(
-            4,
-            &vec![0.; 18],
-            |x| { // Function
-                let mut output = vec![0.; 18];
-                for edge_index in 0..6 {
-                    // Get indices of the adjoining faces
-                    let (i0, i1) = match edge_index {
-                        0 => (4,0),
-                        1 => (0,2),
-                        2 => (2,5),
-                        3 => (5,3),
-                        4 => (3,1),
-                        5 => (1,0),
-                        _ => unreachable!(),
-                    };
-                    let normal = match edge_index {
-                        0 => Vector3::new(1., 0., 1.),
-                        1 => Vector3::new(1., 1., 0.),
-                        2 => Vector3::new(0., 1., -1.),
-                        3 => Vector3::new(0., -1., -1.),
-                        4 => Vector3::new(-1., -1., 0.),
-                        5 => Vector3::new(-1., 0., 1.),
-                        _ => unreachable!(),
-                    } * 0.707;
-                    let u0 = Vector3::new(x[i0*3+0], x[i0*3+1], x[i0*3+2]);
-                    let u1 = Vector3::new(x[i1*3+0], x[i1*3+1], x[i1*3+2]);
-                    let udot = normal.dot((u1+u0)/2.);
-                    let eqn = udot.powi(2) * (u1 - u0) - normal * (
-                        (temps[i1] - temps[i0]) * udot - normal.dot(u1-u0)
-                    );
-                    output[edge_index*3+0] = eqn.x;
-                    output[edge_index*3+1] = eqn.y;
-                    output[edge_index*3+2] = eqn.z;
-                }
-                output
-            },
-            |x| { // Hessian
-                let mut output = Mat::zeros(18,18);
-                for edge_index in 0..6 {
-                    // Get indices of the adjoining faces
-                    let (i0, i1) = match edge_index {
-                        0 => (4,0),
-                        1 => (0,2),
-                        2 => (2,5),
-                        3 => (5,3),
-                        4 => (3,1),
-                        5 => (1,0),
-                        _ => unreachable!(),
-                    };
-                    let normal = match edge_index {
-                        0 => Vector3::new(1., 0., 1.),
-                        1 => Vector3::new(1., 1., 0.),
-                        2 => Vector3::new(0., 1., -1.),
-                        3 => Vector3::new(0., -1., -1.),
-                        4 => Vector3::new(-1., -1., 0.),
-                        5 => Vector3::new(-1., 0., 1.),
-                        _ => unreachable!(),
-                    } * 0.707;
-                    let mut u0 = Vector3::new(x[i0*3+0], x[i0*3+1], x[i0*3+2]);
-                    let mut u1 = Vector3::new(x[i1*3+0], x[i1*3+1], x[i1*3+2]);
-                    let udot = normal.dot((u1+u0)/2.);
-                    let eqn0 = udot.powi(2) * (u1 - u0) - normal * (
-                        (temps[i1] - temps[i0]) * udot - normal.dot(u1-u0)
-                    );
-
-                    let delta = 0.01;
-                    for i in 0..3 {
-                        u0[i] += delta;
-                        let udot = normal.dot((u1+u0)/2.);
-                        let eqn = udot.powi(2) * (u1 - u0) - normal * (
-                            (temps[i1] - temps[i0]) * udot - normal.dot(u1-u0)
-                        );
-                        let grad = (eqn - eqn0) / delta;
-                        u0[i] -= delta;
-                        output[((edge_index*3+0), (i0*3+i))] = grad.x;
-                        output[((edge_index*3+1), (i0*3+i))] = grad.y;
-                        output[((edge_index*3+2), (i0*3+i))] = grad.z;
-                    }
-                    for i in 0..3 {
-                        u1[i] += delta;
-                        let udot = normal.dot((u1+u0)/2.);
-                        let eqn = udot.powi(2) * (u1 - u0) - normal * (
-                            (temps[i1] - temps[i0]) * udot - normal.dot(u1-u0)
-                        );
-                        let grad = (eqn - eqn0) / delta;
-                        u1[i] -= delta;
-                        output[((edge_index*3+0), (i1*3+i))] = grad.x;
-                        output[((edge_index*3+1), (i1*3+i))] = grad.y;
-                        output[((edge_index*3+2), (i1*3+i))] = grad.z;
-                    }
-                }
-                output
-            }
-        );
+        // TODO
         [
-            Vector3::new(output[0], output[1], output[2]),
-            Vector3::new(output[3], output[4], output[5]),
-            Vector3::new(output[6], output[7], output[8]),
-            Vector3::new(output[9], output[10], output[11]),
-            Vector3::new(output[12], output[13], output[14]),
-            Vector3::new(output[15], output[16], output[17]),
+            Vector3::new(0., 0., 0.),
+            Vector3::new(0., 0., 0.),
+            Vector3::new(0., 0., 0.),
+            Vector3::new(0., 0., 0.),
+            Vector3::new(0., 0., 0.),
+            Vector3::new(0., 0., 0.),
         ]
+        // fn get_intro_data(x: &[f64], edge_index: usize) -> (usize, usize, Vector3<f64>, Vector3<f64>, Vector3<f64>) {
+        //     // Get indices of the adjoining faces
+        //     let (i0, i1) = match edge_index {
+        //         0 => (4,0),
+        //         1 => (0,2),
+        //         2 => (2,5),
+        //         3 => (5,3),
+        //         4 => (3,1),
+        //         5 => (1,4),
+        //         _ => unreachable!(),
+        //     };
+        //     let normal = match edge_index {
+        //         0 => Vector3::new(1., 0., 1.),
+        //         1 => Vector3::new(1., 1., 0.),
+        //         2 => Vector3::new(0., 1., -1.),
+        //         3 => Vector3::new(0., -1., -1.),
+        //         4 => Vector3::new(-1., -1., 0.),
+        //         5 => Vector3::new(-1., 0., 1.),
+        //         _ => unreachable!(),
+        //     } * 2f64.sqrt();
+        //     let u0 = match i0 {
+        //         0 | 1 => Vector3::new(0., x[i0*2+0], x[i0*2+1]),
+        //         2 | 3 => Vector3::new(x[i0*2+0], 0., x[i0*2+1]),
+        //         4 | 5 => Vector3::new(x[i0*2+0], x[i0*2+1], 0.),
+        //         _ => unreachable!()
+        //     };
+        //     let u1 = match i1 {
+        //         0 | 1 => Vector3::new(0., x[i1*2+0], x[i1*2+1]),
+        //         2 | 3 => Vector3::new(x[i1*2+0], 0., x[i1*2+1]),
+        //         4 | 5 => Vector3::new(x[i1*2+0], x[i1*2+1], 0.),
+        //         _ => unreachable!()
+        //     };
+        //     (i0, i1, normal, u0, u1)
+        // }
+
+        // let output = newton_iteration(
+        //     4,
+        //     &vec![0.; 12],
+        //     |x| { // Function
+        //         // This is more complicated than I thought. I need to keep better track of the DoF.
+        //         dbg!(&x);
+        //         let mut output = vec![0.; 12];
+        //         for edge_index in 0..6 {
+        //             // Get indices of the adjoining faces
+        //             let (i0, i1, normal, u0, u1) = get_intro_data(x, edge_index);
+        //             let udot = normal.dot((u1+u0)/2.);
+        //             let eqn = udot.powi(2) * (u1 - u0) - normal * (
+        //                 (temps[i1] as f64 - temps[i0] as f64) * udot - normal.dot(u1-u0)
+        //             );
+        //             output[edge_index*3+0] = eqn.x;
+        //             output[edge_index*3+1] = eqn.y;
+        //             output[edge_index*3+2] = eqn.z;
+        //         }
+        //         output
+        //     },
+        //     |x| { // Hessian
+        //         let mut output = Mat::zeros(12,12);
+        //         for edge_index in 0..6 {
+        //             // Get indices of the adjoining faces
+        //             let (i0, i1, normal, mut u0, mut u1) = get_intro_data(x, edge_index);
+        //             let udot = normal.dot((u1+u0)/2.);
+        //             let eqn0 = udot.powi(2) * (u1 - u0) - normal * (
+        //                 (temps[i1] as f64 - temps[i0] as f64) * udot - normal.dot(u1-u0)
+        //             );
+
+        //             let delta = 0.01;
+        //             for i in 0..3 {
+        //                 u0[i] += delta;
+        //                 let udot = normal.dot((u1+u0)/2.);
+        //                 let eqn = udot.powi(2) * (u1 - u0) - normal * (
+        //                     (temps[i1] as f64 - temps[i0] as f64) * udot - normal.dot(u1-u0)
+        //                 );
+        //                 let grad = (eqn - eqn0) / delta;
+        //                 u0[i] -= delta;
+        //                 dbg!(grad);
+        //                 output[((edge_index*3+0), (i0*3+i))] = grad.x;
+        //                 output[((edge_index*3+1), (i0*3+i))] = grad.y;
+        //                 output[((edge_index*3+2), (i0*3+i))] = grad.z;
+        //             }
+        //             dbg!();
+        //             for i in 0..3 {
+        //                 u1[i] += delta;
+        //                 let udot = normal.dot((u1+u0)/2.);
+        //                 let eqn = udot.powi(2) * (u1 - u0) - normal * (
+        //                     (temps[i1] as f64 - temps[i0] as f64) * udot - normal.dot(u1-u0)
+        //                 );
+        //                 let grad = (eqn - eqn0) / delta;
+        //                 u1[i] -= delta;
+        //                 dbg!(grad);
+        //                 output[((edge_index*3+0), (i1*3+i))] = grad.x;
+        //                 output[((edge_index*3+1), (i1*3+i))] = grad.y;
+        //                 output[((edge_index*3+2), (i1*3+i))] = grad.z;
+        //             }
+        //             dbg!();
+        //             dbg!();
+        //         }
+        //         output
+        //     }
+        // );
+        // [
+        //     Vector3::new(output[0] as f32, output[1] as f32, output[2] as f32),
+        //     Vector3::new(output[3] as f32, output[4] as f32, output[5] as f32),
+        //     Vector3::new(output[6] as f32, output[7] as f32, output[8] as f32),
+        //     Vector3::new(output[9] as f32, output[10] as f32, output[11] as f32),
+        //     Vector3::new(output[12] as f32, output[13] as f32, output[14] as f32),
+        //     Vector3::new(output[15] as f32, output[16] as f32, output[17] as f32),
+        // ]
     }
 
     /// Set the wind flow, humidity, and temperature interpolators given the planet terrain
@@ -265,7 +283,20 @@ impl Atmosphere {
         }
         Biome::new(1)
     }
+
+    pub fn get_temp(&self, pos: Vector3<f32>) -> f32 {
+        self.temp_interp.get(pos)
+    }
+
+    pub fn get_wind(&self, pos: Vector3<f32>) -> Vector3<f32> {
+        self.wind_interp.get(pos)
+    }
+
+    pub fn get_humidity(&self, pos: Vector3<f32>) -> f32 {
+        self.humidity_interp.get(pos)
+    }
 }
+#[derive(Debug)]
 pub struct Biome {
     typ: u8,
 }

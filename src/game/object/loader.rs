@@ -13,19 +13,19 @@ impl ShipLoader {
     pub(super) fn load_all(&self, graphics: &crate::graphics::Graphics) -> FxHashMap<(i32, i32, i32), Chunk> {
         let chunk_coord = (0, 0, 0);
         let pos = Vector3::new(
-            chunk_coord.0 as f32 * CHUNK_SIZE as f32,
-            chunk_coord.1 as f32 * CHUNK_SIZE as f32,
-            chunk_coord.2 as f32 * CHUNK_SIZE as f32,
+            chunk_coord.0 as f64 * CHUNK_SIZE as f64,
+            chunk_coord.1 as f64 * CHUNK_SIZE as f64,
+            chunk_coord.2 as f64 * CHUNK_SIZE as f64,
         );
         let mut chunk = Chunk::empty(graphics, pos);
-        chunk.grid.demo();
+        chunk.grid[(7,7,7)] = 1;
         let mut out = FxHashMap::default();
         out.insert(chunk_coord, chunk);
         out
     }
     
     pub(super) fn unload_all(&self) {
-        // TODO 
+        // TODO implement unloading ships so that they can be reloaded with changes saved
     }
 }
 
@@ -146,6 +146,6 @@ impl PlanetLoader {
     }
     
     pub(super) fn unload_chunk(&self, chunk_coord: (i32, i32, i32), chunk: &Chunk) {
-        // TODO 
+        // TODO implement unloading chunk with changes saved
     }
 }

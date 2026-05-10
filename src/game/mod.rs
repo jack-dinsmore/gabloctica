@@ -2,18 +2,20 @@ pub mod object;
 pub mod planet;
 pub mod entity;
 pub mod galaxy;
+pub mod shading;
 
-#[include_wgsl_oil::include_wgsl_oil("../shaders/flat.wgsl")]
-mod flat_shader {}
-#[include_wgsl_oil::include_wgsl_oil("../shaders/block.wgsl")]
-mod block_shader {}
-#[include_wgsl_oil::include_wgsl_oil("../shaders/shadow.wgsl")]
-mod shadow_shader {}
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::game::entity::Entity;
 use crate::game::galaxy::Galaxy;
+use crate::game::object::ObjectLoader;
+use crate::game::object::loader::ShipLoader;
+use crate::game::shading::PostInfo;
 use crate::graphics::*;
 use crate::physics::*;
+use crate::util::RcCell;
+use cgmath::InnerSpace;
 use cgmath::Vector3;
 use object::Object;
 use planet::{Planet, PlanetInit};
@@ -54,14 +56,17 @@ pub struct Game {
     block_shader: Shader,
     flat_shader: Shader,
     shadow_shader: Shader,
+    post_shader: Shader,
     camera: Camera,
     texture: GridTexture,
     lighting: Lighting,
     font: Font,
+    post_info: PostInfo,
 
     physics: Box<Physics>,
-    objects: Vec<Object>,
+    objects: Vec<RcCell<Object>>,
     entities: Vec<Entity>,
+    planets: Vec<Planet>,
 
     key_state: KeyState,
     fps_counter: FpsCounter,
@@ -74,33 +79,47 @@ impl Game {
     pub fn new(mut graphics: Graphics) -> Self {
         let mut physics = Box::new(Physics::new());
         let key_state = KeyState::new();
-        let block_shader = Shader::new::<BlockVertex>(&mut graphics, block_shader::SOURCE, vec![
+        let block_shader = Shader::new::<BlockVertex>(&mut graphics, include_str!("../shaders/block.wgsl"), vec![
             ResourceType::Camera,
             ResourceType::Model,
             ResourceType::Lighting,
             ResourceType::Texture,
-            ResourceType::Shadows,
-        ]);
-        let flat_shader = Shader::new::<FlatVertex>(&mut graphics, flat_shader::SOURCE, vec![
+        ], false);
+        let flat_shader = Shader::new::<FlatVertex>(&mut graphics, include_str!("../shaders/flat.wgsl"), vec![
             ResourceType::Camera,
             ResourceType::Model,
             ResourceType::Texture,
-        ]);
-        let shadow_shader = Shader::new::<BlockVertex>(&mut graphics, shadow_shader::SOURCE, vec![
+        ], false);
+        let shadow_shader = Shader::new::<BlockVertex>(&mut graphics, include_str!("../shaders/shadow.wgsl"), vec![
             ResourceType::Camera,
             ResourceType::Model,
-        ]);
+        ], false);
+        let post_shader = Shader::new::<PostVertex>(&mut graphics, include_str!("../shaders/post.wgsl"), vec![
+            ResourceType::Post,
+            ResourceType::Texture,
+            ResourceType::Camera,
+            ResourceType::Lighting,
+        ], true);
         let camera = Camera::new(&graphics);
-        let planet = Planet::new(PlanetInit::default());
-        let objects = vec![
-            Object::new(&graphics, &mut physics, planet.loader()),
-            // Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos:  Vector3::new(24., 24., 46.), vel: Vector3::zero() })),
-        ];
-        let entities = vec![
-            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 33.), ..Default::default()}),
-        ];
         let lighting = Lighting::new(&graphics);
+        let post_info = PostInfo::new(&graphics, &camera);
 
+        let mut planets: Vec<Planet> = vec![
+            Planet::new(PlanetInit::default()),
+        ];
+        let mut objects = vec![
+            Rc::new(RefCell::new(Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos: Vector3::new(12., 7., 43.), vel: Vector3::new(0., 0., 0.) })))),
+        ];
+        for planet in &mut planets {
+            let obj = Rc::new(RefCell::new(Object::new(&graphics, &mut physics, planet.loader())));
+            planet.object = Some(obj.clone());
+            objects.push(obj);
+        }
+        let entities = vec![
+            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 50.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
+        ];
+
+        
         // Set cursor to center of screen
         let size = graphics.window.inner_size();
         let center = PhysicalPosition::new(
@@ -110,12 +129,12 @@ impl Game {
         graphics.window.set_cursor_position(center).unwrap();
 
         // Load block texture
-        let texture = GridTexture::new(&graphics, include_bytes!("../../assets/texture.png"));
+        let texture = GridTexture::new(&graphics, &camera, include_bytes!("../../assets/texture.png"));
 
-        let font = Font::new(&mut graphics, include_bytes!("../../assets/Rockwell.ttc"));
+        let font = Font::new(&mut graphics, &camera, include_bytes!("../../assets/Rockwell.ttc"));
 
         let mut galaxy = Galaxy::new(&graphics);
-        galaxy.update_skybox(&graphics, Vector3::new(-1e7, 0., 0.));
+        galaxy.update_skybox(&graphics, &camera, Vector3::new(-1e7, 0., 0.));
 
         Self {
             graphics,
@@ -133,6 +152,9 @@ impl Game {
             entities,
             galaxy,
             shadow_shader,
+            post_shader,
+            post_info,
+            planets,
         }
     }
 
@@ -155,7 +177,7 @@ impl Game {
 
                 for object in &mut self.objects {
                     // The collision function should always pick some over None, but choose the one with the smallest distance to the target otherwise.
-                    let new_report = Collider::check_collision(&player.body, &object.body);
+                    let new_report = Collider::check_collision(&player.body, &object. borrow().body);
 
                     if new_report > report {
                         report = new_report;
@@ -166,12 +188,12 @@ impl Game {
                 if let Some(o) = collided_object {
                     let place_pos = match report {
                         CollisionReport::Some { p2, .. } => {
-                            let offset = o.body.ori.invert() * forward;
+                            let offset = o.borrow().body.ori.invert() * forward;
                             p2 - offset*0.001
                         }
                         CollisionReport::None => unreachable!(),
                     };
-                    o.insert_block(&self.graphics, 1, place_pos);
+                    o.borrow_mut().insert_block(&self.graphics, 1, place_pos);
                 }
 
                 // Put the collider back
@@ -182,10 +204,29 @@ impl Game {
     }
 
     pub fn update(&mut self, delta_t: f64) {
-        for object in &mut self.objects {
-            object.update(&self.graphics, self.camera.pos.cast().unwrap());
-        }
         self.fps_counter.update(delta_t);
+        for object in &mut self.objects {
+            object.borrow_mut().update(&self.graphics, self.camera.pos.cast().unwrap());
+        }
+
+        let my_planet = if !self.planets.is_empty() {
+            let mut min_dist = f64::INFINITY;
+            let mut min_index = 0;
+            for (i, planet) in self.planets.iter().enumerate() {
+                if let Some(o) = &planet.object {
+                    let o = o.borrow().body;
+                    let dist = (o.pos - self.camera.pos.cast().unwrap()).magnitude();
+                    if dist < min_dist {
+                        min_index = i;
+                        min_dist = dist;
+                    }
+                }
+            }
+            Some(&self.planets[min_index])
+        } else {
+            None
+        };
+        self.post_info.update_buffer(&self.graphics, &self.camera, my_planet);
 
         {
             // Move camera pos
@@ -212,65 +253,74 @@ impl Game {
                 self.entities[0].walk(-up * (SPEED*delta_t));
             }
         }
+        
+        self.physics.update(delta_t);
 
         {
             // Move camera look
             const SPEED: f64 = 0.2;
-            self.camera.pos = self.entities[0].body.pos.cast::<f32>().unwrap() + 0.7f32 * Vector3::unit_z();
+            self.camera.pos = self.entities[0].body.pos + 0.7f64 * Vector3::unit_z();
             self.camera.theta += (SPEED*delta_t) as f32 *self.mouse_motion.1;
             self.camera.phi -= (SPEED*delta_t) as f32 *self.mouse_motion.0;
             self.mouse_motion = (0., 0.);
             self.camera.theta = self.camera.theta.clamp(0.0001, 3.1415);
         }
-
-        self.physics.update(delta_t);
     }
 
     pub fn draw(&mut self) {
         // OPTIMIZE avoid all calls of queue.write_buffer.
-        self.camera.update_buffer(&self.graphics, &self.lighting);
+        self.camera.update_buffer(&self.graphics, &self.lighting, &self.camera);
         self.lighting.update_buffer(&self.graphics, &self.camera);
         for object in &mut self.objects {
-            object.update_buffer(&self.graphics, &self.camera)
+            object.borrow_mut().update_buffer(&self.graphics, &self.camera)
         }
         self.font.text(&format!("FPS {}", self.fps_counter.get()), 0., 0.12);
+        if !self.planets.is_empty() {
+            self.font.text(&self.planets[0].dbg_text(self.camera.pos.cast().unwrap()), 0.0, 0.2);
+        }
         self.font.update(&self.graphics);
         
         self.graphics.draw(
             |mut renderer| {
                 // Update buffers
                 for object in &self.objects {
-                    object.copy_buffers(&mut renderer);
+                    object.borrow().copy_buffers(&mut renderer);
                 }
                 self.font.copy_buffers(&mut renderer);
 
+                // Shadow render
                 renderer.start_shadow(&mut self.camera);
                 self.shadow_shader.bind(&mut renderer);
                 self.camera.bind(&mut renderer);
                 for object in &self.objects {
-                    object.draw_shadow(&mut renderer);
+                    object.borrow().draw_shadow(&mut renderer);
                 }
-                renderer.start();
 
+                // Sky box
+                renderer.start();
                 self.flat_shader.bind(&mut renderer);
                 self.camera.bind(&mut renderer);
                 self.galaxy.draw_skybox(&mut renderer);
-                
-                renderer.clear();
 
                 // Draw main game
+                renderer.clear();
                 self.block_shader.bind(&mut renderer);
                 self.camera.bind(&mut renderer);
-                self.camera.bind_shadows(&mut renderer);
                 self.lighting.bind(&mut renderer);
                 for object in &self.objects {
-                    object.draw(&mut renderer, &self.texture)
+                    object.borrow().draw(&mut renderer, &self.texture)
                 }
-
-                renderer.clear();
-
+                
                 // Draw text
                 self.font.render(&mut renderer, &self.camera, &self.lighting);
+
+                // Finish
+                renderer.start_post();
+                self.post_shader.bind(&mut renderer);
+                self.post_info.bind(&mut renderer);
+                self.camera.bind(&mut renderer);
+                self.lighting.bind(&mut renderer);
+                renderer.stop_post();
             },
         );
     }

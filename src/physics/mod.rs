@@ -56,8 +56,9 @@ impl Physics {
                         a.moi.mul_inv(p1.cross(normal)).cross(p1).dot(normal) + 
                         b.moi.mul_inv(p2.cross(normal)).cross(p2).dot(normal)
                     ;
+                    let rel_vel = a.vel - b.vel;
                     let restitution = (a.restitution + b.restitution) / 2.;
-                    let impulse = (1. + restitution) / denom;
+                    let impulse = (1. + restitution) * rel_vel.dot(normal) / denom;
                     a.add_force(-impulse / delta_t * normal);
                     b.add_force(impulse / delta_t * normal);
 

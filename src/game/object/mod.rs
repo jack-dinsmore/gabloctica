@@ -108,12 +108,16 @@ impl Object {
         // Set the rigid body data
         mass_m1 /= mass_m0;
         mass_m2 /= mass_m0;
-        self.body.com_pos = mass_m1.cast().unwrap(); // Center of mass
+        let new_com = mass_m1.cast().unwrap();
+        let delta_com = new_com - self.body.com_pos;
+        let delta_com_global = self.body.ori * delta_com;
+        self.body.com_pos = new_com; // Center of mass
         self.body.moi = crate::physics::MoI::new_matrix((mass_m2.clone() - Matrix3::new(
             mass_m1.x*mass_m1.x - 0.1666666666, mass_m1.x*mass_m1.y, mass_m1.x*mass_m1.z,
             mass_m1.y*mass_m1.x, mass_m1.y*mass_m1.y - 0.1666666666, mass_m1.y*mass_m1.z,
             mass_m1.z*mass_m1.x, mass_m1.z*mass_m1.y, mass_m1.z*mass_m1.z - 0.1666666666,
         )) * mass_m0);
+        self.body.pos += delta_com_global;
     }
 
     pub fn update(&mut self, graphics: &Graphics, character_pos: Vector3<f64>) {
@@ -267,7 +271,7 @@ impl Object {
 
         if let None = self.chunks.get(&updated_chunk) {
             // Make a new chunk
-            let pos = Vector3::new(updated_chunk.0 as f32, updated_chunk.1 as f32, updated_chunk.2 as f32)*CHUNK_SIZE as f32;
+            let pos = Vector3::new(updated_chunk.0 as f64, updated_chunk.1 as f64, updated_chunk.2 as f64)*CHUNK_SIZE as f64;
             let new_chunk = Chunk::empty(graphics, pos);
             self.chunks.insert(updated_chunk, new_chunk);
             self.body.get_object_collider_mut().chunks.insert(updated_chunk, [0; (CHUNK_SIZE*CHUNK_SIZE) as usize]);

@@ -7,10 +7,11 @@ pub struct Shader {
     render_pipeline: wgpu::RenderPipeline,
     layout: wgpu::PipelineLayout,
     resources: Vec<ResourceType>,
+    pub(super) is_post: bool,
 }
 
 impl Shader {
-    pub fn new<V: Vertex>(graphics: &mut Graphics, source: &'static str, resources: Vec<ResourceType>) -> Self {
+    pub fn new<V: Vertex>(graphics: &mut Graphics, source: &'static str, resources: Vec<ResourceType>, is_post: bool) -> Self {
         let shader = graphics.device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
             source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(source)),
@@ -46,14 +47,30 @@ impl Shader {
             None
         };
 
+        let depth_stencil = if is_post {
+            None
+        } else {
+            Some(wgpu::DepthStencilState {
+                format: super::resource::DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            })
+        };
+
         // Create shader    
+        let buffers: &[wgpu::VertexBufferLayout<'static>] = match V::desc() {
+            Some(b) => &[b],
+            None => &[],
+        };
         let render_pipeline = graphics.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render pipeline"),
             layout: Some(&layout),
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[V::desc()],
+                buffers,
                 compilation_options: Default::default(),
             },
             fragment,
@@ -66,13 +83,7 @@ impl Shader {
                 unclipped_depth: false,
                 conservative: false,
             },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: super::resource::DEPTH_FORMAT,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
+            depth_stencil,
             multisample: Default::default(),
             multiview: None,
             cache: None,
@@ -82,6 +93,7 @@ impl Shader {
             render_pipeline,
             layout,
             resources,
+            is_post,
         }
     }
 

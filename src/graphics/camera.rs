@@ -1,4 +1,4 @@
-use crate::graphics::{Lighting, Renderer, ResourceType, Texture};
+use crate::graphics::{FreeTexture, Lighting, Renderer, ResourceType, TextureType};
 use crate::graphics::{Graphics, resource::UniformBuffer};
 use crate::graphics::resource::Uniform;
 use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, Vector3};
@@ -30,18 +30,19 @@ impl CameraUniform {
 }
 
 pub struct Camera {
-    pub pos: Vector3<f32>,
+    pub pos: Vector3<f64>,
     pub theta: f32,
     pub phi: f32,
     pub fovy: f32,
     pub up: Vector3<f32>,
 
-    znear: f32,
-    zfar: f32,
+    pub znear: f32,
+    pub zfar: f32,
     aspect: f32,
 
     buffer: UniformBuffer<CameraUniform>,
-    pub(super) shadow_texture: Texture,
+    pub(super) shadow_texture: FreeTexture,
+    pub(super) shadow_texture_sampler: wgpu::Sampler,
 }
 
 impl Camera {
@@ -49,7 +50,17 @@ impl Camera {
         let aspect = graphics.surface_config.width as f32 / graphics.surface_config.height as f32;
         let up = Vector3::new(0., 0., 1.);
         let buffer = UniformBuffer::new(graphics);
-        let shadow_texture = Texture::new_depth(graphics, (1000, 1000));
+        let shadow_texture = FreeTexture::new(&graphics.device, (5000, 5000), TextureType::Depth);
+
+        let shadow_texture_sampler = graphics.device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
 
         Self {
             pos: Vector3::new(0., 0., (5.)*16.),
@@ -59,11 +70,12 @@ impl Camera {
             fovy: 45., // Degrees
             
             znear: 0.1,
-            zfar: 1000.,
+            zfar: 300.,
             aspect,
 
             buffer,
-            shadow_texture: shadow_texture,
+            shadow_texture,
+            shadow_texture_sampler,
         }
     }
     
@@ -95,7 +107,7 @@ impl Camera {
         )
     }
 
-    pub fn update_buffer(&self, graphics: &Graphics, lighting: &Lighting) {
+    pub fn update_buffer(&self, graphics: &Graphics, lighting: &Lighting, camera: &Camera) {
         let view = cgmath::Matrix4::look_at_rh(
             Point3::from_vec(-self.get_forward()),
             Point3::new(0., 0., 0.),
@@ -104,13 +116,14 @@ impl Camera {
         let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
         let view_proj = proj * view;
 
+        let rel_pos = (lighting.pos - camera.pos).cast().unwrap();
         let view = cgmath::Matrix4::look_at_rh(
-            Point3::from_vec(-lighting.pos.normalize()),
+            Point3::from_vec(rel_pos.normalize()),
             Point3::new(0., 0., 0.),
             self.up
         );
-        let proj = cgmath::ortho(-50., 50., -50., 50., self.znear, self.zfar);
-        let shadow_proj = proj * view;
+        let proj = cgmath::ortho(-100., 100., -100., 100., -100., 100.);
+        let shadow_proj = proj * view; // TODO
 
         let uniform = CameraUniform::new(view_proj, shadow_proj);
 
@@ -119,9 +132,5 @@ impl Camera {
 
     pub fn bind(&self, renderer: &mut Renderer) {
         self.buffer.bind(renderer);
-    }
-
-    pub fn bind_shadows(&self, renderer: &mut Renderer) {
-        self.shadow_texture.bind(renderer);
     }
 }

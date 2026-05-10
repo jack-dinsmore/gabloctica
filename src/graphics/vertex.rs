@@ -1,5 +1,5 @@
 pub trait Vertex: Copy + Clone + bytemuck::Pod + bytemuck::Zeroable {
-    fn desc() -> wgpu::VertexBufferLayout<'static>;
+    fn desc() -> Option<wgpu::VertexBufferLayout<'static>>;
 }
 
 #[repr(C)]
@@ -16,8 +16,8 @@ pub struct BlockVertex {
 }
 
 impl Vertex for BlockVertex {
-    fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
+    fn desc() -> Option<wgpu::VertexBufferLayout<'static>> {
+        Some(wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &[
@@ -27,7 +27,7 @@ impl Vertex for BlockVertex {
                     format: wgpu::VertexFormat::Uint32,
                 },
             ],
-        }
+        })
     }
 }
 
@@ -39,8 +39,8 @@ pub struct FlatVertex {
 }
 
 impl Vertex for FlatVertex {
-    fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
+    fn desc() -> Option<wgpu::VertexBufferLayout<'static>> {
+        Some(wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &[
@@ -55,7 +55,7 @@ impl Vertex for FlatVertex {
                     format: wgpu::VertexFormat::Float32x2,
                 },
             ],
-        }
+        })
     }
 }
 
@@ -67,8 +67,8 @@ pub struct TextVertex {
 }
 
 impl Vertex for TextVertex {
-    fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
+    fn desc() -> Option<wgpu::VertexBufferLayout<'static>> {
+        Some(wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &[
@@ -83,6 +83,16 @@ impl Vertex for TextVertex {
                     format: wgpu::VertexFormat::Float32x2,
                 },
             ],
-        }
+        })
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct PostVertex {}
+
+impl Vertex for PostVertex {
+    fn desc() -> Option<wgpu::VertexBufferLayout<'static>> {
+        None
     }
 }

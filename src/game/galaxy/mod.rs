@@ -6,7 +6,7 @@ use noise::{NoiseFn, Perlin};
 use rand::{Rng, rngs::ThreadRng};
 use rustc_hash::FxHashMap;
 
-use crate::graphics::{FlatVertex, Graphics, IndexBuffer, ModelUniform, Renderer, Texture, UniformBuffer, VertexBuffer};
+use crate::graphics::{Camera, FlatVertex, Graphics, IndexBuffer, ModelUniform, Renderer, Texture, UniformBuffer, VertexBuffer};
 
 const MAX_STEPS: usize = 100;
 const MAX_RADIUS: f32 = 1e8;
@@ -104,14 +104,14 @@ impl Galaxy {
         }
     }
 
-    pub fn update_skybox(&mut self, graphics: &Graphics, camera: Vector3<f32>) {
-        let size = 32;//512;
+    pub fn update_skybox(&mut self, graphics: &Graphics, camera: &Camera, camera_pos: Vector3<f32>) {
+        let size = 32; // 512
         let mut image = ImageBuffer::from_pixel(3*size, 2*size, Rgba([0, 0, 0, 255]));
 
         // Partition the stars
         let mut star_map = FxHashMap::default();
         for (star_index, star) in self.stars.iter().enumerate() {
-            let mut delta = star.pos - camera;
+            let mut delta = star.pos - camera_pos;
             delta /= delta.x.abs().max(delta.y.abs().max(delta.z.abs()));
             let xi = ((delta.x + 1.) / 2. * size as f32) as u32;
             let yi = ((delta.y + 1.) / 2. * size as f32) as u32;
@@ -163,7 +163,7 @@ impl Galaxy {
                     }.normalize();
 
                     let star_vec = star_map.get(&index);
-                    let color = self.raytrace(camera, dir, star_vec);
+                    let color = self.raytrace(camera_pos, dir, star_vec);
                     index += 1;
 
                     image[(start_x + x, start_y + y)] = Rgba(get_color(color, 0.1));
@@ -171,7 +171,7 @@ impl Galaxy {
             }
         }
 
-        self.texture = Some(Texture::from_image(graphics, &image, (3*size, 2*size)));
+        self.texture = Some(Texture::from_image(graphics, &camera, &image, (3*size, 2*size)));
     }
 
     fn raytrace(&self, camera: Vector3<f32>, dir: Vector3<f32>, star_indices: Option<&Vec<usize>>) -> [f32; 3] {

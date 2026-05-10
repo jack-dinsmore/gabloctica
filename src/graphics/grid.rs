@@ -27,7 +27,7 @@ const VERTEX_CAPACITY: usize = 0x10000;//TODO
 pub struct CubeGrid {
     data: [u16; (CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize],
     /// Offset of the chunk from the rigid body center (i.e. the center of mass)
-    pub global_pos: Vector3<f32>,
+    pub global_pos: Vector3<f64>,
     vertex_buffer: VertexBuffer<BlockVertex>,
     index_buffer: IndexBuffer,
     n_indices: u32,
@@ -196,10 +196,10 @@ impl CubeGrid {
         self.detail = detail;
     }
 
-    pub fn get_uniform(&self, pos: Vector3<f32>, ori: Quaternion<f32>, camera: &Camera) -> ModelUniform {
+    pub fn get_uniform(&self, pos: Vector3<f64>, ori: Quaternion<f64>, camera: &Camera) -> ModelUniform {
         let model = Matrix4::from_translation(pos + ori * self.global_pos - camera.pos)
             * Matrix4::from(ori);
-        ModelUniform::new(model)
+        ModelUniform::new(model.cast().unwrap())
     }
 
     pub fn draw(&self, renderer: &mut Renderer) {
@@ -229,17 +229,17 @@ pub struct GridTexture {
     textures: [Texture; 4],
 }
 impl GridTexture {
-    pub fn new(graphics: &Graphics, bytes: &[u8]) -> Self {
+    pub fn new(graphics: &Graphics, camera: &Camera, bytes: &[u8]) -> Self {
         let loaded_image = image::load_from_memory(bytes).unwrap();
         let mut rgba = loaded_image.to_rgba8();
         let dimensions = loaded_image.dimensions();
-        let t0 = Texture::from_image(graphics, &rgba, dimensions);
+        let t0 = Texture::from_image(graphics, camera, &rgba, dimensions);
         Self::subsample(&mut rgba, dimensions);
-        let t1 = Texture::from_image(graphics, &rgba, dimensions);
+        let t1 = Texture::from_image(graphics, camera, &rgba, dimensions);
         Self::subsample(&mut rgba, dimensions);
-        let t2 = Texture::from_image(graphics, &rgba, dimensions);
+        let t2 = Texture::from_image(graphics, camera, &rgba, dimensions);
         Self::subsample(&mut rgba, dimensions);
-        let t3 = Texture::from_image(graphics, &rgba, dimensions);
+        let t3 = Texture::from_image(graphics, camera, &rgba, dimensions);
         Self {
             textures: [t0, t1, t2, t3]
         }

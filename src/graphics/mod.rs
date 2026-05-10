@@ -29,6 +29,7 @@ pub struct Graphics {
     device: Device,
     queue: Queue,
     depth_texture_view: wgpu::TextureView,
+    render_texture: Option<Texture>,
     layouts: Vec<Option<wgpu::BindGroupLayout>>,
 }
 
@@ -44,8 +45,7 @@ impl Graphics {
         }).await.expect("Could not get an adapter (GPU).");
     
         // Get device
-        let mut limits = Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits());
-        limits.max_bind_groups = 5;
+        let limits = Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits());
         let (device, queue) = adapter.request_device(
             &DeviceDescriptor {
                 label: None,
@@ -64,9 +64,9 @@ impl Graphics {
         let surface_config = surface.get_default_config(&adapter, width, height).unwrap();
         surface.configure(&device, &surface_config);
 
-        let depth_texture_view = Texture::depth(&device, (width, height)).1;
+        let depth_texture_view = FreeTexture::new(&device, (width, height), TextureType::Depth).view;
     
-        let output = Graphics {
+        let mut output = Graphics {
             window: window.clone(),
             _instance: instance,
             surface,
@@ -74,10 +74,14 @@ impl Graphics {
             _adapter: adapter,
             device,
             queue,
-            depth_texture_view,
+            depth_texture_view: depth_texture_view.clone(),
             layouts: Vec::new(),
+            render_texture: None,
         };
-    
+
+        output.make_layout(ResourceType::Texture);
+        output.render_texture = Some(Texture::new_surface_texture(&output, (width, height), &depth_texture_view));
+        
         let _ = proxy.send_event(output);
     }
 
@@ -97,8 +101,10 @@ impl Graphics {
         let frame_view = frame.texture.create_view(&TextureViewDescriptor::default());
         let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor { label: None });
 
-        let renderer = Renderer::new(&self, &mut encoder, frame_view);
-        render(renderer);
+        {
+            let renderer = Renderer::new(&self, &mut encoder, frame_view);
+            render(renderer);
+        }
         self.queue.submit(Some(encoder.finish()));
         frame.present();
         self.window.request_redraw();
@@ -113,7 +119,7 @@ impl Graphics {
             self.layouts.push(None);
         }
         if let None = self.layouts[r as usize] {
-            let layout = self.device.create_bind_group_layout(&r.get_descriptor());
+            let layout = r.create_bind_group_layout(&self.device);
             self.layouts[r as usize] = Some(layout)
         }
     }
@@ -122,6 +128,7 @@ impl Graphics {
 pub struct Renderer<'a> {
     encoder_ptr: *mut wgpu::CommandEncoder,
     frame_view: wgpu::TextureView,
+    render_texture: &'a Texture,
     render_pass: Option<wgpu::RenderPass<'a>>,
     depth_texture_view: &'a wgpu::TextureView,
     group_map: [u32; 5],
@@ -136,6 +143,7 @@ impl<'a> Renderer<'a> {
             encoder_ptr,
             depth_texture_view: &graphics.depth_texture_view,
             group_map: [0; 5],
+            render_texture: graphics.render_texture.as_ref().unwrap(),
         }
     }
 
@@ -164,7 +172,7 @@ impl<'a> Renderer<'a> {
         self.render_pass = Some(encoder_ref.begin_render_pass(&RenderPassDescriptor {
             label: Some("Render pass"),
             color_attachments: &[Some(RenderPassColorAttachment {
-                view: &self.frame_view,
+                view: &self.render_texture.texture.view,
                 depth_slice: None,
                 resolve_target: None,
                 ops: Operations {
@@ -191,7 +199,7 @@ impl<'a> Renderer<'a> {
         self.render_pass = Some(encoder_ref.begin_render_pass(&RenderPassDescriptor {
             label: Some("Render pass"),
             color_attachments: &[Some(RenderPassColorAttachment {
-                view: &self.frame_view,
+                view: &self.render_texture.texture.view,
                 depth_slice: None,
                 resolve_target: None,
                 ops: Operations {
@@ -211,6 +219,31 @@ impl<'a> Renderer<'a> {
             occlusion_query_set: None,
         }));
     }
+
+    pub fn start_post(&mut self) {
+        self.render_pass.take();
+        let encoder_ref = self.encoder();
+        self.render_pass = Some(encoder_ref.begin_render_pass(&RenderPassDescriptor {
+            label: Some("Render pass"),
+            color_attachments: &[Some(RenderPassColorAttachment {
+                view: &self.frame_view,
+                depth_slice: None,
+                resolve_target: None,
+                ops: Operations {
+                    load: LoadOp::Clear(Color::BLUE),
+                    store: StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        }));
+    }
+
+    pub fn stop_post(&mut self) {
+        self.render_texture.bind(self);
+        self.render_pass.as_mut().unwrap().draw(0..3, 0..1);
+    }
     
     pub fn draw_indices(&mut self, n_indices: u32) {
         self.render_pass.as_mut().unwrap().draw_indexed(0..n_indices, 0, 0..1);
@@ -218,7 +251,7 @@ impl<'a> Renderer<'a> {
 
     fn encoder(&mut self) -> &'a mut wgpu::CommandEncoder {
         if let Some(_) = &self.render_pass {
-            panic!("You cannot access the encoder when a renderpass is open");
+            panic!("You cannot access the encoder when a render pass is open");
         }
         unsafe {&mut *self.encoder_ptr}
     }
