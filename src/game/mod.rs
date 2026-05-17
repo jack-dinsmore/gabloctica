@@ -10,6 +10,7 @@ use std::rc::Rc;
 use crate::game::entity::Entity;
 use crate::game::galaxy::Galaxy;
 use crate::game::object::ObjectLoader;
+use crate::game::object::computer::BlockProperties;
 use crate::game::object::loader::ShipLoader;
 use crate::game::shading::PostInfo;
 use crate::graphics::*;
@@ -25,6 +26,8 @@ use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
     event::{KeyEvent, WindowEvent}, keyboard::{KeyCode, PhysicalKey},
 };
+
+const LOOK_DIST: f64 = 5.;
 
 struct KeyState {
     down_set: FxHashSet<KeyCode>
@@ -53,6 +56,7 @@ impl KeyState {
 
 pub struct Game {
     graphics: Graphics,
+    block_properties: BlockProperties,
     block_shader: Shader,
     flat_shader: Shader,
     shadow_shader: Shader,
@@ -63,16 +67,16 @@ pub struct Game {
     font: Font,
     post_info: PostInfo,
 
-    physics: Box<Physics>,
     objects: Vec<RcCell<Object>>,
     entities: Vec<Entity>,
     planets: Vec<Planet>,
-
+    
     key_state: KeyState,
     fps_counter: FpsCounter,
     mouse_motion: (f32, f32),
-
+    
     galaxy: Galaxy,
+    physics: Box<Physics>,
 }
 
 impl Game {
@@ -136,8 +140,13 @@ impl Game {
         let mut galaxy = Galaxy::new(&graphics);
         galaxy.update_skybox(&graphics, &camera, Vector3::new(-1e7, 0., 0.));
 
+        // Load block properties
+        let mut block_properties = BlockProperties::new();
+        block_properties.load_manifest(include_str!("../../assets/blocks.txt"));
+
         Self {
             graphics,
+            block_properties,
             key_state,
             camera,
             objects,
@@ -166,7 +175,6 @@ impl Game {
         match button {
             winit::event::MouseButton::Left => {
                 // Replace the player's collider with its look ray temporarily
-                const LOOK_DIST: f64 = 5.;
                 let player = &mut self.entities[0];
                 let body_collider = player.body.collider.take();
                 let forward = self.camera.get_forward().cast().unwrap();
@@ -193,20 +201,68 @@ impl Game {
                         }
                         CollisionReport::None => unreachable!(),
                     };
-                    o.borrow_mut().insert_block(&self.graphics, 1, place_pos);
+                    o.borrow_mut().insert_block(&self.graphics, &self.block_properties, 1, place_pos);
                 }
 
                 // Put the collider back
                 player.body.collider = body_collider;
             },
+            winit::event::MouseButton::Right => self.interact(),
             _ => (),
         }
+    }
+
+    fn interact(&mut self) {
+        // Replace the player's collider with its look ray temporarily
+        let player = &mut self.entities[0];
+        let body_collider = player.body.collider.take();
+        let forward = self.camera.get_forward().cast().unwrap();
+        player.body.collider = Some(Collider::new_ray(self.camera.pos.cast().unwrap(), forward*LOOK_DIST));
+
+        let mut report = CollisionReport::None;
+        let mut collided_object = None;
+
+        for object in &mut self.objects {
+            // The collision function should always pick some over None, but choose the one with the smallest distance to the target otherwise.
+            let new_report = Collider::check_collision(&player.body, &object. borrow().body);
+
+            if new_report > report {
+                report = new_report;
+                collided_object = Some(object);
+            }
+        }
+
+        if let Some(o) = collided_object {
+            // Interacted with this block
+            let place_pos = match report {
+                CollisionReport::Some { p2, .. } => {
+                    let offset = o.borrow().body.ori.invert() * forward;
+                    p2 + offset*0.001
+                }
+                CollisionReport::None => unreachable!(),
+            };
+            let block = o.borrow().get_block(place_pos);
+
+            // Interact with the block
+            match block.id {
+                5 => {
+                    // Turn the engine on
+                },// Engine
+                6 => {
+                    // Enter the chair
+                },// Chair
+                _ => (),
+            }
+        }
+
+        // Put the collider back
+        player.body.collider = body_collider;
     }
 
     pub fn update(&mut self, delta_t: f64) {
         self.fps_counter.update(delta_t);
         for object in &mut self.objects {
-            object.borrow_mut().update(&self.graphics, self.camera.pos.cast().unwrap());
+            object.borrow_mut().update_graphics(&self.graphics, &self.block_properties, self.camera.pos.cast().unwrap());
         }
 
         let my_planet = if !self.planets.is_empty() {
@@ -214,7 +270,7 @@ impl Game {
             let mut min_index = 0;
             for (i, planet) in self.planets.iter().enumerate() {
                 if let Some(o) = &planet.object {
-                    let o = o.borrow().body;
+                    let o = o.borrow().body.clone();
                     let dist = (o.pos - self.camera.pos.cast().unwrap()).magnitude();
                     if dist < min_dist {
                         min_index = i;
@@ -227,6 +283,10 @@ impl Game {
             None
         };
         self.post_info.update_buffer(&self.graphics, &self.camera, my_planet);
+
+        for object in &mut self.objects {
+            object.borrow_mut().update_internals(delta_t);
+        }
 
         {
             // Move camera pos
@@ -249,7 +309,7 @@ impl Game {
             if self.key_state.get(KeyCode::KeyQ) {
                 self.entities[0].walk(up * (SPEED*delta_t));
             }
-            if self.key_state.get(KeyCode::KeyE){
+            if self.key_state.get(KeyCode::KeyF){
                 self.entities[0].walk(-up * (SPEED*delta_t));
             }
         }

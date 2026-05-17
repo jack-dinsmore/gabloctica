@@ -1,6 +1,7 @@
 use cgmath::{InnerSpace, Matrix3, Quaternion, SquareMatrix, Vector3, Zero};
+use crate::{physics::collisions::Collider, util::{Vendor, Tagged}};
 
-use crate::physics::{Physics, collisions::Collider};
+pub type RigidBody = Tagged<RigidBodyData>;
 
 #[derive(Clone, Debug)]
 pub enum MoI {
@@ -73,90 +74,6 @@ impl MoI {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct RigidBody {
-    physics: *mut Physics,
-    pub(super) index: usize,
-}
-impl std::ops::Deref for RigidBody {
-    type Target = RigidBodyData;
-
-    fn deref(&self) -> &Self::Target {
-        unsafe {&(&*self.physics).bodies[self.index]}
-    }
-}
-impl std::ops::DerefMut for RigidBody {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe {&mut (&mut *self.physics).bodies[self.index]}
-    }
-}
-impl PartialEq for RigidBody {
-    fn eq(&self, other: &Self) -> bool {
-        self.index == other.index
-    }
-}
-impl Eq for RigidBody {}
-impl PartialOrd for RigidBody {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.index.partial_cmp(&other.index)
-    }
-}
-impl RigidBody {
-    pub fn new(physics: &mut Physics, init: RigidBodyInit) -> Self {
-        let index = physics.bodies.len();
-
-        // Initialize data
-        let data = RigidBodyData {
-            pos: init.pos,
-            com_pos: init.com_pos,
-            vel: init.vel,
-            ori: init.ori,
-            ang_vel: init.ang_vel,
-            mass: init.mass,
-            moi: init.moi,
-            static_coeff: init.static_coeff,
-            kinetic_coeff: init.kinetic_coeff,
-            collider: init.collider,
-            restitution: init.restitution,
-            
-            forces: Vector3::zero(),
-            torques: Vector3::zero(),
-        };
-        if data.static_coeff < data.kinetic_coeff {
-            panic!("Coefficient of static friction was < kinetic friction. This is probably a mistake");
-        }
-        if data.static_coeff < 0. || data.kinetic_coeff < 0. {
-            panic!("Coefficients of friction must be non-negative");
-        }
-        if data.mass < 0. {
-            panic!("Mass must be non-negative");
-        }
-        physics.bodies.push(data);
-
-        // Create the RigidBody
-        Self {
-            physics: physics as *mut _,
-            index,
-        }
-    }
-
-    pub(super) fn from_index(physics: &mut Physics, index: usize) -> Self {
-        Self {
-            physics: physics as *mut _,
-            index,
-        }
-    }
-    
-    pub fn get_object_collider_mut(&mut self) -> &mut super::collisions::shapes::ObjectData {
-        if let Some(c) = &mut self.collider {
-            if let Collider::Object(d) = c {
-                return d;
-            }
-        }
-        panic!("The collider was not type Object.")
-    }
-}
-
 pub struct RigidBodyInit {
     pub pos: Vector3<f64>,
     pub com_pos: Vector3<f64>,
@@ -210,6 +127,41 @@ pub struct RigidBodyData {
     pub(super) forces: Vector3<f64>,
     pub(super) torques: Vector3<f64>,
 }
+
+impl RigidBody{
+    pub fn new(vendor: &mut Vendor<RigidBodyData>, init: RigidBodyInit) -> Self {
+        // Initialize data
+        let data = RigidBodyData {
+            pos: init.pos,
+            com_pos: init.com_pos,
+            vel: init.vel,
+            ori: init.ori,
+            ang_vel: init.ang_vel,
+            mass: init.mass,
+            moi: init.moi,
+            static_coeff: init.static_coeff,
+            kinetic_coeff: init.kinetic_coeff,
+            collider: init.collider,
+            restitution: init.restitution,
+            
+            forces: Vector3::zero(),
+            torques: Vector3::zero(),
+        };
+        if data.static_coeff < data.kinetic_coeff {
+            panic!("Coefficient of static friction was < kinetic friction. This is probably a mistake");
+        }
+        if data.static_coeff < 0. || data.kinetic_coeff < 0. {
+            panic!("Coefficients of friction must be non-negative");
+        }
+        if data.mass < 0. {
+            panic!("Mass must be non-negative");
+        }
+
+        // Insert the data
+        vendor.insert(data)
+    }
+}
+
 impl RigidBodyData {
     pub fn add_force(&mut self, force: Vector3<f64>) {
         self.forces += force;
@@ -233,5 +185,14 @@ impl RigidBodyData {
 
         self.forces = Vector3::zero();
         self.torques = Vector3::zero();
+    }
+    
+    pub fn get_object_collider_mut(&mut self) -> &mut super::collisions::shapes::ObjectData {
+        if let Some(c) = &mut self.collider {
+            if let Collider::Object(d) = c {
+                return d;
+            }
+        }
+        panic!("The collider was not type Object.")
     }
 }

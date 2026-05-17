@@ -2,11 +2,16 @@ use cgmath::{InnerSpace, Matrix3, Rotation, Vector3, Zero};
 
 use loader::{PlanetLoader, ShipLoader};
 use rustc_hash::FxHashMap;
+use crate::game::object::computer::BlockProperties;
+use crate::game::object::internals::Internals;
 use crate::graphics::{Block, CHUNK_SIZE, Graphics, GridTexture, ModelUniform, Renderer, StorageBuffer};
 use crate::physics::{Collider, MoI, Physics, RigidBody, RigidBodyInit};
 
 pub mod chunk;
 pub mod loader;
+pub mod computer;
+mod internals;
+
 use chunk::Chunk;
 
 const RENDER_DISTANCE: i32 = 12; // Units of chunks
@@ -42,21 +47,26 @@ impl ObjectLoader {
 
 pub struct Object {
     chunks: FxHashMap<(i32, i32, i32), Chunk>,
-    loader: ObjectLoader,
-    pub body: RigidBody,
     last_load: Option<std::time::Instant>,
+    internals: Internals,
+
+    pub body: RigidBody,
+    
+    loader: ObjectLoader,
     storage_buffer: StorageBuffer,
 }
 impl Object {
     pub fn new(graphics: &Graphics, physics: &mut Physics, loader: ObjectLoader) -> Self {
         let mut initial_data = loader.get_initial_data();
         initial_data.collider = Some(Collider::empty_object());
-        let body = RigidBody::new(physics, initial_data);
+        let body = RigidBody::new(&mut physics.rb_vendor, initial_data);
         let buffer_size = loader.estimate_max_rendered_chunks()*std::mem::size_of::<ModelUniform>();
         let storage_buffer = StorageBuffer::new(graphics, buffer_size as usize);
+        let internals = Internals::new();
         Self {
             chunks: FxHashMap::default(),
-            loader: loader,
+            loader,
+            internals,
             body,
             last_load: None,
             storage_buffer,
@@ -64,7 +74,7 @@ impl Object {
     }
 
     /// Update the model buffers and rigid body. If only some chunks were changed, pass a vector of chunk positions. Otherwise, pass an empty vector. This will update the passed chunks, and neighbors if the neighbors now become visible.
-    pub fn update_chunk_info(&mut self, graphics: &Graphics, coord_vec: Vec<(i32, i32, i32)>) {
+    pub fn update_chunk_info(&mut self, graphics: &Graphics, properties: &BlockProperties, coord_vec: Vec<(i32, i32, i32)>) {
         let mut mass_m0 = 0.;
         let mut mass_m1 = Vector3::zero();
         let mut mass_m2 = Matrix3::zero();
@@ -118,13 +128,20 @@ impl Object {
             mass_m1.z*mass_m1.x, mass_m1.z*mass_m1.y, mass_m1.z*mass_m1.z - 0.1666666666,
         )) * mass_m0);
         self.body.pos += delta_com_global;
+
+        // Update the internals
+        self.internals.update_info(&self.chunks, properties);// TODO implement partial updates
     }
 
-    pub fn update(&mut self, graphics: &Graphics, character_pos: Vector3<f64>) {
-        self.load_chunks(graphics, character_pos);
+    pub fn update_graphics(&mut self, graphics: &Graphics, properties: &BlockProperties, character_pos: Vector3<f64>) {
+        self.load_chunks(graphics, properties, character_pos);
     }
 
-    fn load_chunks(&mut self, graphics: &Graphics, character_pos: Vector3<f64>) {
+    pub fn update_internals(&mut self, delta_t: f64) {
+        self.internals.update(delta_t);
+    }
+
+    fn load_chunks(&mut self, graphics: &Graphics, properties: &BlockProperties, character_pos: Vector3<f64>) {
         if let Some(l) = self.last_load {
             if l.elapsed().as_millis() < LOAD_TIME {
                 return;
@@ -149,7 +166,7 @@ impl Object {
                         for coord in self.chunks.keys() {
                             collider.chunks.insert(*coord, [0; (CHUNK_SIZE*CHUNK_SIZE) as usize]);
                         }
-                        self.update_chunk_info(graphics, Vec::new());
+                        self.update_chunk_info(graphics, properties, Vec::new());
                     }
                 } else {
                     // Check if all chunks are outside render distance
@@ -206,7 +223,7 @@ impl Object {
                     }
                 }
                 if !new_coords.is_empty() {
-                    self.update_chunk_info(graphics, new_coords);
+                    self.update_chunk_info(graphics, properties, new_coords);
                 }
                 self.last_load = Some(std::time::Instant::now());
             },
@@ -255,9 +272,25 @@ impl Object {
             }
         }
     }
+
+    pub fn get_block(&self, pos: Vector3<f64>) -> Block {
+        let updated_chunk = (
+            (pos.x/CHUNK_SIZE as f64).floor() as i32,
+            (pos.y/CHUNK_SIZE as f64).floor() as i32,
+            (pos.z/CHUNK_SIZE as f64).floor() as i32,
+        );
+        let updated_block = (
+            my_fmod(pos.x, CHUNK_SIZE as f64) as u32,
+            my_fmod(pos.y, CHUNK_SIZE as f64) as u32,
+            my_fmod(pos.z, CHUNK_SIZE as f64) as u32,
+        );
+
+        let chunk = self.chunks.get(&updated_chunk).unwrap();
+        chunk.grid[updated_block]
+    }
     
     /// Insert a block into the cell containg position pos. Pos is in body coordinates.
-    pub(crate) fn insert_block(&mut self, graphics: &Graphics, typ: u8, pos: Vector3<f64>) {
+    pub(crate) fn insert_block(&mut self, graphics: &Graphics, properties: &BlockProperties, typ: u8, pos: Vector3<f64>) {
         let updated_chunk = (
             (pos.x/CHUNK_SIZE as f64).floor() as i32,
             (pos.y/CHUNK_SIZE as f64).floor() as i32,
@@ -280,7 +313,7 @@ impl Object {
         let chunk = self.chunks.get_mut(&updated_chunk).unwrap();
         chunk.grid[updated_block] = Block{id: typ, ori: 0}; // TODO work out the orientation
         chunk.update_model(graphics);
-        self.update_chunk_info(graphics, vec![updated_chunk]);
+        self.update_chunk_info(graphics, properties, vec![updated_chunk]);
     }
 }
 

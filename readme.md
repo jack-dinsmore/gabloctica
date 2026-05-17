@@ -1,6 +1,9 @@
 # Todo
 
 ## Ships
+* Block manifest
+* Internal updates
+* Block scripting
 
 ## Graphics: 
 * Fog

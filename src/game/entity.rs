@@ -14,7 +14,7 @@ impl Entity {
         }));
         init.moi = crate::physics::MoI::new_diagonal(Vector3::new(1e8, 1e8, 1e8));
         Self {
-            body: RigidBody::new(physics, init),
+            body: RigidBody::new(&mut physics.rb_vendor, init),
         }
     }
 

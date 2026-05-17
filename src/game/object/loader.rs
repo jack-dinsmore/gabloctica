@@ -18,7 +18,16 @@ impl ShipLoader {
             chunk_coord.2 as f64 * CHUNK_SIZE as f64,
         );
         let mut chunk = Chunk::empty(graphics, pos);
-        chunk.grid[(7,7,7)] = Block{id: 1, ori: 0};
+
+        chunk.grid[(7,7,7)] = Block{id: 1, ori: 0};// Dirt
+        chunk.grid[(6,8,7)] = Block{id: 4, ori: 1};// Tank
+        chunk.grid[(7,8,7)] = Block{id: 4, ori: 1};// Tank
+        chunk.grid[(8,8,7)] = Block{id: 5, ori: 3};// Engine
+        chunk.grid[(6,6,7)] = Block{id: 4, ori: 1};// Tank
+        chunk.grid[(7,6,7)] = Block{id: 4, ori: 1};// Tank
+        chunk.grid[(8,6,7)] = Block{id: 5, ori: 3};// Engine
+        chunk.grid[(7,7,8)] = Block{id: 6, ori: 0};// Chair
+
         let mut out = FxHashMap::default();
         out.insert(chunk_coord, chunk);
         out

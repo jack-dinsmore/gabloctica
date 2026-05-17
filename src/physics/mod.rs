@@ -1,19 +1,19 @@
 mod rigid_body;
 mod collisions;
 
+use std::marker::PhantomData;
+
 use faer::{Mat, Side, prelude::Solve};
+use cgmath::{InnerSpace, Matrix3, Vector3};
 pub use rigid_body::{RigidBody, RigidBodyInit, MoI};
 pub use collisions::{shapes, Collider, CollisionReport};
-
-use cgmath::{InnerSpace, Matrix3, Vector3};
-use crate::physics::rigid_body::RigidBodyData;
-
+use crate::{physics::rigid_body::RigidBodyData, util::{Vendor, new_vendor}};
 
 pub const NEWTON_G: f64 = 5.;
 const GRAVITY_THRESH: f64 = 10.;
 
 pub struct Physics {
-    bodies: Vec<RigidBodyData>,
+    pub rb_vendor: Vendor<RigidBodyData>,
     collision_pairs: Vec<(RigidBody, RigidBody)>,
     collision_normals: Vec<Vector3<f64>>,
 }
@@ -21,7 +21,7 @@ pub struct Physics {
 impl Physics {
     pub fn new() -> Self {
         Self {
-            bodies: Vec::new(),
+            rb_vendor: new_vendor(),
             collision_pairs: Vec::new(),
             collision_normals: Vec::new(),
         }
@@ -29,12 +29,10 @@ impl Physics {
 
     pub fn update(&mut self, delta_t: f64) {
         // Gravity
-        for i in 0..self.bodies.len() {
-            let planet = RigidBody::from_index(self, i);
+        for (i, planet) in self.rb_vendor.iter().enumerate() {
             if planet.mass < GRAVITY_THRESH {continue;}
-            for j in 0..self.bodies.len() {
+            for (j, mut part) in &mut self.rb_vendor.iter().enumerate() {
                 if j == i {continue;}
-                let mut part = RigidBody::from_index(self, j);
                 if part.mass > GRAVITY_THRESH {continue;}
 
                 let dist = part.pos - planet.pos;
@@ -46,10 +44,9 @@ impl Physics {
         // Collisions
         self.collision_pairs.clear();
         self.collision_normals.clear();
-        for i in 0..self.bodies.len() {
-            let mut a = RigidBody::from_index(self, i);
-            for j in (i+1)..self.bodies.len() {
-                let mut b = RigidBody::from_index(self, j);
+        for (i, mut a) in self.rb_vendor.iter().enumerate() {
+            for (j, mut  b) in self.rb_vendor.iter().enumerate() {
+                if j >= i {break;}
                 if let CollisionReport::Some { normal, depth, p1, p2 } = Collider::check_collision(&a, &b) {
                     // handle collisions
                     let denom = (1. / a.mass + 1. / b.mass) + 
@@ -66,21 +63,22 @@ impl Physics {
                     a.pos -= normal*depth * (1. - a_mass_frac);
                     b.pos += normal*depth * a_mass_frac;
 
-                    self.collision_pairs.push((a, b));
+                    self.collision_pairs.push((a.clone(), b.clone()));
                     self.collision_normals.push(normal);
                 }
             }
         }
 
         // Compute self angular acceleration
-        for body in &mut self.bodies {
-            body.add_torque(body.moi.get_self_accel(body.ang_vel));
+        for mut body in self.rb_vendor.iter() {
+            let accel = body.moi.get_self_accel(body.ang_vel);
+            body.add_torque(accel);
         }
         // self.resolve_normal_forces(); // TODO
         // self.resolve_normal_torques();
 
         // Force updates
-        for body in &mut self.bodies {
+        for mut body in self.rb_vendor.iter() {
             body.update(delta_t);
         }
     }
@@ -91,14 +89,14 @@ impl Physics {
         let mut m: Mat<f64> = Mat::zeros(dimension, dimension);
         let mut k = Mat::zeros(dimension, 1);
         for i in 0..dimension {
-            let a = self.collision_pairs[i].0;
-            let b = self.collision_pairs[i].1;
+            let a = self.collision_pairs[i].0.clone();
+            let b = self.collision_pairs[i].1.clone();
             let normal = self.collision_normals[i];
             k[(i, 0)] = (a.forces / a.mass - b.forces / b.mass).dot(normal);
             m[(i,i)] += 1./a.mass + 1./b.mass;
             for j in (i+1)..dimension {
-                let c = self.collision_pairs[j].0;
-                let d = self.collision_pairs[j].1;
+                let c = self.collision_pairs[j].0.clone();
+                let d = self.collision_pairs[j].1.clone();
                 if a == c {
                     m[(i,j)] += 1./a.mass;
                     m[(j,i)] += 1./a.mass;
@@ -141,8 +139,8 @@ impl Physics {
         };
 
         for i in 0..n_pairs {
-            let a = self.collision_pairs[i].0;
-            let b = self.collision_pairs[i].1;
+            let a = self.collision_pairs[i].0.clone();
+            let b = self.collision_pairs[i].1.clone();
             let vec = a.moi.mul_inv(a.torques) - b.moi.mul_inv(b.torques / b.mass);
             k[(3*i+0, 0)] = vec.x;
             k[(3*i+1, 0)] = vec.y;
@@ -152,8 +150,8 @@ impl Physics {
             let b_inv = b.moi.get_inv();
             write_block(i, i, a_inv + b_inv);
             for j in (i+1)..n_pairs {
-                let c = self.collision_pairs[j].0;
-                let d = self.collision_pairs[j].1;
+                let c = self.collision_pairs[j].0.clone();
+                let d = self.collision_pairs[j].1.clone();
                 if a == c {
                     write_block(i,j,a_inv);
                     write_block(j,i,a_inv);
