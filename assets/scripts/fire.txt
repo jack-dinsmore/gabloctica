@@ -1,0 +1,9 @@
+fire: 
+    push 1.0
+    push 0.
+    push 0.
+    push 1. # Function 1
+    call 4
+
+    tick
+    jmp fire

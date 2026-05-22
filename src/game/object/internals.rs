@@ -1,6 +1,7 @@
+use cgmath::Vector3;
 use rustc_hash::FxHashMap;
 use sorted_vec::SortedSet;
-use crate::{game::object::{Chunk, computer::BlockProperties}, graphics::CHUNK_SIZE, util::{Vendor, Tagged, new_vendor}};
+use crate::{game::object::{Chunk, computer::{BlockProperties, machine::Machine}}, graphics::CHUNK_SIZE, util::{Tagged, Vendor}};
 
 type Pipe = Tagged<PipeData>;
 type Circuit = Tagged<CircuitData>;
@@ -71,8 +72,8 @@ pub struct Internals {
 impl Internals {
     pub fn new() -> Self {
         Self {
-            circuits: new_vendor(),
-            pipes: new_vendor(),
+            circuits: Vendor::new(),
+            pipes: Vendor::new(),
             blocks: Vec::new(),
         }
     }
@@ -145,7 +146,7 @@ impl Internals {
                             None => None
                         };
 
-                        self.blocks.push(CommandBlock::new(block, circuit, pipe));
+                        self.blocks.push(CommandBlock::new(block, chunks, circuit, pipe, properties));
                     }
                 }
             }
@@ -187,18 +188,36 @@ struct CommandBlock {
     block: BlockKey,
     pipe: Option<Pipe>,
     circuit: Option<Circuit>,
+    machine: Machine,
 }
 
 impl CommandBlock {
-    fn new(block: BlockKey, circuit: Option<Circuit>, pipe: Option<Pipe>) -> Self {
+    fn new(block: BlockKey, chunks: &FxHashMap<(i32, i32, i32), Chunk>, circuit: Option<Circuit>, pipe: Option<Pipe>, properties: &BlockProperties) -> Self {
+        let block_type = chunks[&block.0].grid[block.1].id;
+        let machine = Machine::new(properties.command_block_scripts.get(&block_type).unwrap().clone());
         Self {
             block,
             pipe,
             circuit,
+            machine,
         }
     }
 
     fn update(&mut self, delta_t: f64) {
-
+        self.machine.tick();
+        while !self.machine.calls.is_empty() {
+            let function = self.machine.calls.pop().unwrap();
+            match function {
+                0. => {
+                    let arg = self.machine.calls.pop().unwrap();
+                    println!("Breakpoint {}", arg);
+                }
+                1. => {
+                    let force = Vector3::new(self.machine.calls.pop().unwrap(), self.machine.calls.pop().unwrap(), self.machine.calls.pop().unwrap());
+                    // TODO
+                }
+                _ => panic!("Unrecognized function number"),
+            }
+        }
     }
 }

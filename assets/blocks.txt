@@ -1,0 +1,7 @@
+# ID, Name, Conductor, pipe, command
+1 dirt1 F F F
+2 dirt2 F F F
+3 dirt3 F F F
+4 dirt4 T T F
+5 fire  T F T
+6 chair F F T

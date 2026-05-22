@@ -1,32 +1,18 @@
 mod interp;
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, ops::{Deref, DerefMut}, rc::Rc};
 
 pub use interp::SphericalInterpolator;
 use rustc_hash::FxHashMap;
 pub type RcCell<T> = Rc<RefCell<T>>;
-pub type Vendor<D> = Box<TagVendor<D>>;
 
-pub fn new_vendor<D>() -> Vendor<D> {
-    Box::new(TagVendor::new())
-}
-
-#[derive(Debug)]
-pub struct Tagged<D> {
-    vendor: *mut TagVendor<D>,
-    tag: u32,
-}
-
-pub struct TagVendor<D> {
-    data: FxHashMap<u32, D>,
-    borrows: FxHashMap<u32, u32>,
-}
-impl<D> TagVendor<D> {
+pub struct Vendor<D>(Box<TagVendor<D>>);
+impl<D> Vendor<D> {
     pub fn new() -> Self {
-        Self {
+        Self (Box::new(TagVendor {
             data: FxHashMap::default(),
             borrows: FxHashMap::default(),
-        }
+        }))
     }
 
     pub fn insert(&mut self, data: D) -> Tagged<D> {
@@ -34,11 +20,29 @@ impl<D> TagVendor<D> {
         self.data.insert(tag, data);
         self.borrows.insert(tag, 1);
         Tagged {
-            vendor: self as *mut Self,
+            vendor: self.0.as_mut() as *mut _,
             tag
         }
     }
+}
+impl<D> Deref for Vendor<D> {
+    type Target = TagVendor<D>;
 
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl<D> DerefMut for Vendor<D> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+pub struct TagVendor<D> {
+    data: FxHashMap<u32, D>,
+    borrows: FxHashMap<u32, u32>,
+}
+impl<D> TagVendor<D> {
     fn remove(&mut self, tag: u32) {
         self.data.remove(&tag);
         self.borrows.remove(&tag);
@@ -87,6 +91,13 @@ impl<D> Iterator for TagVendorIterator<D> {
             output
         }
     }
+}
+
+
+#[derive(Debug)]
+pub struct Tagged<D> {
+    vendor: *mut TagVendor<D>,
+    tag: u32,
 }
 
 impl<D> Clone for Tagged<D> {

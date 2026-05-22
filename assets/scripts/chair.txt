@@ -1,0 +1,4 @@
+chair: 
+    nop
+    tick
+    jmp chair

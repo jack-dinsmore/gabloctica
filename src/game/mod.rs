@@ -142,6 +142,8 @@ impl Game {
 
         // Load block properties
         let mut block_properties = BlockProperties::new();
+        block_properties.preload_script(include_str!("../../assets/scripts/chair.txt"), "chair");
+        block_properties.preload_script(include_str!("../../assets/scripts/fire.txt"), "fire");
         block_properties.load_manifest(include_str!("../../assets/blocks.txt"));
 
         Self {
@@ -309,7 +311,7 @@ impl Game {
             if self.key_state.get(KeyCode::KeyQ) {
                 self.entities[0].walk(up * (SPEED*delta_t));
             }
-            if self.key_state.get(KeyCode::KeyF){
+            if self.key_state.get(KeyCode::KeyE){
                 self.entities[0].walk(-up * (SPEED*delta_t));
             }
         }

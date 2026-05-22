@@ -1,13 +1,11 @@
 mod rigid_body;
 mod collisions;
 
-use std::marker::PhantomData;
-
 use faer::{Mat, Side, prelude::Solve};
 use cgmath::{InnerSpace, Matrix3, Vector3};
 pub use rigid_body::{RigidBody, RigidBodyInit, MoI};
 pub use collisions::{shapes, Collider, CollisionReport};
-use crate::{physics::rigid_body::RigidBodyData, util::{Vendor, new_vendor}};
+use crate::{physics::rigid_body::RigidBodyData, util::Vendor};
 
 pub const NEWTON_G: f64 = 5.;
 const GRAVITY_THRESH: f64 = 10.;
@@ -21,7 +19,7 @@ pub struct Physics {
 impl Physics {
     pub fn new() -> Self {
         Self {
-            rb_vendor: new_vendor(),
+            rb_vendor: Vendor::new(),
             collision_pairs: Vec::new(),
             collision_normals: Vec::new(),
         }
