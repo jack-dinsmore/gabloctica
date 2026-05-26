@@ -1,4 +1,4 @@
-use cgmath::Vector3;
+use cgmath::{Quaternion, Vector3};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Block {
@@ -22,6 +22,36 @@ impl Block {
         let rotation = 0; // TODO use the up vector to get the orientation
 
         axis << 2
+    }
+
+    pub fn quat(&self) -> Quaternion<f64> {
+        match self.ori {
+            0 => Quaternion::new(0.500000, 0.500000, 0.500000, 0.500000),
+            1 => Quaternion::new(0.000000, 0.707107, 0.707107, 0.000000),
+            2 => Quaternion::new(-0.500000, 0.500000, 0.500000, -0.500000),
+            3 => Quaternion::new(-0.707107, 0.000000, 0.000000, -0.707107),
+            4 => Quaternion::new(-0.500000, 0.500000, -0.500000, 0.500000),
+            5 => Quaternion::new(-0.707107, 0.000000, 0.000000, 0.707107),
+            6 => Quaternion::new(-0.500000, -0.500000, 0.500000, 0.500000),
+            7 => Quaternion::new(-0.000000, -0.707107, 0.707107, 0.000000),
+            8 => Quaternion::new(0.000000, 0.707107, 0.000000, 0.707107),
+            9 => Quaternion::new(-0.500000, 0.500000, 0.500000, 0.500000),
+            10 => Quaternion::new(-0.707107, 0.000000, 0.707107, 0.000000),
+            11 => Quaternion::new(-0.500000, -0.500000, 0.500000, -0.500000),
+            12 => Quaternion::new(0.707107, 0.000000, 0.707107, 0.000000),
+            13 => Quaternion::new(0.500000, 0.500000, 0.500000, -0.500000),
+            14 => Quaternion::new(0.000000, 0.707107, 0.000000, -0.707107),
+            15 => Quaternion::new(-0.500000, 0.500000, -0.500000, -0.500000),
+            16 => Quaternion::new(0.000000, 0.000000, 0.000000, 1.000000),
+            17 => Quaternion::new(0.000000, 0.000000, 0.707107, 0.707107),
+            18 => Quaternion::new(0.000000, 0.000000, 1.000000, 0.000000),
+            19 => Quaternion::new(0.000000, 0.000000, 0.707107, -0.707107),
+            20 => Quaternion::new(0.000000, 1.000000, 0.000000, 0.000000),
+            21 => Quaternion::new(-0.707107, 0.707107, 0.000000, 0.000000),
+            22 => Quaternion::new(-1.000000, 0.000000, 0.000000, 0.000000),
+            23 => Quaternion::new(-0.707107, -0.707107, 0.000000, -0.000000),
+            _ => unreachable!()
+        }
     }
 
     pub fn is_null(&self) -> bool {

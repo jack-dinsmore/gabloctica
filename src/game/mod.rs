@@ -9,6 +9,7 @@ use std::rc::Rc;
 
 use crate::game::entity::Entity;
 use crate::game::galaxy::Galaxy;
+use crate::game::object::Interrupt;
 use crate::game::object::ObjectLoader;
 use crate::game::object::computer::BlockProperties;
 use crate::game::object::loader::ShipLoader;
@@ -16,6 +17,7 @@ use crate::game::shading::PostInfo;
 use crate::graphics::*;
 use crate::physics::*;
 use crate::util::RcCell;
+use crate::util::my_fmod;
 use cgmath::InnerSpace;
 use cgmath::Vector3;
 use object::Object;
@@ -56,7 +58,6 @@ impl KeyState {
 
 pub struct Game {
     graphics: Graphics,
-    block_properties: BlockProperties,
     block_shader: Shader,
     flat_shader: Shader,
     shadow_shader: Shader,
@@ -66,7 +67,7 @@ pub struct Game {
     lighting: Lighting,
     font: Font,
     post_info: PostInfo,
-
+    
     objects: Vec<RcCell<Object>>,
     entities: Vec<Entity>,
     planets: Vec<Planet>,
@@ -76,7 +77,8 @@ pub struct Game {
     mouse_motion: (f32, f32),
     
     galaxy: Galaxy,
-    physics: Box<Physics>,
+    block_properties: BlockProperties, // Needs to be last
+    physics: Box<Physics>, // Needs to be last
 }
 
 impl Game {
@@ -112,7 +114,7 @@ impl Game {
             // Planet::new(PlanetInit::default()),
         ];
         let mut objects = vec![
-            Rc::new(RefCell::new(Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos: Vector3::new(12., 7., 43.), vel: Vector3::new(0., 0., 0.) })))),
+            Rc::new(RefCell::new(Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos: Vector3::new(12., 7., 42.), vel: Vector3::new(0., 0., 0.) })))),
         ];
         for planet in &mut planets {
             let obj = Rc::new(RefCell::new(Object::new(&graphics, &mut physics, planet.loader())));
@@ -243,17 +245,23 @@ impl Game {
                 }
                 CollisionReport::None => unreachable!(),
             };
-            let block = o.borrow().get_block(place_pos);
-
-            // Interact with the block
-            match block.id {
-                5 => {
-                    // Turn the engine on
-                },// Engine
-                6 => {
-                    // Enter the chair
-                },// Chair
-                _ => (),
+            let interacted_block = o.borrow().get_block(place_pos);
+            if !interacted_block.is_null() {
+                let updated_chunk = (
+                    (place_pos.x/CHUNK_SIZE as f64).floor() as i32,
+                    (place_pos.y/CHUNK_SIZE as f64).floor() as i32,
+                    (place_pos.z/CHUNK_SIZE as f64).floor() as i32,
+                );
+                let updated_block = (
+                    my_fmod(place_pos.x, CHUNK_SIZE as f64) as u32,
+                    my_fmod(place_pos.y, CHUNK_SIZE as f64) as u32,
+                    my_fmod(place_pos.z, CHUNK_SIZE as f64) as u32,
+                );
+                let block_key = (updated_chunk, updated_block);
+                o.borrow_mut().interrupt(block_key, Interrupt::Interact);
+                if self.block_properties.chair_blocks.contains(&interacted_block.id) {
+                    player.set_chair(o, block_key);
+                }
             }
         }
 
@@ -291,41 +299,71 @@ impl Game {
         }
 
         {
-            // Move camera pos
-            const SPEED: f64 = 1000.;
-            let forward: Vector3<f64> = self.camera.get_forward().cast().unwrap();
-            let up: Vector3<f64> = self.camera.get_up().cast().unwrap();
-            let right: Vector3<f64> = self.camera.get_right().cast().unwrap();
-            if self.key_state.get(KeyCode::KeyW) {
-                self.entities[0].walk(forward * (SPEED*delta_t));
-            }
-            if self.key_state.get(KeyCode::KeyS) {
-                self.entities[0].walk(-forward * (SPEED*delta_t));
-            }
-            if self.key_state.get(KeyCode::KeyD) {
-                self.entities[0].walk(right * (SPEED*delta_t));
-            }
-            if self.key_state.get(KeyCode::KeyA){
-                self.entities[0].walk(-right * (SPEED*delta_t));
-            }
-            if self.key_state.get(KeyCode::KeyQ) {
-                self.entities[0].walk(up * (SPEED*delta_t));
-            }
-            if self.key_state.get(KeyCode::KeyE){
-                self.entities[0].walk(-up * (SPEED*delta_t));
+            let player = &mut self.entities[0];
+            match &player.chair {
+                None => {
+                    // Move camera pos
+                    const SPEED: f64 = 1000.;
+                    let forward: Vector3<f64> = self.camera.get_forward().cast().unwrap();
+                    let up: Vector3<f64> = self.camera.get_up().cast().unwrap();
+                    let right: Vector3<f64> = self.camera.get_right().cast().unwrap();
+                    if self.key_state.get(KeyCode::KeyW) {
+                        player.walk(forward * (SPEED*delta_t));
+                    }
+                    if self.key_state.get(KeyCode::KeyS) {
+                        player.walk(-forward * (SPEED*delta_t));
+                    }
+                    if self.key_state.get(KeyCode::KeyD) {
+                        player.walk(right * (SPEED*delta_t));
+                    }
+                    if self.key_state.get(KeyCode::KeyA){
+                        player.walk(-right * (SPEED*delta_t));
+                    }
+                    if self.key_state.get(KeyCode::KeyQ) {
+                        player.walk(up * (SPEED*delta_t));
+                    }
+                    if self.key_state.get(KeyCode::KeyE){
+                        player.walk(-up * (SPEED*delta_t));
+                    }
+                },
+                Some((obj, block_key, block_pos)) => {
+                    if self.key_state.get(KeyCode::KeyW) {
+                        obj.borrow_mut().interrupt(*block_key, Interrupt::Forward(1.));
+                    }
+                    if self.key_state.get(KeyCode::KeyS) {
+                        obj.borrow_mut().interrupt(*block_key, Interrupt::Backward(1.));
+                    }
+                    if self.key_state.get(KeyCode::KeyD) {
+                        obj.borrow_mut().interrupt(*block_key, Interrupt::Right(1.));
+                    }
+                    if self.key_state.get(KeyCode::KeyA){
+                        obj.borrow_mut().interrupt(*block_key, Interrupt::Left(1.));
+                    }
+                    if self.key_state.get(KeyCode::KeyQ) {
+                        obj.borrow_mut().interrupt(*block_key, Interrupt::Up(1.));
+                    }
+                    if self.key_state.get(KeyCode::KeyE){
+                        obj.borrow_mut().interrupt(*block_key, Interrupt::Down(1.));
+                    }
+                }
             }
         }
         
         self.physics.update(delta_t);
+        for entity in &mut self.entities {
+            entity.update(delta_t);
+        }
 
         {
             // Move camera look
+            let player = &self.entities[0];
             const SPEED: f64 = 0.2;
-            self.camera.pos = self.entities[0].body.pos + 0.7f64 * Vector3::unit_z();
+            self.camera.pos = player.body.pos;
             self.camera.theta += (SPEED*delta_t) as f32 *self.mouse_motion.1;
             self.camera.phi -= (SPEED*delta_t) as f32 *self.mouse_motion.0;
             self.mouse_motion = (0., 0.);
             self.camera.theta = self.camera.theta.clamp(0.0001, 3.1415);
+            self.camera.ori = player.body.ori.cast().unwrap();
         }
     }
 

@@ -32,6 +32,7 @@ pub struct BlockProperties {
     pub conductor_blocks: SortedSet<u8>,
     pub pipe_blocks: SortedSet<u8>,
     pub command_block_scripts: FxHashMap<u8, Instructions>,
+    pub chair_blocks: SortedSet<u8>,
     preloaded_scripts: FxHashMap<String, &'static str>,
     script_vendor: Vendor<InstructionData>,
 }
@@ -42,6 +43,7 @@ impl BlockProperties {
             command_blocks: SortedSet::default(),
             conductor_blocks: SortedSet::new(),
             pipe_blocks: SortedSet::new(),
+            chair_blocks: SortedSet::new(),
             preloaded_scripts: FxHashMap::default(),
             command_block_scripts: FxHashMap::default(),
             script_vendor: Vendor::new(),
@@ -62,6 +64,7 @@ impl BlockProperties {
             let is_conductor = arguments.next().unwrap() == "T";
             let is_pipe = arguments.next().unwrap() == "T";
             let is_command = arguments.next().unwrap() == "T";
+            let is_chair = arguments.next().unwrap() == "T";
 
             if is_command {
                 let data = InstructionData::new(name, &self.preloaded_scripts);
@@ -72,6 +75,7 @@ impl BlockProperties {
             if is_conductor { self.conductor_blocks.push(id); }
             if is_pipe { self.pipe_blocks.push(id); }
             if is_command { self.command_blocks.push(id); }
+            if is_chair { self.chair_blocks.push(id); }
         }
     }
 }

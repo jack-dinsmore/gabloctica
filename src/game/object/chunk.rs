@@ -3,7 +3,7 @@ use rustc_hash::FxHashMap;
 
 use crate::{graphics::{CHUNK_SIZE, Camera, CubeGrid, Graphics, ModelUniform, Renderer, StorageBuffer}, physics::RigidBody};
 
-pub(super) struct Chunk {
+pub struct Chunk {
     pub(super) grid: CubeGrid,
     pub mass_m0: f64,
     pub mass_m1: Vector3<f64>,

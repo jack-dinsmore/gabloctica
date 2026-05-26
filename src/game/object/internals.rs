@@ -1,11 +1,11 @@
-use cgmath::Vector3;
+use cgmath::{Quaternion, Rotation, Vector3};
 use rustc_hash::FxHashMap;
 use sorted_vec::SortedSet;
-use crate::{game::object::{Chunk, computer::{BlockProperties, machine::Machine}}, graphics::CHUNK_SIZE, util::{Tagged, Vendor}};
+use crate::{game::object::{Chunk, computer::{BlockProperties, machine::Machine}}, graphics::CHUNK_SIZE, physics::RigidBody, util::{Tagged, Vendor}};
 
 type Pipe = Tagged<PipeData>;
 type Circuit = Tagged<CircuitData>;
-type BlockKey = ((i32, i32, i32), (u32, u32, u32));
+pub type BlockKey = ((i32, i32, i32), (u32, u32, u32));
 
 fn recursive_search(block: BlockKey, chunks: &FxHashMap<(i32, i32, i32), Chunk>, visited: &mut SortedSet<BlockKey>, attached: &mut FxHashMap<((i32, i32, i32), (u32, u32, u32)), u32>, conductors: &SortedSet<u8>, commands: &SortedSet<u8>, index: u32){
     // Check if block is visited
@@ -65,7 +65,7 @@ fn recursive_search(block: BlockKey, chunks: &FxHashMap<(i32, i32, i32), Chunk>,
 }
 
 pub struct Internals {
-    blocks: Vec<CommandBlock>,
+    blocks: FxHashMap<BlockKey, CommandBlock>,
     circuits: Vendor<CircuitData>,
     pipes: Vendor<PipeData>,
 }
@@ -74,11 +74,11 @@ impl Internals {
         Self {
             circuits: Vendor::new(),
             pipes: Vendor::new(),
-            blocks: Vec::new(),
+            blocks: FxHashMap::default(),
         }
     }
 
-    pub fn update_info(&mut self, chunks: &FxHashMap<(i32, i32, i32), Chunk>, properties: &BlockProperties) {
+    pub fn update_info(&mut self, properties: &BlockProperties, chunks: &FxHashMap<(i32, i32, i32), Chunk>, body: RigidBody) {
         let mut attached_circuits = FxHashMap::default();
         let mut attached_pipes = FxHashMap::default();
         let mut visited = SortedSet::new();
@@ -146,7 +146,7 @@ impl Internals {
                             None => None
                         };
 
-                        self.blocks.push(CommandBlock::new(block, chunks, circuit, pipe, properties));
+                        self.blocks.insert(block, CommandBlock::new(block, chunks, properties, circuit, pipe, body.clone()));
                     }
                 }
             }
@@ -154,10 +154,37 @@ impl Internals {
     }
 
     pub fn update(&mut self, delta_t: f64) {
-        for block in &mut self.blocks {
+        for block in self.blocks.values_mut() {
             block.update(delta_t);
         }
     }
+
+    pub fn interrupt(&mut self, block: BlockKey, interrupt: Interrupt) {
+        if let Some(b) = self.blocks.get_mut(&block) {
+            // Call an interrupt on block b
+            let irps = &mut b.machine.interrupts;
+            match interrupt {
+                Interrupt::Interact => irps.push(1.),
+                Interrupt::Forward(f) => {irps.push(f); irps.push(2.);},
+                Interrupt::Backward(f) => {irps.push(f); irps.push(3.);},
+                Interrupt::Left(f) => {irps.push(f); irps.push(4.);},
+                Interrupt::Right(f) => {irps.push(f); irps.push(5.);},
+                Interrupt::Up(f) => {irps.push(f); irps.push(6.);},
+                Interrupt::Down(f) => {irps.push(f); irps.push(7.);},
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum Interrupt {
+    Interact,
+    Forward(f64),
+    Backward(f64),
+    Left(f64),
+    Right(f64),
+    Up(f64),
+    Down(f64),
 }
 
 struct CircuitData {
@@ -188,36 +215,61 @@ struct CommandBlock {
     block: BlockKey,
     pipe: Option<Pipe>,
     circuit: Option<Circuit>,
+    body: RigidBody,
+    pos: Vector3<f64>,
+    quat: Quaternion<f64>,
     machine: Machine,
 }
 
 impl CommandBlock {
-    fn new(block: BlockKey, chunks: &FxHashMap<(i32, i32, i32), Chunk>, circuit: Option<Circuit>, pipe: Option<Pipe>, properties: &BlockProperties) -> Self {
-        let block_type = chunks[&block.0].grid[block.1].id;
-        let machine = Machine::new(properties.command_block_scripts.get(&block_type).unwrap().clone());
+    fn new(block_pos: BlockKey, chunks: &FxHashMap<(i32, i32, i32), Chunk>, properties: &BlockProperties, circuit: Option<Circuit>, pipe: Option<Pipe>, body: RigidBody) -> Self {
+        let block = chunks[&block_pos.0].grid[block_pos.1];
+        let mut pos: Vector3<f64> = Vector3::new(block_pos.0.0 * CHUNK_SIZE as i32, block_pos.0.1 * CHUNK_SIZE as i32, block_pos.0.2 * CHUNK_SIZE as i32).cast().unwrap();
+        pos += Vector3::new(block_pos.1.0 as f64 + 0.5, block_pos.1.1 as f64 + 0.5, block_pos.1.2 as f64 + 0.5);
+        pos -= body.com_pos;
+        let quat = block.quat();
+        let machine = Machine::new(properties.command_block_scripts.get(&block.id).unwrap().clone());
         Self {
-            block,
+            block: block_pos,
             pipe,
             circuit,
+            body,
             machine,
+            pos,
+            quat,
         }
     }
 
     fn update(&mut self, delta_t: f64) {
-        self.machine.tick();
+        if let None = self.machine.tick() {
+            println!("Stack invalidation");
+            self.machine.reset();
+        }
+        if let None = self.run_functions(delta_t) {
+            println!("Function failure");
+            self.machine.reset();
+        }
+    }
+
+    fn run_functions(&mut self, delta_t: f64) -> Option<()> {
         while !self.machine.calls.is_empty() {
-            let function = self.machine.calls.pop().unwrap();
+            let function = self.machine.calls.pop()?;
             match function {
                 0. => {
-                    let arg = self.machine.calls.pop().unwrap();
+                    let arg = self.machine.calls.pop()?;
                     println!("Breakpoint {}", arg);
                 }
                 1. => {
-                    let force = Vector3::new(self.machine.calls.pop().unwrap(), self.machine.calls.pop().unwrap(), self.machine.calls.pop().unwrap());
-                    // TODO
+                    let mut force = Vector3::new(self.machine.calls.pop()?, self.machine.calls.pop()?, self.machine.calls.pop()?);
+                    force = self.quat.rotate_vector(force);
+                    let torque = self.pos.cross(force);
+                    let force = self.body.ori.rotate_vector(force);
+                    self.body.add_force(force);
+                    self.body.add_torque(torque);
                 }
                 _ => panic!("Unrecognized function number"),
             }
         }
+        Some(())
     }
 }

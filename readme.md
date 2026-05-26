@@ -1,9 +1,11 @@
 # Todo
 
 ## Ships
-* Block manifest
-* Internal updates
-* Block scripting
+* Sitting in chairs
+* Sending signals over the circuit network
+* Basic thrusters
+* Updating the command block properties and circuits etc when a block is placed
+* Speed up bucket fill for planets
 
 ## Graphics: 
 * Fog

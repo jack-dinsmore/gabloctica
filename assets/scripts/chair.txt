@@ -1,4 +1,16 @@
-chair: 
-    nop
+start: 
     tick
-    jmp chair
+    irp # Test for interrupt
+    dup # Duplicate the interrupt type
+    push 2.
+    eq # Test if the forward button is pressed
+    jnz forward # Jump if it is
+    pop # No interrupts were called. Pop the duplicated entry
+endl:
+    jmp start
+
+forward:
+    pop # Pop the duplicated entry
+    push 0.
+    call 2 # Print
+    jmp endl

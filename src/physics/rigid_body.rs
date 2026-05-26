@@ -163,9 +163,11 @@ impl RigidBody{
 }
 
 impl RigidBodyData {
+    /// Add a global force to the body
     pub fn add_force(&mut self, force: Vector3<f64>) {
         self.forces += force;
     }
+    /// Add a local torque to the body
     pub fn add_torque(&mut self, torque: Vector3<f64>) {
         self.torques += torque;
     }

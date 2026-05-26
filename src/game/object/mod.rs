@@ -1,18 +1,20 @@
-use cgmath::{InnerSpace, Matrix3, Rotation, Vector3, Zero};
-
-use loader::{PlanetLoader, ShipLoader};
-use rustc_hash::FxHashMap;
-use crate::game::object::computer::BlockProperties;
-use crate::game::object::internals::Internals;
-use crate::graphics::{Block, CHUNK_SIZE, Graphics, GridTexture, ModelUniform, Renderer, StorageBuffer};
-use crate::physics::{Collider, MoI, Physics, RigidBody, RigidBodyInit};
 
 pub mod chunk;
 pub mod loader;
 pub mod computer;
 mod internals;
 
+use cgmath::{InnerSpace, Matrix3, Rotation, Vector3, Zero};
+use loader::{PlanetLoader, ShipLoader};
+use rustc_hash::FxHashMap;
+use crate::game::object::computer::BlockProperties;
+pub use crate::game::object::internals::{Internals, Interrupt};
+use crate::graphics::{Block, CHUNK_SIZE, Graphics, GridTexture, ModelUniform, Renderer, StorageBuffer};
+use crate::physics::{Collider, MoI, Physics, RigidBody, RigidBodyInit};
+use crate::util::my_fmod;
 use chunk::Chunk;
+pub use internals::BlockKey;
+
 
 const RENDER_DISTANCE: i32 = 12; // Units of chunks
 const LOAD_TIME: u128 = 25000; // Millseconds
@@ -130,7 +132,7 @@ impl Object {
         self.body.pos += delta_com_global;
 
         // Update the internals
-        self.internals.update_info(&self.chunks, properties);// TODO implement partial updates
+        self.internals.update_info(properties, &self.chunks, self.body.clone());// TODO implement partial updates
     }
 
     pub fn update_graphics(&mut self, graphics: &Graphics, properties: &BlockProperties, character_pos: Vector3<f64>) {
@@ -139,6 +141,11 @@ impl Object {
 
     pub fn update_internals(&mut self, delta_t: f64) {
         self.internals.update(delta_t);
+    }
+
+    /// Interact with a block through right clicking
+    pub fn interrupt(&mut self, block: BlockKey, interrupt: Interrupt) {
+        self.internals.interrupt(block, interrupt);
     }
 
     fn load_chunks(&mut self, graphics: &Graphics, properties: &BlockProperties, character_pos: Vector3<f64>) {
@@ -315,11 +322,6 @@ impl Object {
         chunk.update_model(graphics);
         self.update_chunk_info(graphics, properties, vec![updated_chunk]);
     }
-}
-
-fn my_fmod(f: f64, l: f64) -> f64 {
-    let phase = f / l;
-    (phase - phase.floor()) * l
 }
 
 /// Return the detail of the cube given how far away it is

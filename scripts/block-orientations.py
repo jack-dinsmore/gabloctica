@@ -101,8 +101,15 @@ def print_code(vecs):
     print("\t_ => unreachable!()")
     print("}")
 
+def print_oris():
+    for i, rotation in enumerate(all_rotations):
+        quat = rotation.as_quat();
+        print(f"\t{i} => Quaternion::new({quat[0]:.6f}, {quat[1]:.6f}, {quat[2]:.6f}, {quat[3]:.6f}),")
+
+print_oris()
+
 # forward
-print_code([[1,-1,-1], [1,1,-1], [1,1,1], [1,-1,1]])
+# print_code([[1,-1,-1], [1,1,-1], [1,1,1], [1,-1,1]])
 # backward
 # print_code([[-1,-1,1], [-1,1,1], [-1,1,-1], [-1,-1,-1]])
 # # left

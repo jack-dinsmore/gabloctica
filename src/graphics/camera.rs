@@ -1,7 +1,7 @@
 use crate::graphics::{FreeTexture, Lighting, Renderer, ResourceType, TextureType};
 use crate::graphics::{Graphics, resource::UniformBuffer};
 use crate::graphics::resource::Uniform;
-use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, Vector3};
+use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, Quaternion, Vector3};
 
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::from_cols(
@@ -35,6 +35,7 @@ pub struct Camera {
     pub phi: f32,
     pub fovy: f32,
     pub up: Vector3<f32>,
+    pub ori: Quaternion<f32>,
 
     pub znear: f32,
     pub zfar: f32,
@@ -76,6 +77,7 @@ impl Camera {
             buffer,
             shadow_texture,
             shadow_texture_sampler,
+            ori: Quaternion::new(1., 0., 0., 0.),
         }
     }
     
@@ -84,7 +86,7 @@ impl Camera {
     }
 
     pub fn get_forward(&self) -> Vector3<f32> {
-        Vector3::new(
+        self.ori * Vector3::new(
             self.theta.sin() * self.phi.cos(),
             self.theta.sin() * self.phi.sin(),
             self.theta.cos(),
@@ -92,7 +94,7 @@ impl Camera {
     }
 
     pub fn get_right(&self) -> Vector3<f32> {
-        Vector3::new(
+        self.ori * Vector3::new(
             self.phi.sin(),
             -self.phi.cos(),
             0.,
@@ -100,7 +102,7 @@ impl Camera {
     }
 
     pub fn get_up(&self) -> Vector3<f32> {
-        Vector3::new(
+        self.ori * Vector3::new(
             -self.theta.cos() * self.phi.cos(),
             -self.theta.cos() * self.phi.sin(),
             self.theta.sin(),
@@ -109,9 +111,9 @@ impl Camera {
 
     pub fn update_buffer(&self, graphics: &Graphics, lighting: &Lighting, camera: &Camera) {
         let view = cgmath::Matrix4::look_at_rh(
-            Point3::from_vec(-self.get_forward()),
             Point3::new(0., 0., 0.),
-            self.up
+            Point3::from_vec(self.get_forward()),
+            self.get_up()
         );
         let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
         let view_proj = proj * view;
@@ -120,7 +122,7 @@ impl Camera {
         let view = cgmath::Matrix4::look_at_rh(
             Point3::from_vec(rel_pos.normalize()),
             Point3::new(0., 0., 0.),
-            self.up
+            self.get_up()
         );
         let proj = cgmath::ortho(-100., 100., -100., 100., -100., 100.);
         let shadow_proj = proj * view; // TODO

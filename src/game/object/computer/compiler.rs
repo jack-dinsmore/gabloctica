@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap;
 
-const COMMANDS: [&'static str; 27] = [
+const COMMANDS: [&'static str; 29] = [
     "nop",      // No operation
     "push",     // Push to stack
     "pop",      // Pop from stack
@@ -33,6 +33,8 @@ const COMMANDS: [&'static str; 27] = [
     
     "call",      // Call a function
     "tick",      // Tick
+    "irp",       // Get interrupt
+    "swp",       // Swap
 ];
 
 const LIT_ARG: [&'static str; 1] = [
@@ -76,22 +78,28 @@ pub fn compile(text: &str) -> Vec<u8> {
             let arg = &line[(index+1)..];
             if LIT_ARG.contains(&command) {
                 if let Ok(d) = arg.parse::<i64>() {
-                    output.extend((d as f64).to_le_bytes());// Convert int to data
+                    // Push an integer
+                    output.extend((d as f64).to_le_bytes());
                 } else if let Ok(d) = arg.parse::<f64>() {
-                    output.extend(d.to_le_bytes());// Convert int to data
+                    // Push a float
+                    output.extend(d.to_le_bytes());
                 } else {
-                    panic!("Line {}: Command {} take a literal argument, but one was not passed", line_number+1, command);
+                    // Push a label
+                    label_positions.push((output.len(), arg.to_owned()));
+                    output.extend([0,0,0,0]);
                 }
             } else if INT_ARG.contains(&command) {
+                // Push an unsigned integer
                 if let Ok(d) = arg.parse::<u32>() {
-                    output.extend(d.to_le_bytes());// Convert int to data
+                    output.extend(d.to_le_bytes());
                 }
                 else {
                     panic!("Line {}: Command {} take an integer argument, but one was not passed", line_number+1, command);
                 }
             } else if LABEL_ARG.contains(&command) {
+                // Push a label
                 label_positions.push((output.len(), arg.to_owned()));
-                output.extend([0,0,0,0]);// Convert label to data
+                output.extend([0,0,0,0]);
             }
         } else {
             // Handle a unary command
@@ -115,7 +123,10 @@ pub fn compile(text: &str) -> Vec<u8> {
 
     // Replace the labels
     for (pos, label) in label_positions {
-        let instruction_number = (*labels.get(&label).unwrap()) as u32;
+        let instruction_number = match labels.get(&label) {
+            Some(l) => *l as u32,
+            None => panic!("Could not find label {}", label)
+        };
         for (i, byte) in instruction_number.to_le_bytes().into_iter().enumerate() {
             output[pos + i] = byte;
         }
