@@ -1,8 +1,8 @@
-# ID, Name, Conductor, pipe, command
-1 dirt1 F F F F
-2 dirt2 F F F F
-3 dirt3 F F F F
-4 tank T T F F
-5 engine  T T T T
-6 chair F T T T
-7 metal F T F F
+# ID, Name, Conductor, pipe, command, chair
+1 dirt1     F F F F
+2 dirt2     F F F F
+3 dirt3     F F F F
+4 tank      T T F F
+5 engine    T F T F
+6 chair     T F T T
+7 metal     T F F F

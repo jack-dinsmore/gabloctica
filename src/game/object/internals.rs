@@ -28,13 +28,11 @@ fn bucket_fill(chunks: &FxHashMap<(i32, i32, i32), Chunk>, targets: &SortedSet<u
         let mut queue = vec![*all_blocks.first().unwrap()];
         while !queue.is_empty() {
             let block = queue.pop().unwrap();
-
+            
             if commands.contains(&chunks[&block.0].grid[block.1].id) {
                 attached.insert(block, index);
             }
-            if let None = all_blocks.pop() {
-                continue;
-            } // Already visited
+            if let None = all_blocks.remove_item(&block) { continue; } // Already visited, or not a target.
             
             let new_coords = [
                 if block.1.0 != 0 { (block.0, (block.1.0-1, block.1.1, block.1.2)) }
@@ -56,8 +54,7 @@ fn bucket_fill(chunks: &FxHashMap<(i32, i32, i32), Chunk>, targets: &SortedSet<u
                 else { ((block.0.0, block.0.1, block.0.2+1), (block.1.0, block.1.1, 0)) },
             ];
             for c in new_coords {
-                let block_id = chunks[&c.0].grid[c.1].id;
-                if block_id == 0 {continue;}
+                if chunks[&c.0].grid[c.1].id == 0 {continue;}
                 queue.push(c);
             }
         }
@@ -81,10 +78,7 @@ impl Internals {
     }
 
     pub fn update_info(&mut self, properties: &BlockProperties, chunks: &FxHashMap<(i32, i32, i32), Chunk>, body: RigidBody) {
-        // Get all adjoining circuits
         let attached_circuits = bucket_fill(chunks, &properties.conductor_blocks, &properties.command_blocks);
-
-        // Get all adjoining pipes
         let attached_pipes = bucket_fill(chunks, &properties.pipe_blocks, &properties.command_blocks);
 
         let mut circuit_structs: FxHashMap<u32, Circuit> = FxHashMap::default();
@@ -164,6 +158,7 @@ pub enum Interrupt {
 }
 
 pub struct CircuitData {
+    /// Messages are double buffered
     messages: [Vec<(u8, Vec<f64>)>; 2],
     up_index: usize,
 }
