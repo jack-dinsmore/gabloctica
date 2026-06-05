@@ -19,7 +19,7 @@ impl ShipLoader {
         );
         let mut chunk = Chunk::empty(graphics, pos);
 
-        chunk.grid[(7,7,7)] = Block{id: 1, ori: 0};// Dirt
+        chunk.grid[(7,7,7)] = Block{id: 7, ori: 0};// Metal
         chunk.grid[(6,8,7)] = Block{id: 4, ori: 1};// Tank
         chunk.grid[(7,8,7)] = Block{id: 4, ori: 1};// Tank
         chunk.grid[(8,8,7)] = Block{id: 5, ori: 3};// Engine

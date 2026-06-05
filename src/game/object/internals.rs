@@ -1,67 +1,69 @@
-use cgmath::{Quaternion, Rotation, Vector3};
+use cgmath::{Quaternion, Vector3};
 use rustc_hash::FxHashMap;
 use sorted_vec::SortedSet;
-use crate::{game::object::{Chunk, computer::{BlockProperties, machine::Machine}}, graphics::CHUNK_SIZE, physics::RigidBody, util::{Tagged, Vendor}};
+use crate::{game::object::{Chunk, computer::{BlockProperties, machine::{Machine, MachineError}}}, graphics::CHUNK_SIZE, physics::RigidBody, util::{Tagged, Vendor}};
 
 type Pipe = Tagged<PipeData>;
 type Circuit = Tagged<CircuitData>;
 pub type BlockKey = ((i32, i32, i32), (u32, u32, u32));
 
-fn recursive_search(block: BlockKey, chunks: &FxHashMap<(i32, i32, i32), Chunk>, visited: &mut SortedSet<BlockKey>, attached: &mut FxHashMap<((i32, i32, i32), (u32, u32, u32)), u32>, conductors: &SortedSet<u8>, commands: &SortedSet<u8>, index: u32){
-    // Check if block is visited
-    if visited.contains(&block) { return; }
-    visited.push(block);
+fn bucket_fill(chunks: &FxHashMap<(i32, i32, i32), Chunk>, targets: &SortedSet<u8>, commands: &SortedSet<u8>) -> FxHashMap<BlockKey, u32>{
+    let mut attached = FxHashMap::default();
+    let mut all_blocks = SortedSet::new();
 
-    // Add the command block to the given circuit
-    if commands.contains(&chunks[&block.0].grid[block.1].id) {
-        if !attached.contains_key(&block) {
-            attached.insert(block, index);
+    for (chunk_pos, chunk) in chunks {
+        for i in 0..CHUNK_SIZE {
+            for j in 0..CHUNK_SIZE {
+                for k in 0..CHUNK_SIZE {
+                    let block = (*chunk_pos, (i,j,k));
+                    let block_type = chunks[&block.0].grid[block.1].id;
+                    if targets.contains(&block_type) { all_blocks.push(block); }
+                }
+            }
         }
     }
 
-    // Check if block is a conductor
-    if !conductors.contains(&chunks[&block.0].grid[block.1].id) {return;}
-    
-    let new_coords = [
-        if block.1.0 != 0 {
-            (block.0, (block.1.0-1, block.1.1, block.1.2))
-        } else {
-            ((block.0.0-1, block.0.1, block.0.2), (CHUNK_SIZE-1, block.1.1, block.1.2))
-        },
+    let mut index = 0;
+    while !all_blocks.is_empty() {
+        let mut queue = vec![*all_blocks.first().unwrap()];
+        while !queue.is_empty() {
+            let block = queue.pop().unwrap();
 
-        if block.1.0 != CHUNK_SIZE-1 {
-            (block.0, (block.1.0+1, block.1.1, block.1.2))
-        } else {
-            ((block.0.0+1, block.0.1, block.0.2), (0, block.1.1, block.1.2))
-        },
+            if commands.contains(&chunks[&block.0].grid[block.1].id) {
+                attached.insert(block, index);
+            }
+            if let None = all_blocks.pop() {
+                continue;
+            } // Already visited
+            
+            let new_coords = [
+                if block.1.0 != 0 { (block.0, (block.1.0-1, block.1.1, block.1.2)) }
+                else { ((block.0.0-1, block.0.1, block.0.2), (CHUNK_SIZE-1, block.1.1, block.1.2)) },
 
-        if block.1.1 != 0 {
-            (block.0, (block.1.0, block.1.1-1, block.1.2))
-        } else {
-            ((block.0.0, block.0.1-1, block.0.2), (block.1.0, CHUNK_SIZE-1, block.1.2))
-        },
+                if block.1.0 != CHUNK_SIZE-1 { (block.0, (block.1.0+1, block.1.1, block.1.2)) }
+                else { ((block.0.0+1, block.0.1, block.0.2), (0, block.1.1, block.1.2)) },
 
-        if block.1.1 != CHUNK_SIZE-1 {
-            (block.0, (block.1.0, block.1.1+1, block.1.2))
-        } else {
-            ((block.0.0, block.0.1+1, block.0.2), (block.1.0, 0, block.1.2))
-        },
+                if block.1.1 != 0 { (block.0, (block.1.0, block.1.1-1, block.1.2)) }
+                else { ((block.0.0, block.0.1-1, block.0.2), (block.1.0, CHUNK_SIZE-1, block.1.2)) },
 
-        if block.1.2 != 0 {
-            (block.0, (block.1.0, block.1.1, block.1.2-1))
-        } else {
-            ((block.0.0, block.0.1, block.0.2-1), (block.1.0, block.1.1, CHUNK_SIZE-1))
-        },
+                if block.1.1 != CHUNK_SIZE-1 { (block.0, (block.1.0, block.1.1+1, block.1.2)) }
+                else { ((block.0.0, block.0.1+1, block.0.2), (block.1.0, 0, block.1.2)) },
 
-        if block.1.2 != CHUNK_SIZE-1 {
-            (block.0, (block.1.0, block.1.1, block.1.2+1))
-        } else {
-            ((block.0.0, block.0.1, block.0.2+1), (block.1.0, block.1.1, 0))
-        },
-    ];
-    for c in new_coords {
-        recursive_search(c, chunks, visited, attached, conductors, commands, index);
+                if block.1.2 != 0 { (block.0, (block.1.0, block.1.1, block.1.2-1)) }
+                else { ((block.0.0, block.0.1, block.0.2-1), (block.1.0, block.1.1, CHUNK_SIZE-1)) },
+
+                if block.1.2 != CHUNK_SIZE-1 { (block.0, (block.1.0, block.1.1, block.1.2+1)) }
+                else { ((block.0.0, block.0.1, block.0.2+1), (block.1.0, block.1.1, 0)) },
+            ];
+            for c in new_coords {
+                let block_id = chunks[&c.0].grid[c.1].id;
+                if block_id == 0 {continue;}
+                queue.push(c);
+            }
+        }
+        index += 1;
     }
+    attached
 }
 
 pub struct Internals {
@@ -79,40 +81,11 @@ impl Internals {
     }
 
     pub fn update_info(&mut self, properties: &BlockProperties, chunks: &FxHashMap<(i32, i32, i32), Chunk>, body: RigidBody) {
-        let mut attached_circuits = FxHashMap::default();
-        let mut attached_pipes = FxHashMap::default();
-        let mut visited = SortedSet::new();
-        let mut index = 0;
-
         // Get all adjoining circuits
-        for (chunk_pos, chunk) in chunks {
-            for i in 0..CHUNK_SIZE {
-                for j in 0..CHUNK_SIZE {
-                    for k in 0..CHUNK_SIZE {
-                        let block = (*chunk_pos, (i,j,k));
-                        if visited.contains(&block) { continue; }
-                        recursive_search(block, chunks, &mut visited, &mut attached_circuits, &properties.conductor_blocks, &properties.command_blocks, index);
-                        index += 1;
-                    }
-                }
-            }
-        }
+        let attached_circuits = bucket_fill(chunks, &properties.conductor_blocks, &properties.command_blocks);
 
         // Get all adjoining pipes
-        visited.clear();
-        index = 0;
-        for (chunk_pos, chunk) in chunks {
-            for i in 0..CHUNK_SIZE {
-                for j in 0..CHUNK_SIZE {
-                    for k in 0..CHUNK_SIZE {
-                        let block = (*chunk_pos, (i,j,k));
-                        if visited.contains(&block) { continue; }
-                        recursive_search(block, chunks, &mut visited, &mut attached_pipes, &properties.pipe_blocks, &properties.command_blocks, index);
-                        index += 1;
-                    }
-                }
-            }
-        }
+        let attached_pipes = bucket_fill(chunks, &properties.pipe_blocks, &properties.command_blocks);
 
         let mut circuit_structs: FxHashMap<u32, Circuit> = FxHashMap::default();
         let mut pipe_structs: FxHashMap<u32, Pipe>  = FxHashMap::default();
@@ -157,6 +130,9 @@ impl Internals {
         for block in self.blocks.values_mut() {
             block.update(delta_t);
         }
+        for mut circuit in &mut self.circuits.iter() {
+            circuit.tick();
+        }
     }
 
     pub fn interrupt(&mut self, block: BlockKey, interrupt: Interrupt) {
@@ -187,19 +163,41 @@ pub enum Interrupt {
     Down(f64),
 }
 
-struct CircuitData {
-
+pub struct CircuitData {
+    messages: [Vec<(u8, Vec<f64>)>; 2],
+    up_index: usize,
 }
 
 impl CircuitData {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
-            
+            messages: [Vec::new(), Vec::new()],
+            up_index: 0,
         }
+    }
+    /// Send a message for to_block 
+    pub fn send(&mut self, to_block: u8, data: Vec<f64>) {
+        let down_messages = &mut self.messages[(self.up_index + 1) % 2];
+        down_messages.push((to_block, data));
+    }
+
+    /// Receive a message for to_block. Returns the data if it exists, else None. Also return the index of the first unexplored message.
+    pub fn recv(&self, to_block: u8, start_message: usize) -> (Option<&[f64]>, usize) {
+        let up_messages = &self.messages[self.up_index];
+        for (i, (m_to_block, m_data)) in up_messages.iter().skip(start_message).enumerate() {
+            if *m_to_block != to_block {continue;}
+            return (Some(m_data), i + 1)
+        }
+        (None, self.messages.len())
+    }
+
+    pub fn tick(&mut self) {
+        self.messages[self.up_index].clear();
+        self.up_index = (self.up_index + 1) % 2;
     }
 }
 
-struct PipeData {
+pub struct PipeData {
 
 }
 
@@ -211,13 +209,17 @@ impl PipeData {
     }
 }
 
-struct CommandBlock {
-    block: BlockKey,
-    pipe: Option<Pipe>,
-    circuit: Option<Circuit>,
-    body: RigidBody,
-    pos: Vector3<f64>,
-    quat: Quaternion<f64>,
+pub struct CommandBlockInfo {
+    pub(super) pipe: Option<Pipe>,
+    pub(super) circuit: Option<Circuit>,
+    pub(super) id: u8,
+    pub(super) block: BlockKey,
+    pub(super) body: RigidBody,
+    pub(super) pos: Vector3<f64>,
+    pub(super) quat: Quaternion<f64>,
+}
+pub struct CommandBlock {
+    info: CommandBlockInfo,
     machine: Machine,
 }
 
@@ -230,46 +232,30 @@ impl CommandBlock {
         let quat = block.quat();
         let machine = Machine::new(properties.command_block_scripts.get(&block.id).unwrap().clone());
         Self {
-            block: block_pos,
-            pipe,
-            circuit,
-            body,
+            info: CommandBlockInfo {
+                id: chunks[&block_pos.0].grid[block_pos.1].id,
+                block: block_pos,
+                pipe,
+                circuit,
+                body,
+                pos,
+                quat,
+            },
             machine,
-            pos,
-            quat,
         }
     }
 
     fn update(&mut self, delta_t: f64) {
-        if let None = self.machine.tick() {
-            println!("Stack invalidation");
-            self.machine.reset();
-        }
-        if let None = self.run_functions(delta_t) {
-            println!("Function failure");
-            self.machine.reset();
-        }
-    }
-
-    fn run_functions(&mut self, delta_t: f64) -> Option<()> {
-        while !self.machine.calls.is_empty() {
-            let function = self.machine.calls.pop()?;
-            match function {
-                0. => {
-                    let arg = self.machine.calls.pop()?;
-                    println!("Breakpoint {}", arg);
-                }
-                1. => {
-                    let mut force = Vector3::new(self.machine.calls.pop()?, self.machine.calls.pop()?, self.machine.calls.pop()?);
-                    force = self.quat.rotate_vector(force);
-                    let torque = self.pos.cross(force);
-                    let force = self.body.ori.rotate_vector(force);
-                    self.body.add_force(force);
-                    self.body.add_torque(torque);
-                }
-                _ => panic!("Unrecognized function number"),
+        let tick = self.machine.tick(&mut self.info);
+        if let Err(e) = tick {
+            match e {
+                MachineError::Stack => println!("Segmentation fault in block (type {})", self.info.id),
+                MachineError::Ip => println!("Program overflow in block (type {})", self.info.id),
+                MachineError::Func => println!("Invalid function call in block (type {})", self.info.id),
+                MachineError::OpCode => println!("Invalid opcode in block (type {})", self.info.id),
             }
+            ;
+            self.machine.reset();
         }
-        Some(())
     }
 }

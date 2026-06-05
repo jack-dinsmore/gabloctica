@@ -11,6 +11,9 @@ endl:
 
 forward:
     pop # Pop the duplicated entry
-    push 0.
-    call 2 # Print
+    push 1. # Thrust 1
+    push 1. # Apply thrust command
+    push 2. # Two arguments
+    push 5. # Engine
+    call 3 # Print
     jmp endl

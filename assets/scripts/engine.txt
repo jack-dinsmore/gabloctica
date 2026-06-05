@@ -1,0 +1,23 @@
+start: 
+    push nosignal
+    push signal
+    push 6. # Chair
+    call 4
+signal: # The number of arguments is first
+    swp # Now the type is first, n args is second
+    push 1.
+    eq
+    jnz fire
+    # TODO handle other cases
+fire: # type is at top, then n args, then thrust
+    pop
+    pop
+    push 5. # Rocket thrust
+    mul # Multiply the throttle by the thrust
+    push 0 # No acceleration along y
+    push 0 # No acceleration along x
+    call 1 # Add force
+    # Roll through
+nosignal:
+    tick
+    jmp start

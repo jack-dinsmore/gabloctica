@@ -24,7 +24,6 @@ fn newton_iteration(iterations: usize, x0: &[f64], func: impl Fn(&[f64]) -> Vec<
         let x_owned: Vec<f64> = x.iter().copied().collect();
         let f = ColRef::from_slice(&func(&x_owned)).to_owned();
         let h = hess(&x_owned);
-        dbg!(h.determinant());
         let lu = h.full_piv_lu();
         x -= lu.solve(&f);
     }
@@ -138,7 +137,6 @@ impl Atmosphere {
         //     &vec![0.; 12],
         //     |x| { // Function
         //         // This is more complicated than I thought. I need to keep better track of the DoF.
-        //         dbg!(&x);
         //         let mut output = vec![0.; 12];
         //         for edge_index in 0..6 {
         //             // Get indices of the adjoining faces
@@ -172,12 +170,10 @@ impl Atmosphere {
         //                 );
         //                 let grad = (eqn - eqn0) / delta;
         //                 u0[i] -= delta;
-        //                 dbg!(grad);
         //                 output[((edge_index*3+0), (i0*3+i))] = grad.x;
         //                 output[((edge_index*3+1), (i0*3+i))] = grad.y;
         //                 output[((edge_index*3+2), (i0*3+i))] = grad.z;
         //             }
-        //             dbg!();
         //             for i in 0..3 {
         //                 u1[i] += delta;
         //                 let udot = normal.dot((u1+u0)/2.);
@@ -186,13 +182,10 @@ impl Atmosphere {
         //                 );
         //                 let grad = (eqn - eqn0) / delta;
         //                 u1[i] -= delta;
-        //                 dbg!(grad);
         //                 output[((edge_index*3+0), (i1*3+i))] = grad.x;
         //                 output[((edge_index*3+1), (i1*3+i))] = grad.y;
         //                 output[((edge_index*3+2), (i1*3+i))] = grad.z;
         //             }
-        //             dbg!();
-        //             dbg!();
         //         }
         //         output
         //     }

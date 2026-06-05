@@ -145,7 +145,7 @@ impl Game {
         // Load block properties
         let mut block_properties = BlockProperties::new();
         block_properties.preload_script(include_str!("../../assets/scripts/chair.txt"), "chair");
-        block_properties.preload_script(include_str!("../../assets/scripts/fire.txt"), "fire");
+        block_properties.preload_script(include_str!("../../assets/scripts/engine.txt"), "engine");
         block_properties.load_manifest(include_str!("../../assets/blocks.txt"));
 
         Self {

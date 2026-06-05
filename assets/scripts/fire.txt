@@ -1,3 +1,0 @@
-start: 
-    tick
-    jmp start

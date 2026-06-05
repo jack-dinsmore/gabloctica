@@ -6,7 +6,7 @@ const COMMANDS: [&'static str; 29] = [
     "pop",      // Pop from stack
     "dup",      // Copy top of stack
     "puship",   // Push the instruction pointer
-    "popip",    // Pop top to the  instruction pointer
+    "jpop",     // Pop top to the  instruction pointer
     
     "jmp",      // Unconditional jump
     "jnz",      // Jump if not equal to zero
@@ -28,13 +28,13 @@ const COMMANDS: [&'static str; 29] = [
     "xor",      // Boolean exclusive or
     "not",      // Boolean not
 
-    "popn",      // Pop next item
-    "dupn",      // Duplicate next item
+    "popn",     // Pop next item
+    "dupn",     // Duplicate next item
     
-    "call",      // Call a function
-    "tick",      // Tick
-    "irp",       // Get interrupt
-    "swp",       // Swap
+    "call",     // Call a function
+    "tick",     // Tick
+    "irp",      // Get interrupt
+    "swp",      // Swap
 ];
 
 const LIT_ARG: [&'static str; 1] = [
@@ -86,11 +86,11 @@ pub fn compile(text: &str) -> Vec<u8> {
                 } else {
                     // Push a label
                     label_positions.push((output.len(), arg.to_owned()));
-                    output.extend([0,0,0,0]);
+                    output.extend([0,0,0,0,0,0,0,0]);
                 }
             } else if INT_ARG.contains(&command) {
                 // Push an unsigned integer
-                if let Ok(d) = arg.parse::<u32>() {
+                if let Ok(d) = arg.parse::<u64>() {
                     output.extend(d.to_le_bytes());
                 }
                 else {
@@ -99,7 +99,7 @@ pub fn compile(text: &str) -> Vec<u8> {
             } else if LABEL_ARG.contains(&command) {
                 // Push a label
                 label_positions.push((output.len(), arg.to_owned()));
-                output.extend([0,0,0,0]);
+                output.extend([0,0,0,0,0,0,0,0]);
             }
         } else {
             // Handle a unary command
@@ -124,7 +124,7 @@ pub fn compile(text: &str) -> Vec<u8> {
     // Replace the labels
     for (pos, label) in label_positions {
         let instruction_number = match labels.get(&label) {
-            Some(l) => *l as u32,
+            Some(l) => *l as u64,
             None => panic!("Could not find label {}", label)
         };
         for (i, byte) in instruction_number.to_le_bytes().into_iter().enumerate() {
