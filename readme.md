@@ -1,9 +1,7 @@
 # Todo
 
 ## Ships
-* Sending signals over the circuit network
-* Basic thrusters
-* Ensure the command block keeps up with interrupts generated once per frame
+* Quahog language
 * Updating the command block properties and circuits etc when a block is placed
 * Speed up bucket fill for planets
 
