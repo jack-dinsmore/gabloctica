@@ -1,4 +1,4 @@
 # project/Cargo.toml
 [workspace]
-members = ["biscuit", "pyxis"]
+members = ["biscuit", "astranesse"]
 resolver = "2"

@@ -3,6 +3,8 @@ use num_enum::TryFromPrimitive;
 use rustc_hash::FxHashMap;
 use strum::IntoEnumIterator;
 
+use crate::ssa::VariableType;
+
 lazy_static! {
     static ref COMMAND_MAP : FxHashMap<String, Command> = {
         let mut map = FxHashMap::default();
@@ -20,6 +22,13 @@ lazy_static! {
         }
         map
     };
+    pub static ref FUNCTION_MAP_LOWER : FxHashMap<String, Function> = {
+        let mut map = FxHashMap::default();
+        for v in Function::iter() {
+            map.insert(v.to_string().to_lowercase(), v);
+        }
+        map
+    };
 }
 
 #[repr(u8)]
@@ -28,8 +37,6 @@ pub enum Command {
     // In the above, T stands for stack top, N stands for next, and A stands for an argument.
     Nop,        // No operation
     Call,       // Call T
-    Tick,       // Tick
-    Irp,        // Get interrupt
     Jmp,        // Unconditional jump to A
     Jnz,        // Jump to A if not equal to zero
 
@@ -68,7 +75,9 @@ pub enum Command {
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, strum_macros::Display, strum_macros::EnumIter, TryFromPrimitive)]
 pub enum Function {
-    Dbg,
+    Debug,
+    Tick,
+    Interrupt,
 }
 
 impl Command {
@@ -106,6 +115,14 @@ impl Function {
         match FUNCTION_MAP.get(s) {
             Some(k) => Some(k.to_owned()),
             None => None,
+        }
+    }
+
+    pub fn return_type(&self) -> VariableType {
+        match self {
+            Function::Debug => VariableType::Null,
+            Function::Tick => VariableType::Null,
+            Function::Interrupt => VariableType::Null,
         }
     }
 }

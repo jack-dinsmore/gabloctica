@@ -4,15 +4,22 @@ use crate::{parser::SyntaxNode, ssa::{Bytecode, Ssa, VariableType}};
 
 lazy_static! {
     static ref CONSTANT_PRECURSOR: SyntaxNode = {
-        let tokens = crate::parser::load_str("float const() ", "root").unwrap();
-        SyntaxNode::tree(tokens).unwrap()
+        let tokens = crate::parser::load_str("fn const() {}", "root").unwrap();
+        let tree = SyntaxNode::tree(tokens).unwrap();
+        match tree {
+            SyntaxNode::Adjacent(nodes) => match &nodes[0] {
+                SyntaxNode::Block(header, _) => (&**header).clone(),
+                _ => unreachable!()
+            },
+            _ => unreachable!()
+        }
     };
 }
 
 pub struct Function {
-    name: String,
+    pub name: String,
     lines: Vec<SyntaxNode>,
-    return_value: VariableType,
+    pub return_value: VariableType,
     arguments: Vec<(String, VariableType)>,
 }
 
@@ -21,23 +28,24 @@ impl Function {
         let mut return_value = VariableType::Float;
         let mut node_iter = match header {
             SyntaxNode::Adjacent(v) => v.iter(),
-            _ => return header.raise("Invalid syntax"),
+            _ => return header.raise("Invalid syntax 1"),
         };
 
-        match node_iter.next() {
+        let n = node_iter.next();
+        match n {
             Some(SyntaxNode::Unclassified(t)) => if t != "fn" {
                 return t.raise("Function declarations must start with fn")
             }
-            _ => return header.raise("Invalid syntax"),
+            _ => return header.raise("Invalid syntax 2"),
         };
 
         let function_name = match node_iter.next() {
             Some(SyntaxNode::Unclassified(t)) => &t.s,
-            _ => return header.raise("Invalid syntax"),
+            _ => return header.raise("Invalid syntax 3"),
         };
 
         let mut next = node_iter.next();
-        if let Some(SyntaxNode::Parenthesis(c, arg)) = next {
+        if let Some(SyntaxNode::Parenthesis(c, _)) = next {
             if *c == "[" {
                 return_value = VariableType::List;
                 next = node_iter.next();
@@ -77,21 +85,14 @@ impl Function {
                             arguments.push((item.to_owned(), VariableType::Float))
                         }
                     },
-                    _ => return header.raise("Braces must contain expression"),
+                    _ => return header.raise("Invalid syntax 4"),
                 };
             }
             _ => return header.raise("Function declaractions must have parentheses")
         }
 
         let lines = match body {
-            SyntaxNode::List(c, list) => {
-                if *c != ";" { return body.raise("Braces must contain expressions"); }
-                match &**list {
-                    SyntaxNode::Adjacent(items) => items,
-                    _ => return list.raise("Invalid syntax"),
-                }
-                
-            },
+            SyntaxNode::Adjacent(nodes) => nodes,
             _ => return header.raise("Braces must contain expression"),
         };
 
@@ -103,17 +104,12 @@ impl Function {
         })
     }
 
-    fn compile(&self, available_functions: &FxHashMap<String, Function>) -> Result<(Ssa, Vec<String>), String> {
-        let mut ssa = Ssa::new();
-        let mut used_functions = Vec::new();
+    fn compile(&self, available_functions: &FxHashMap<String, Function>) -> Result<Ssa, String> {
+        let mut arguments = FxHashMap::default();
         for (name, typ) in &self.arguments {
-            ssa.add_arg(name, *typ)
+            arguments.insert(name.to_owned(), *typ);
         }
-        for line in &self.lines {
-            ssa.process_node(line, available_functions, &mut used_functions);
-        }
-        ssa.order_instructions();
-        Ok((ssa, used_functions))
+        Ssa::compile(&self.lines, &arguments, available_functions)
     }
 }
 
@@ -122,13 +118,13 @@ struct Compiler {
 }
 
 impl Compiler {
-    pub fn new(tree: SyntaxNode) -> Result<Self, String> {
+    pub fn new(tree: &SyntaxNode) -> Result<Self, String> {
         let mut constants = Vec::new();
         let mut functions = FxHashMap::default();
 
         let main_list = match tree {
             SyntaxNode::Adjacent(nodes) => nodes,
-            _ => return tree.raise("Invalid syntax"),
+            _ => return tree.raise("Invalid syntax 6"),
         };
 
         for entry in main_list {
@@ -138,12 +134,12 @@ impl Compiler {
                     functions.insert(function.name.to_owned(), function);
                 },
                 SyntaxNode::List(_, syntax_node) => {
-                    match *syntax_node {
+                    match &**syntax_node {
                         SyntaxNode::Adjacent(syntax_nodes) => constants.append(&mut syntax_nodes.clone()),
-                        _ => return syntax_node.raise("Invalid syntax"),
+                        _ => return syntax_node.raise("Invalid syntax 7"),
                     }
                 },
-                _ => return entry.raise("Invalid syntax"),
+                _ => return entry.raise("All code outside functions must be pragmas or function definitions"),
             }
         }
         
@@ -160,9 +156,9 @@ impl Compiler {
         let mut queue = vec![name.to_owned()];
         while !queue.is_empty() {
             let name = queue.pop().unwrap();
-            let (ssa, used_functions) = self.functions[&name].compile(&self.functions)?;
-            for f in used_functions {
-                queue.push(f);
+            let ssa = self.functions[&name].compile(&self.functions)?;
+            for f in &ssa.get_used_functions() {
+                queue.push(f.clone());
             }
             compiled.insert(name, ssa);
         }
@@ -170,20 +166,24 @@ impl Compiler {
     }
 }
 
-fn compile_tree(tree: SyntaxNode, _filename: &str) -> Result<Vec<u8>, String> {
+fn compile_tree(tree: &SyntaxNode) -> Result<Vec<u8>, String> {
     let compiler = Compiler::new(tree)?;
+    if !compiler.functions.contains_key("main") {
+        return tree.raise("No function named main");
+    }
     let ssa = compiler.compile("main")?;
+    dbg!(&ssa);
     // let const_ssa = compiler.compile("const")?; // TODO
     
     // Optimize IR
 
     // Write to bytecode
     let mut names = vec!["main".to_owned()];
-    let mut compiled_functions = vec![Bytecode::new(&ssa["main"])];
+    let mut compiled_functions = vec![Bytecode::new(&ssa["main"], 0)];
     for (name, ssa) in &ssa {
         if name == "main" { continue; }
         names.push(name.to_owned());
-        compiled_functions.push(Bytecode::new(ssa));
+        compiled_functions.push(Bytecode::new(ssa, 0));
     }
     let mut locations = FxHashMap::default();
     let mut net_loc = 0;
@@ -197,6 +197,7 @@ fn compile_tree(tree: SyntaxNode, _filename: &str) -> Result<Vec<u8>, String> {
         f.replace_calls(&locations);
         code.extend(f.code().into_iter());
     }
+    dbg!();
     Ok(code)
 }
 
@@ -204,5 +205,5 @@ fn compile_tree(tree: SyntaxNode, _filename: &str) -> Result<Vec<u8>, String> {
 pub fn compile_str(s: &str, filename: &str) -> Result<Vec<u8>, String> {
     let tokens = crate::parser::load_str(s, filename)?;
     let tree = crate::parser::SyntaxNode::tree(tokens)?;
-    compile_tree(tree, filename)
+    compile_tree(&tree)
 }

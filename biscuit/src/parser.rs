@@ -4,7 +4,7 @@ use sorted_vec::SortedSet;
 
 use crate::parser::SyntaxNode::{Parenthesis, Unclassified};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Token {
     pub s: String,
     filename: String,
@@ -12,8 +12,11 @@ pub struct Token {
     col_no: u32,
 }
 impl Token {
+    pub fn raise_str(&self, message: &str) -> String {
+        format!("{}:{}:{}\n{}", self.filename, self.line_no+1, self.col_no+1, message)
+    }
     pub fn raise<T>(&self, message: &str) -> Result<T, String> {
-        Err(format!("{}:{}:{}\n{}", self.filename, self.line_no, self.col_no, message))
+        Err(self.raise_str(message))
     }
 }
 impl PartialEq<str> for Token {
@@ -21,8 +24,13 @@ impl PartialEq<str> for Token {
         self.s == other
     }
 }
+impl std::fmt::Debug for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.s)
+    }
+}
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum SyntaxNode {
     Unclassified(Token),
     Number(f64),
@@ -36,10 +44,12 @@ pub enum SyntaxNode {
 impl SyntaxNode {
     fn reduce(&mut self) -> Result<(), String> {
         self.strip_comment()?;
-        self.strip_whitespace()?;
+        self.strip_newline()?;
         self.reduce_parens("{", "}")?;
         self.reduce_blocks()?;
-        self.reduce_list(";")?;
+        dbg!(&self);
+        self.reduce_semicolon()?;
+        dbg!(&self);
         self.reduce_parens("(", ")")?;
         self.reduce_parens("[", "]")?;
         self.reduce_list(",")?;
@@ -53,35 +63,7 @@ impl SyntaxNode {
         self.reduce_binop(&["*", "/"])?;
         self.reduce_binop(&["+", "-"])?;
         self.reduce_number();
-        Ok(())
-    }
-
-    fn strip_whitespace(&mut self) -> Result<(), String> {
-        match self {
-            SyntaxNode::Adjacent(nodes) => {
-                let mut i = 0;
-                while i < nodes.len() {
-                    if let Unclassified(t) = &nodes[i] {
-                        if t == " " || t == "\n" || t == "\t" {
-                            nodes.remove(i);
-                            continue;
-                        }
-                    } else {
-                        nodes[i].strip_whitespace()?;
-                    }
-                    i += 1;
-                }
-            }
-            SyntaxNode::Parenthesis(_, n) | SyntaxNode::List(_, n) | SyntaxNode::Unop(_, n) => {
-                n.strip_whitespace()?;
-            },
-            SyntaxNode::Binop(_, n1, n2) | SyntaxNode::Block(n1, n2) => {
-                n1.strip_whitespace()?;
-                n2.strip_whitespace()?;
-            },
-            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax"),
-            SyntaxNode::Number(_) => unreachable!()
-        };
+        dbg!(&self);
         Ok(())
     }
 
@@ -101,7 +83,7 @@ impl SyntaxNode {
                                     comment_index = None;
                                     i = j;
                                 },
-                                None => todo!(),
+                                None => (),
                             }
                         }
                     } else {
@@ -117,28 +99,65 @@ impl SyntaxNode {
                 n1.strip_comment()?;
                 n2.strip_comment()?;
             },
-            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax"),
+            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax 9"),
             SyntaxNode::Number(_) => unreachable!()
         }
         Ok(())
     }
 
-    fn reduce_parens(&mut self, symbol_open: &str, symbol_close: &str) -> Result<(), String> {
+    fn strip_newline(&mut self) -> Result<(), String> {
+        match self {
+            SyntaxNode::Adjacent(nodes) => {
+                let mut i = 0;
+                while i < nodes.len() {
+                    if let Unclassified(t) = &nodes[i] {
+                        if t == "\n" {
+                            nodes.remove(i);
+                            i -= 1;
+                        }
+                    }
+                    i += 1;
+                }
+            },
+            SyntaxNode::Parenthesis(_, n) | SyntaxNode::List(_, n) | SyntaxNode::Unop(_, n) => {
+                n.strip_comment()?;
+            },
+            SyntaxNode::Binop(_, n1, n2) | SyntaxNode::Block(n1, n2) => {
+                n1.strip_comment()?;
+                n2.strip_comment()?;
+            },
+            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax 9"),
+            SyntaxNode::Number(_) => unreachable!()
+        }
+        Ok(())
+    }
+
+    fn reduce_parens(&mut self, symbol_open: &'static str, symbol_close: &'static str) -> Result<(), String> {
         match self {
             SyntaxNode::Adjacent(nodes) => {
                 let mut parentheses = Vec::new();
-                for i in 0..nodes.len(){
-                    if let Unclassified(t) = &nodes[i] {
-                        if t == symbol_open {
-                            parentheses.push(i);
-                        } else if t == symbol_close {
-                            let start_index = parentheses.pop().ok_or(t.raise::<()>("Parenthesis was not opened").unwrap_err())?;
-                            let inner_node = SyntaxNode::Adjacent(nodes[start_index..i].to_vec());
-                            nodes.splice(start_index..i, [inner_node]);
+                let mut i = 0;
+                while i < nodes.len() {
+                    match &nodes[i] {
+                        Unclassified(t) => {
+                            if t == symbol_open {
+                                parentheses.push(i);
+                                i += 1
+                            } else if t == symbol_close {
+                                let start_index = parentheses.pop().ok_or(t.raise_str("Parenthesis was not opened"))?;
+                                let inner_node = SyntaxNode::Adjacent(nodes[start_index+1..i].to_vec());
+                                let paren = SyntaxNode::Parenthesis(symbol_open, Box::new(inner_node));
+                                nodes.splice(start_index..=i, [paren]);
+                                i = start_index+1
+                            } else {
+                                i += 1
+                            }
+                        },
+                        _ => {
+                            nodes[i].reduce_parens(symbol_open, symbol_close)?;
+                            i += 1;
                         }
-                    } else {
-                        nodes[i].reduce_parens(symbol_open, symbol_close)?;
-                    }
+                    };
                 }
                 if !parentheses.is_empty() {
                     return self.raise("Parenthesis was not closed");
@@ -151,7 +170,7 @@ impl SyntaxNode {
                 n1.reduce_parens(symbol_open, symbol_close)?;
                 n2.reduce_parens(symbol_open, symbol_close)?;
             },
-            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax"),
+            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax 10"),
             SyntaxNode::Number(_) => unreachable!()
         };
         Ok(())
@@ -160,22 +179,24 @@ impl SyntaxNode {
     fn reduce_blocks(&mut self) -> Result<(), String> {
         match self {
             SyntaxNode::Adjacent(nodes) => {
-                let mut new_nodes = Vec::new();
+                let mut start_predicate = 0;
                 let mut i = 0;
                 while i < nodes.len() {
-                    if let Parenthesis(c, inner) = &nodes[i] {
-                        if *c != "{" { continue; }
-                        let predicate = SyntaxNode::Adjacent(nodes[0..i].iter().cloned().collect::<Vec<_>>());
-                        let new_node = SyntaxNode::Block(Box::new(predicate), inner.clone());
-                        new_nodes.push(new_node);
-                        continue;
-                    } else {
-                        nodes[i].reduce_blocks()?;
+                    match &nodes[i] {
+                        Unclassified(token) => if token.s == ";" {
+                            start_predicate = i;
+                        } else {
+                            i += 1;
+                        },
+                        Parenthesis("{", inner) =>{
+                            let predicate = SyntaxNode::Adjacent(nodes[start_predicate..i].to_vec());
+                            let block = SyntaxNode::Block(Box::new(predicate), inner.clone());
+                            nodes.splice(start_predicate..=i, [block]);
+                            start_predicate += 1;
+                            i = start_predicate;
+                        },
+                        _ => i += 1,
                     }
-                    i += 1;
-                }
-                if !new_nodes.is_empty() {
-                    *nodes = new_nodes;
                 }
             }
             SyntaxNode::Parenthesis(_, n) | SyntaxNode::List(_, n) | SyntaxNode::Unop(_, n) => {
@@ -185,7 +206,61 @@ impl SyntaxNode {
                 n1.reduce_blocks()?;
                 n2.reduce_blocks()?;
             },
-            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax"),
+            SyntaxNode::Unclassified(_) => (),
+            SyntaxNode::Number(_) => unreachable!()
+        };
+        Ok(())
+    }
+
+    fn reduce_semicolon(&mut self) -> Result<(), String> {
+        match self {
+            SyntaxNode::Adjacent(nodes) => {
+                let mut start_index = 0;
+                let mut i = 0;
+                while i < nodes.len() {
+                    match &nodes[i] {
+                        SyntaxNode::Unclassified(t) => if t == ";" {
+                            if start_index < i {
+                                let line = SyntaxNode::Adjacent(nodes[start_index..i].to_vec());
+                                nodes.splice(start_index..=i, [line]);
+                            }
+                            start_index += 1;
+                            i = start_index;
+                        } else {
+                            i += 1;
+                        },
+                        SyntaxNode::Block(_, _) => {
+                            let mut block_copy = nodes[i].clone();
+                            if let SyntaxNode::Block(_, body) = &mut block_copy { body.reduce_semicolon()?; }
+                            if start_index > i {
+                                let line = SyntaxNode::Adjacent(nodes[start_index..i].to_vec());
+                                nodes.splice(start_index..=i, [line, block_copy]);
+                                start_index += 2;
+                            } else {
+                                nodes[i] = block_copy;
+                                start_index += 1;
+                            }
+                            i = start_index;
+                        },
+                        _ => i += 1
+                    };
+                }
+                if start_index != nodes.len() {
+                    return nodes[nodes.len() - 1].raise("Last line must end in a semicolon");
+                }
+            }
+
+            SyntaxNode::Parenthesis(_, n) | SyntaxNode::List(_, n) | SyntaxNode::Unop(_, n) => {
+                n.reduce_semicolon()?;
+            },
+            SyntaxNode::Binop(_, n1, n2) => {
+                n1.reduce_semicolon()?;
+                n2.reduce_semicolon()?;
+            },
+            SyntaxNode::Block(_, n2) => {
+                n2.reduce_semicolon()?;
+            },
+            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax 11"),
             SyntaxNode::Number(_) => unreachable!()
         };
         Ok(())
@@ -194,19 +269,18 @@ impl SyntaxNode {
     fn reduce_list(&mut self, symbol: &'static str) -> Result<(), String> {
         match self {
             SyntaxNode::Adjacent(nodes) => {
-                let mut new_nodes = Vec::new();
-                for i in 0..nodes.len(){
-                    if let Unclassified(t) = &nodes[i] {
-                        if t == symbol {
-                            new_nodes.push(SyntaxNode::Adjacent(nodes.drain(..i).collect::<Vec<_>>()));
-                        }
-                    } else {
-                        nodes[i].reduce_list(symbol)?;
-                    }
-                }
-                if !new_nodes.is_empty() {
-                    new_nodes.push(SyntaxNode::Adjacent(nodes.drain(..).collect::<Vec<_>>()));
-                    *nodes = new_nodes;
+                let mut start_index = 0;
+                let mut i = 0;
+                while i < nodes.len() {
+                    match &nodes[i] {
+                        SyntaxNode::Unclassified(t) => if t == symbol {
+                            let line = SyntaxNode::Adjacent(nodes[start_index..i].to_vec());
+                            nodes.splice(start_index..=i, [line]);
+                            start_index += 1;
+                            i = start_index;
+                        },
+                        _ => i += 1
+                    };
                 }
             }
             SyntaxNode::Parenthesis(_, n) | SyntaxNode::List(_, n) | SyntaxNode::Unop(_, n) => {
@@ -216,7 +290,7 @@ impl SyntaxNode {
                 n1.reduce_list(symbol)?;
                 n2.reduce_list(symbol)?;
             },
-            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax"),
+            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax 11"),
             SyntaxNode::Number(_) => unreachable!()
         };
         Ok(())
@@ -256,7 +330,7 @@ impl SyntaxNode {
                 n1.reduce_binop(symbols)?;
                 n2.reduce_binop(symbols)?;
             },
-            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax"),
+            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax 12"),
             SyntaxNode::Number(_) => unreachable!()
         };
         Ok(())
@@ -297,7 +371,7 @@ impl SyntaxNode {
                 n1.reduce_total_binop(symbols)?;
                 n2.reduce_total_binop(symbols)?;
             },
-            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax"),
+            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax 13"),
             SyntaxNode::Number(_) => unreachable!()
         };
         Ok(())
@@ -335,7 +409,7 @@ impl SyntaxNode {
                 n1.reduce_unop(symbols)?;
                 n2.reduce_unop(symbols)?;
             },
-            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax"),
+            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax 14"),
             SyntaxNode::Number(_) => unreachable!()
         };
         Ok(())
@@ -388,11 +462,30 @@ impl SyntaxNode {
             None => Err(format!("File is empty")),
         }
     }
+
+    pub fn raise_str(&self, message: &str) -> String {
+        self.raise::<()>(message).err().unwrap()
+    }
     
     pub fn tree(tokens: Vec<Token>) -> Result<SyntaxNode, String> {
         let mut tree = Self::Adjacent(tokens.into_iter().map(|t| SyntaxNode::Unclassified(t)).collect::<Vec<_>>());
         tree.reduce()?;
         Ok(tree)
+    }
+}
+
+impl std::fmt::Debug for SyntaxNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unclassified(arg0) => write!(f, "`{:?}`", arg0),
+            Self::Number(arg0) => write!(f, "Number({:?})", arg0),
+            Self::Adjacent(arg0) => write!(f, "{:?}", arg0),
+            Self::Parenthesis(op, arg1) => write!(f, "Parens `{}` ({:?})", op, arg1),
+            Self::List(op, arg1) => write!(f, "List `{}` ({:?})", op, arg1),
+            Self::Binop(op, arg1, arg2) => write!(f, "Binop `{}` (, {:?}, {:?})", op, arg1, arg2),
+            Self::Unop(op, arg1) => write!(f, "Unop `{}` (, {:?})", op, arg1),
+            Self::Block(arg0, arg1) => write!(f, "{{ {:?} | {:?} }}", arg0, arg1),
+        }
     }
 }
 
@@ -425,7 +518,7 @@ fn get_stream(text: &str, filename: &str) -> Result<Vec<Token>, String> {
             return Err(format!("{}:{}:{}\nNon-ascii characters are not allowed", filename, line_no, col_no));
         }
 
-        if singletons.contains(&c) {
+        if singletons.contains(&c) && !token.is_empty() {
             // Push the token immediately
             tokens.push(Token {
                 s: token.drain(..).collect(),
@@ -449,12 +542,23 @@ fn get_stream(text: &str, filename: &str) -> Result<Vec<Token>, String> {
         if token.is_empty() {
             token_is_special = specials.contains(&c);
         }
-        token.push(c);
+        if c != ' ' && c != '\t' {
+            token.push(c);
+        }
         if c == '\n' {
             line_no += 1;
             col_no = 0;
         }
     }
+    if !token.is_empty() {
+        // Push the token immediately
+        tokens.push(Token {
+            s: token.drain(..).collect(),
+            filename: filename.to_owned(),
+            line_no,
+            col_no,
+        });
+    } 
     Ok(tokens)
 }
 

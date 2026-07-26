@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use clap::{Args, Parser, Subcommand};
 
@@ -24,11 +24,14 @@ enum Command {
 fn main() {
     let cli = Cli::parse();
 
-    match cli.command {
+    let result = match cli.command {
         Command::Build(args) => args.run(),
         Command::Run(args) => args.run(),
         Command::Asm(args) => args.run(),
         Command::Dis(args) => args.run(),
+    };
+    if let Err(message) = result {
+        println!("Error:\n{}", message);
     }
 }
 
@@ -42,16 +45,18 @@ struct Build {
     output: Option<String>,
 }
 impl Build {
-    fn run(self) {
+    fn run(self) -> Result<(), String> {
         let input = Path::new(&self.input);
-        let output = Path::new(&match self.output {
-            Some(v) => v,
-            None => format!("{}.b", input.file_stem().unwrap().to_string_lossy()),
-        });
+        let output = match &self.output {
+            Some(v) => PathBuf::from(v),
+            None => input.with_extension("b"),
+        };
 
-        let bytes = biscuit::compile_file(input.to_string_lossy().as_ref());
+        let bytes = biscuit::compile_file(input.to_string_lossy().as_ref())?;
 
-        std::fs::write(output, bytes).unwrap();
+        std::fs::write(output, bytes).map_err(|_| "Could not write output file".to_owned())?;
+
+        Ok(())
     }
 }
 
@@ -65,16 +70,18 @@ struct Asm {
     output: Option<String>,
 }
 impl Asm {
-    fn run(self) {
+    fn run(self) -> Result<(), String> {
         let input = Path::new(&self.input);
-        let output = Path::new(&match self.output {
-            Some(v) => v,
-            None => format!("{}.b", input.file_stem().unwrap().to_string_lossy()),
-        });
+        let output = match &self.output {
+            Some(v) => PathBuf::from(v),
+            None => input.with_extension("b"),
+        };
 
-        let bytes = biscuit::assemble_file(input.to_string_lossy().as_ref());
+        let bytes = biscuit::assemble_file(input.to_string_lossy().as_ref())?;
 
-        std::fs::write(output, bytes).unwrap();
+        std::fs::write(output, bytes).map_err(|_| "Could not write output file".to_owned())?;
+
+        Ok(())
     }
 }
 
@@ -88,24 +95,28 @@ struct Dis {
     output: Option<String>,
 }
 impl Dis {
-    fn run(self) {
+    fn run(self) -> Result<(), String> {
         let input = Path::new(&self.input);
-        let output = Path::new(&match self.output {
-            Some(v) => v,
-            None => format!("{}.basm", input.file_stem().unwrap().to_string_lossy()),
-        });
+        let output = match &self.output {
+            Some(v) => PathBuf::from(v),
+            None => input.with_extension("basm"),
+        };
 
-        let bytes = biscuit::disassemble_file(input.to_string_lossy().as_ref());
+        let bytes = biscuit::disassemble_file(input.to_string_lossy().as_ref())?;
 
-        std::fs::write(output, bytes).unwrap();
+        std::fs::write(output, bytes).map_err(|_| "Could not write output file".to_owned())?;
+
+        Ok(())
     }
 }
 
 #[derive(Args)]
 struct Run {
+
 }
 impl Run {
-    fn run(self) {
+    fn run(self) -> Result<(), String> {
         println!("run");
+        Ok(())
     }
 }

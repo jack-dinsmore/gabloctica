@@ -1,5 +1,8 @@
 # Todo
 
+## Quahog
+* Make sure that commands are not skipped if they take action (e.g. drop)
+
 ## Ships
 * Quahog language
 * Updating the command block properties and circuits etc when a block is placed
