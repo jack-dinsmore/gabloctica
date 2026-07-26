@@ -23,7 +23,7 @@ pub fn disassemble_bytes(s: &[u8], _filename: &str) -> Result<String, String> {
         let mut line = command.to_string().to_lowercase();
         match command {
             Command::Push => {
-                let arg = f64::from_le_bytes([
+                let mut arg = f64::from_le_bytes([
                     *iter.next().ok_or("Corrupted file")?,
                     *iter.next().ok_or("Corrupted file")?,
                     *iter.next().ok_or("Corrupted file")?,
@@ -33,6 +33,9 @@ pub fn disassemble_bytes(s: &[u8], _filename: &str) -> Result<String, String> {
                     *iter.next().ok_or("Corrupted file")?,
                     *iter.next().ok_or("Corrupted file")?
                 ]);
+                if (arg - arg.round()).abs() < 1e-10 {
+                    arg = arg.round();
+                }
                 line = format!("{} {}", line, arg);
             },
             

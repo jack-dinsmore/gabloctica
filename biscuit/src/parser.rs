@@ -5,35 +5,44 @@ use sorted_vec::SortedSet;
 use crate::parser::SyntaxNode::{Parenthesis, Unclassified};
 
 #[derive(Clone)]
-pub struct Token {
-    pub s: String,
+pub struct Token<T: std::fmt::Display + PartialEq> {
+    s: T,
     filename: String,
     line_no: u32,
     col_no: u32,
 }
-impl Token {
+impl<T: std::fmt::Display + PartialEq> Token<T> {
     pub fn raise_str(&self, message: &str) -> String {
         format!("{}:{}:{}\n{}", self.filename, self.line_no+1, self.col_no+1, message)
     }
-    pub fn raise<T>(&self, message: &str) -> Result<T, String> {
+    pub fn raise<R>(&self, message: &str) -> Result<R, String> {
         Err(self.raise_str(message))
     }
-}
-impl PartialEq<str> for Token {
-    fn eq(&self, other: &str) -> bool {
-        self.s == other
+    pub(crate) fn get_inner(&self) -> &T {
+        &self.s
     }
 }
-impl std::fmt::Debug for Token {
+impl<T: std::fmt::Display + PartialEq> std::fmt::Debug for Token<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.s)
     }
 }
 
+impl PartialEq<str> for Token<String> {
+    fn eq(&self, other: &str) -> bool {
+        self.s == *other
+    }
+}
+impl PartialEq<f64> for Token<f64> {
+    fn eq(&self, other: &f64) -> bool {
+        self.s == *other
+    }
+}
+
 #[derive(Clone)]
 pub enum SyntaxNode {
-    Unclassified(Token),
-    Number(f64),
+    Unclassified(Token<String>),
+    Number(Token<f64>),
     Adjacent(Vec<SyntaxNode>),
     Parenthesis(&'static str, Box<SyntaxNode>),
     List(&'static str, Box<SyntaxNode>),
@@ -47,9 +56,7 @@ impl SyntaxNode {
         self.strip_newline()?;
         self.reduce_parens("{", "}")?;
         self.reduce_blocks()?;
-        dbg!(&self);
         self.reduce_semicolon()?;
-        dbg!(&self);
         self.reduce_parens("(", ")")?;
         self.reduce_parens("[", "]")?;
         self.reduce_list(",")?;
@@ -63,6 +70,7 @@ impl SyntaxNode {
         self.reduce_binop(&["*", "/"])?;
         self.reduce_binop(&["+", "-"])?;
         self.reduce_number();
+        self.reduce_singletons();
         dbg!(&self);
         Ok(())
     }
@@ -111,7 +119,7 @@ impl SyntaxNode {
                 let mut i = 0;
                 while i < nodes.len() {
                     if let Unclassified(t) = &nodes[i] {
-                        if t == "\n" {
+                        if t.s == "\n" {
                             nodes.remove(i);
                             i -= 1;
                         }
@@ -431,17 +439,46 @@ impl SyntaxNode {
             },
             SyntaxNode::Unclassified(v) => {
                 if let Ok(n) = v.s.parse::<f64>() {
-                    *self = SyntaxNode::Number(n);
+                    let new_token = Token {
+                        s: n,
+                        filename: v.filename.clone(),
+                        line_no: v.line_no,
+                        col_no: v.col_no,
+                    };
+                    *self = SyntaxNode::Number(new_token);
                 }
             },
             SyntaxNode::Number(_) => (),
         };
     }
 
+    fn reduce_singletons(&mut self) {
+        match self {
+            SyntaxNode::Adjacent(nodes) => {
+                if nodes.len() == 1 {
+                    *self = nodes[0].clone();
+                    self.reduce_singletons();
+                } else {
+                    for node in nodes {
+                        node.reduce_singletons();
+                    }
+                }
+            }
+            SyntaxNode::Parenthesis(_, n) | SyntaxNode::List(_, n) | SyntaxNode::Unop(_, n) => {
+                n.reduce_singletons();
+            },
+            SyntaxNode::Binop(_, n1, n2) | SyntaxNode::Block(n1, n2) => {
+                n1.reduce_singletons();
+                n2.reduce_singletons();
+            },
+            SyntaxNode::Unclassified(_) | SyntaxNode::Number(_) => (),
+        };
+    }
+
     fn internal_raise<T>(&self, message: &str) -> Option<Result<T, String>> {
         match self {
             Unclassified(token) => Some(token.raise(message)),
-            SyntaxNode::Number(_) => None,
+            SyntaxNode::Number(token) => Some(token.raise(message)),
             SyntaxNode::Adjacent(syntax_nodes) => match syntax_nodes.first() {
                 Some(n) => n.internal_raise(message),
                 None => None,
@@ -459,7 +496,7 @@ impl SyntaxNode {
     pub fn raise<T>(&self, message: &str) -> Result<T, String> {
         match self.internal_raise(message) {
             Some(r) => r,
-            None => Err(format!("File is empty")),
+            None => Err(format!("No file\n{}", message)),
         }
     }
 
@@ -467,7 +504,7 @@ impl SyntaxNode {
         self.raise::<()>(message).err().unwrap()
     }
     
-    pub fn tree(tokens: Vec<Token>) -> Result<SyntaxNode, String> {
+    pub fn tree(tokens: Vec<Token<String>>) -> Result<SyntaxNode, String> {
         let mut tree = Self::Adjacent(tokens.into_iter().map(|t| SyntaxNode::Unclassified(t)).collect::<Vec<_>>());
         tree.reduce()?;
         Ok(tree)
@@ -482,15 +519,15 @@ impl std::fmt::Debug for SyntaxNode {
             Self::Adjacent(arg0) => write!(f, "{:?}", arg0),
             Self::Parenthesis(op, arg1) => write!(f, "Parens `{}` ({:?})", op, arg1),
             Self::List(op, arg1) => write!(f, "List `{}` ({:?})", op, arg1),
-            Self::Binop(op, arg1, arg2) => write!(f, "Binop `{}` (, {:?}, {:?})", op, arg1, arg2),
-            Self::Unop(op, arg1) => write!(f, "Unop `{}` (, {:?})", op, arg1),
+            Self::Binop(op, arg1, arg2) => write!(f, "Binop `{}` ({:?}, {:?})", op, arg1, arg2),
+            Self::Unop(op, arg1) => write!(f, "Unop `{}` ({:?})", op, arg1),
             Self::Block(arg0, arg1) => write!(f, "{{ {:?} | {:?} }}", arg0, arg1),
         }
     }
 }
 
 /// Load file, handling import statements
-pub fn load_file(filename: &str) -> Result<Vec<Token>, String> {
+pub fn load_file(filename: &str) -> Result<Vec<Token<String>>, String> {
     let mut file = File::open(filename).map_err(|_| format!("Could not find file {}", filename))?;
     let mut text = "".to_owned();
     file.read_to_string(&mut text).map_err(|_| format!("Could not read file {}", filename))?;
@@ -498,14 +535,14 @@ pub fn load_file(filename: &str) -> Result<Vec<Token>, String> {
 }
 
 /// Load string, handling import statements
-pub fn load_str(text: &str, filename: &str) -> Result<Vec<Token>, String> {
+pub fn load_str(text: &str, filename: &str) -> Result<Vec<Token<String>>, String> {
     let mut stream = get_stream(&text, filename)?;
     reduce_pragmas(&mut stream)?;
     Ok(stream)
 }
 
 /// Get a stream of all tokens
-fn get_stream(text: &str, filename: &str) -> Result<Vec<Token>, String> {
+fn get_stream(text: &str, filename: &str) -> Result<Vec<Token<String>>, String> {
     let singletons = unsafe { SortedSet::from_sorted(vec!['\t', '\n', ' ', '"', '#', '\'', '(', ')', ',', ';', '[', ']', '{', '}']) };
     let specials = unsafe { SortedSet::from_sorted(vec!['!', '$', '%', '&', '*', '+', '-', '/', ':', '<', '=', '>', '?', '@', '\\', '^', '`', '|', '~']) };
     let mut tokens = Vec::new();
@@ -518,17 +555,18 @@ fn get_stream(text: &str, filename: &str) -> Result<Vec<Token>, String> {
             return Err(format!("{}:{}:{}\nNon-ascii characters are not allowed", filename, line_no, col_no));
         }
 
-        if singletons.contains(&c) && !token.is_empty() {
-            // Push the token immediately
-            tokens.push(Token {
-                s: token.drain(..).collect(),
-                filename: filename.to_owned(),
-                line_no,
-                col_no,
-            });
-        } else if !token.is_empty() {
-            let c_is_special = specials.contains(&c);
-            if token_is_special ^ c_is_special {
+        let c_is_special = specials.contains(&c);
+        let c_is_singleton = singletons.contains(&c);
+        // Push the existing token if necessary
+        if !token.is_empty() {
+            if c_is_singleton {
+                tokens.push(Token {
+                    s: token.drain(..).collect(),
+                    filename: filename.to_owned(),
+                    line_no,
+                    col_no,
+                });
+            } else if token_is_special ^ c_is_special {
                 // The token is special but c is not, or vice versa
                 tokens.push(Token {
                     s: token.drain(..).collect(),
@@ -538,13 +576,22 @@ fn get_stream(text: &str, filename: &str) -> Result<Vec<Token>, String> {
                 });
             }
         }
-        col_no += 1;
-        if token.is_empty() {
-            token_is_special = specials.contains(&c);
-        }
         if c != ' ' && c != '\t' {
-            token.push(c);
+            if c_is_singleton {
+                tokens.push(Token {
+                    s: format!("{}", c),
+                    filename: filename.to_owned(),
+                    line_no,
+                    col_no,
+                });
+            } else {
+                if token.is_empty() {
+                    token_is_special = c_is_special;
+                }
+                token.push(c);
+            }
         }
+        col_no += 1;
         if c == '\n' {
             line_no += 1;
             col_no = 0;
@@ -563,7 +610,7 @@ fn get_stream(text: &str, filename: &str) -> Result<Vec<Token>, String> {
 }
 
 /// Reduce the pragmas in each file
-fn reduce_pragmas(tokens: &mut Vec<Token>) -> Result<(), String> {
+fn reduce_pragmas(tokens: &mut Vec<Token<String>>) -> Result<(), String> {
     for i in 0..tokens.len() {
         if &tokens[i] != "#" {continue;}
         if i != 0 && &tokens[i-1] != "\n" {continue;}

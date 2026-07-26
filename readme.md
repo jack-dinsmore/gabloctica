@@ -1,10 +1,11 @@
 # Todo
 
-## Quahog
-* Make sure that commands are not skipped if they take action (e.g. drop)
+## Biscuit
+* Ensure that store and store_back modify the pointer of the list
+* Implement thetas, meaning allow variables to be modified in code blocks.
+* Automatically drop tables whenever they go out of scope
 
 ## Ships
-* Quahog language
 * Updating the command block properties and circuits etc when a block is placed
 * Speed up bucket fill for planets
 

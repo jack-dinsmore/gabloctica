@@ -51,7 +51,8 @@ pub enum Command {
     Alc,        // Allocate new vector and push the vector index
     Drp,        // Drop vector T
     Ld,         // Push the index N of vector T
-    Str,        // Store T in index NN of vector N
+    St,         // Store T in index NN of vector N
+    Stb,        // Store T at back of vector N
     
     Lt,         // Push T < N
     Gt,         // Push T > N
@@ -75,7 +76,7 @@ pub enum Command {
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, strum_macros::Display, strum_macros::EnumIter, TryFromPrimitive)]
 pub enum Function {
-    Debug,
+    Dbg,
     Tick,
     Interrupt,
 }
@@ -120,7 +121,7 @@ impl Function {
 
     pub fn return_type(&self) -> VariableType {
         match self {
-            Function::Debug => VariableType::Null,
+            Function::Dbg => VariableType::Null,
             Function::Tick => VariableType::Null,
             Function::Interrupt => VariableType::Null,
         }

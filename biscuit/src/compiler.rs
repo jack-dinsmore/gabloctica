@@ -7,10 +7,7 @@ lazy_static! {
         let tokens = crate::parser::load_str("fn const() {}", "root").unwrap();
         let tree = SyntaxNode::tree(tokens).unwrap();
         match tree {
-            SyntaxNode::Adjacent(nodes) => match &nodes[0] {
-                SyntaxNode::Block(header, _) => (&**header).clone(),
-                _ => unreachable!()
-            },
+            SyntaxNode::Block(header, _) => (&*header).clone(),
             _ => unreachable!()
         }
     };
@@ -40,7 +37,7 @@ impl Function {
         };
 
         let function_name = match node_iter.next() {
-            Some(SyntaxNode::Unclassified(t)) => &t.s,
+            Some(SyntaxNode::Unclassified(t)) => t.get_inner(),
             _ => return header.raise("Invalid syntax 3"),
         };
 
@@ -67,7 +64,7 @@ impl Function {
                                     if let Some(item) = &last_argument {
                                         arguments.push((item.to_owned(), VariableType::Float))
                                     }
-                                    last_argument = Some(token.s.clone());
+                                    last_argument = Some(token.get_inner().clone());
                                 },
                                 SyntaxNode::Parenthesis(c, syntax_node) => {
                                     if *c != "[" { return syntax_node.raise("Only brackets can appear in variable definitions"); }
@@ -122,9 +119,9 @@ impl Compiler {
         let mut constants = Vec::new();
         let mut functions = FxHashMap::default();
 
-        let main_list = match tree {
+        let main_list: &[SyntaxNode] = match tree {
             SyntaxNode::Adjacent(nodes) => nodes,
-            _ => return tree.raise("Invalid syntax 6"),
+            _ => std::slice::from_ref(&tree),
         };
 
         for entry in main_list {
@@ -173,7 +170,7 @@ fn compile_tree(tree: &SyntaxNode) -> Result<Vec<u8>, String> {
     }
     let ssa = compiler.compile("main")?;
     dbg!(&ssa);
-    // let const_ssa = compiler.compile("const")?; // TODO
+    // let const_ssa = compiler.compile("const")?; // TODO implement constants
     
     // Optimize IR
 
@@ -197,7 +194,6 @@ fn compile_tree(tree: &SyntaxNode) -> Result<Vec<u8>, String> {
         f.replace_calls(&locations);
         code.extend(f.code().into_iter());
     }
-    dbg!();
     Ok(code)
 }
 

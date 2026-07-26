@@ -14,7 +14,7 @@ pub enum VariableType {
 pub enum Instruction {
     Argument,
     LiteralVector(Vec<u32>),
-    LiteralFloat(u32),
+    LiteralFloat(f64),
 
     Call(u8, u32),
     LocalCall(String, u32),
@@ -23,7 +23,8 @@ pub enum Instruction {
 
     Drp(u32),
     Ld(u32, u32), // Get index B f vector A
-    Str(u32, u32, u32), // Store C in index B of vector A 
+    St(u32, u32, u32), // Store C in index B of vector A 
+    Stb(u32, u32), // Store C in back of vector A 
     
     Lt(u32, u32),
     Gt(u32, u32),
@@ -108,18 +109,18 @@ impl Ssa {
                 Instruction::Ld(a, b) | Instruction::Lt(a, b) | Instruction::Gt(a, b) |
                 Instruction::Le(a, b) | Instruction::Ge(a, b) | Instruction::Eq(a, b) | Instruction::And(a, b) |
                 Instruction::Or(a, b) | Instruction::Xor(a, b) | Instruction::Add(a, b) | Instruction::Sub(a, b) |
-                Instruction::Mul(a, b) | Instruction::Div(a, b) | Instruction::Pow(a, b) => {
+                Instruction::Mul(a, b) | Instruction::Div(a, b) | Instruction::Pow(a, b) | Instruction::Stb(a, b) => {
                     used.push(*a);
                     used.push(*b);
                 },
-                Instruction::Str(a, b, c) => {
+                Instruction::St(a, b, c) => {
                     used.push(*a);
                     used.push(*b);
                     used.push(*c);
                 },
             };
             match instruction {
-                Instruction::Loop(_) | Instruction::IfElse(_, _, _) | Instruction::Drp(_) | Instruction::Call(_, _) | Instruction::LocalCall(_, _) | Instruction::Str(_, _, _) => {used.push(i);},
+                Instruction::Loop(_) | Instruction::IfElse(_, _, _) | Instruction::Drp(_) | Instruction::Call(_, _) | Instruction::LocalCall(_, _) | Instruction::St(_, _, _) | Instruction::Stb(_, _) => {used.push(i);},
                 _ => ()
             };
         }
@@ -138,7 +139,7 @@ impl Ssa {
                 match &**header {
                     SyntaxNode::Unclassified(token) => {
                         // Else, loop
-                        let s: &str = &token.s;
+                        let s: &str = &token.get_inner();
                         match s {
                             "else" => {
                                 let body_block = self.add_block(&body_nodes, available_functions)?;
@@ -157,14 +158,14 @@ impl Ssa {
                                 let body_block = self.add_block(&body_nodes, available_functions)?;
                                 self.push_instruction(Instruction::Loop(body_block));
                             },
-                            _ => {return node.raise(&format!("Invalid keyword `{}`", token.s));}
+                            _ => {return node.raise(&format!("Invalid keyword `{}`", token.get_inner()));}
                         }
 
                     },
                     SyntaxNode::Adjacent(nodes) => {
                         // If
                         let first: &str = match &nodes[0] {
-                            SyntaxNode::Unclassified(text) => &text.s,
+                            SyntaxNode::Unclassified(text) => &text.get_inner(),
                             _ => {return node.raise("Invalid syntax 15");}
                         };
                         match first {
@@ -183,10 +184,10 @@ impl Ssa {
                 };
                 self.instruction_counter-1
             },
-            // Keyword phrase or function call
             SyntaxNode::Adjacent(nodes) => {
+                // Keyword phrase or function call
                 let first: &str = match &nodes[0] {
-                    SyntaxNode::Unclassified(text) => &text.s,
+                    SyntaxNode::Unclassified(text) => &text.get_inner(),
                     _ => {return node.raise("Invalid syntax 17");}
                 };
                 match first {
@@ -194,7 +195,7 @@ impl Ssa {
                         let mut last_instruction = self.instruction_counter-1;
                         for item in &nodes[1..] {
                             let name = match &item {
-                                SyntaxNode::Unclassified(token) => &token.s,
+                                SyntaxNode::Unclassified(token) => &token.get_inner(),
                                 _ => {return node.raise("Only variables can be deleted");},
                             };
                             let var = self.check_var(name, VariableType::List).ok_or(item.raise_str(&format!("`{}` is not a valid list", name)))?;
@@ -211,21 +212,28 @@ impl Ssa {
                             SyntaxNode::Parenthesis("(", token) => token,
                             _ => {return node.raise("Invalid function call 1");}
                         };
-                        let arguments = match &**arguments {
-                            SyntaxNode::List(",", token) => token,
+                        let arguments: &[SyntaxNode] = match &**arguments {
+                            SyntaxNode::List(",", nodes) => {
+                                match &**nodes {
+                                    SyntaxNode::Adjacent(tokens) => tokens,
+                                    _ => {return node.raise("Invalid function call 4");}
+                                }
+                            },
                             SyntaxNode::Adjacent(tokens) => if tokens.is_empty() {
-                                arguments
-                            } else { return node.raise("Invalid function call 2"); },
-                            _ => { return node.raise("Invalid function call 3"); }
+                                // There were no arguments
+                                &[]
+                            } else {
+                                return node.raise("Invalid function call 2");
+                            },
+                            _ => {
+                                // There was a single argument
+                                std::slice::from_ref(arguments)
+                            }
                         };
-                        let arguments = match &**arguments {
-                            SyntaxNode::Adjacent(tokens) => tokens,
-                            _ => {return node.raise("Invalid function call 4");}
-                        };
-                        let arg_v = self.push_instruction(Instruction::LiteralVector(Vec::new()));
-                        for (i, argument) in arguments.iter().enumerate() {
+                        let mut arg_v = self.push_instruction(Instruction::LiteralVector(Vec::new()));
+                        for argument in arguments {
                             let node = self.process_node(argument, available_functions)?;
-                            self.push_instruction(Instruction::Str(arg_v, i as u32, node));
+                            arg_v = self.push_instruction(Instruction::Stb(arg_v, node));
                         }
                         
                         match FUNCTION_MAP_LOWER.get(first) {
@@ -244,16 +252,16 @@ impl Ssa {
                 }
             },
             SyntaxNode::Unclassified(token) => {
-                match self.declared_variables.get(&token.s) {
+                match self.declared_variables.get(token.get_inner()) {
                     Some(n) => *n,
-                    None => {return node.raise(&format!("Undeclared variable {}", token.s));},
+                    None => {return node.raise(&format!("Undeclared variable {}", token.get_inner()));},
                 }
             }
             // Usually some kind of assignment
             SyntaxNode::Binop(op, a, b) => {
                 let b_var = self.process_node(b, available_functions)?;
                 let a_name = match &**a {
-                    SyntaxNode::Unclassified(token) => Some(&token.s),
+                    SyntaxNode::Unclassified(token) => Some(token.get_inner()),
                     _ => None
                 };
                 match *op {
@@ -308,6 +316,10 @@ impl Ssa {
                     _ => {return a.raise(&format!("Unrecognized unary operation {}", op));},
                 }
             },
+            // Usually some kind of assignment
+            SyntaxNode::Number(t) => {
+                self.push_instruction(Instruction::LiteralFloat(*t.get_inner()))
+            },
             _ => {
                 return node.raise("Invalid syntax 21");
             }
@@ -329,13 +341,13 @@ impl Ssa {
 
     pub fn push_instruction(&mut self, instruction: Instruction) -> u32 {
         let typ = match &instruction {
-            Instruction::LiteralVector(_) => VariableType::List,
+            Instruction::LiteralVector(_) | Instruction::St(_, _, _) | Instruction::Stb(_, _) => VariableType::List,
             Instruction::Ld(_, _) | Instruction::LiteralFloat(_) | Instruction::Lt(_, _) | Instruction::Gt(_, _) | 
             Instruction::Le(_, _) |  Instruction::Ge(_, _) | Instruction::Eq(_, _) | Instruction::And(_, _) |
             Instruction::Or(_, _) | Instruction::Xor(_, _) | Instruction::Not(_) | Instruction::Add(_, _) | 
             Instruction::Sub(_, _) | Instruction::Mul(_, _) | Instruction::Div(_, _) | Instruction::Neg(_) | 
             Instruction::Pow(_, _) => VariableType::Float,
-            Instruction::Loop(_) | Instruction::Drp(_) | Instruction::Str(_, _, _) | Instruction::LocalCall(_, _) |
+            Instruction::Loop(_) | Instruction::Drp(_) | Instruction::LocalCall(_, _) |
             Instruction::IfElse(_, _, _) => VariableType::Null,
             Instruction::Argument | Instruction::Call(_, _) => unreachable!(),
         };
@@ -368,8 +380,9 @@ impl Ssa {
 impl std::fmt::Debug for Ssa {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Ssa (")?;
-        for (index, (instruction, _typ)) in &self.instructions {
-            writeln!(f, "    {:04} {:?}", index, instruction)?;
+        let indices = SortedSet::from_unsorted(self.instructions.keys().collect());
+        for index in indices {
+            writeln!(f, "    {:04} {:?}", index, self.instructions[index].0)?;
         }
         write!(f, ")")
     }
@@ -382,13 +395,9 @@ impl std::fmt::Debug for Ssa {
 /// Move the float "op" to the top of the stack if it is not already there
 fn topify(op: u32, bytecode: &mut Vec<u8>, running_stack: &mut Vec<u32>) {
     if running_stack.last() == Some(&op) {return;}
-    let pos = running_stack.iter().position(|i| *i == op).unwrap() as u32;
-    let pos_bytes = pos.to_le_bytes();
     bytecode.push(Command::Push as u8);
-    bytecode.push(pos_bytes[0]);
-    bytecode.push(pos_bytes[1]);
-    bytecode.push(pos_bytes[2]);
-    bytecode.push(pos_bytes[3]);
+    let pos = running_stack.iter().position(|i| *i == op).unwrap() as f64;
+    bytecode.extend(&pos.to_le_bytes());
     bytecode.push(Command::Pick as u8);
     running_stack.push(op);
 }
@@ -446,7 +455,7 @@ impl Bytecode {
                 None => true,
                 Some(last_used_index) => *last_used_index < i,
             } {
-                // Pop the top of the stack
+                // Pop all unused variables
                 if let Some(i) = running_stack.pop() {
                     match ssa.instructions[&i].1 {
                         VariableType::Float | VariableType::List => {
@@ -460,21 +469,20 @@ impl Bytecode {
                 Instruction::Argument => running_stack.push(*op),
                 Instruction::LiteralVector(items) => {
                     bytecode.push(Command::Alc as u8);
-                    running_stack.push(*op);
-                    for (i, item) in items.iter().enumerate() {
+                    for item in items {
+                        bytecode.push(Command::Push as u8);
                         bytecode.extend(&item.to_le_bytes());
                         bytecode.push(Command::Push as u8);
-                        bytecode.extend(&(i as f64).to_le_bytes());
-                        bytecode.push(Command::Push as u8);
                         bytecode.extend(&2f64.to_le_bytes());
-                        bytecode.push(Command::Push as u8);
                         bytecode.push(Command::Pick as u8);
-                        bytecode.push(Command::Str as u8);
+                        bytecode.push(Command::Stb as u8);
                     }
+                    running_stack.push(*op);
                 },
                 Instruction::LiteralFloat(f) => {
                     bytecode.push(Command::Push as u8);
                     bytecode.extend(&f.to_le_bytes());
+                    running_stack.push(*op);
                 },
                 Instruction::Add(op1, op2) => {
                     binopify_comm(*op1, *op2, &mut bytecode, &mut running_stack);
@@ -591,19 +599,28 @@ impl Bytecode {
                     running_stack.pop();
                     running_stack.push(*op);
                 },
-                Instruction::Str(adr, idx, val) => {
+                Instruction::St(adr, idx, val) => {
                     topify(*val, &mut bytecode, &mut running_stack);
                     topify(*idx, &mut bytecode, &mut running_stack);
                     topify(*adr, &mut bytecode, &mut running_stack);
-                    bytecode.push(Command::Str as u8);
+                    bytecode.push(Command::St as u8);
                     running_stack.pop();
                     running_stack.pop();
                     running_stack.pop();
+                    running_stack.push(*op);
+                },
+                Instruction::Stb(adr, val) => {
+                    topify(*val, &mut bytecode, &mut running_stack);
+                    topify(*adr, &mut bytecode, &mut running_stack);
+                    bytecode.push(Command::Stb as u8);
+                    running_stack.pop();
+                    running_stack.pop();
+                    running_stack.push(*op);
                 },
                 Instruction::Call(func, arg) => {
                     topify(*arg, &mut bytecode, &mut running_stack);
-                    bytecode.push(*func);
                     bytecode.push(Command::Call as u8);
+                    bytecode.push(*func);
                     running_stack.pop();
                 },
                 Instruction::LocalCall(name, args) => {
