@@ -1,10 +1,11 @@
-pub mod compiler;
 pub mod machine;
 
 use rustc_hash::FxHashMap;
 use sorted_vec::SortedSet;
 use crate::{game::object::computer::compiler::compile, util::{Tagged, Vendor}};
 pub type Instructions = Tagged<InstructionData>;
+
+pub use memory::Memory;
 
 pub struct InstructionData {
     name: String,

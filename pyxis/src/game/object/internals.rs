@@ -1,7 +1,9 @@
+use std::{cell::RefCell, rc::Rc};
+
 use cgmath::{Quaternion, Vector3};
 use rustc_hash::FxHashMap;
 use sorted_vec::SortedSet;
-use crate::{game::object::{Chunk, computer::{BlockProperties, machine::{Machine, MachineError}}}, graphics::CHUNK_SIZE, physics::RigidBody, util::{Tagged, Vendor}};
+use crate::{game::object::{Chunk, computer::{BlockProperties, Memory, machine::{Machine, MachineError}}}, graphics::CHUNK_SIZE, physics::RigidBody, util::{Tagged, Vendor}};
 
 type Pipe = Tagged<PipeData>;
 type Circuit = Tagged<CircuitData>;
@@ -67,6 +69,7 @@ pub struct Internals {
     blocks: FxHashMap<BlockKey, CommandBlock>,
     circuits: Vendor<CircuitData>,
     pipes: Vendor<PipeData>,
+    memory: Rc<RefCell<Memory>>,
 }
 impl Internals {
     pub fn new() -> Self {
@@ -74,6 +77,7 @@ impl Internals {
             circuits: Vendor::new(),
             pipes: Vendor::new(),
             blocks: FxHashMap::default(),
+            memory: Rc::new(RefCell::new(Memory::new())),
         }
     }
 
@@ -113,7 +117,7 @@ impl Internals {
                             None => None
                         };
 
-                        self.blocks.insert(block, CommandBlock::new(block, chunks, properties, circuit, pipe, body.clone()));
+                        self.blocks.insert(block, CommandBlock::new(block, chunks, properties, circuit, pipe, body.clone(), self.memory.clone()));
                     }
                 }
             }
@@ -219,13 +223,16 @@ pub struct CommandBlock {
 }
 
 impl CommandBlock {
-    fn new(block_pos: BlockKey, chunks: &FxHashMap<(i32, i32, i32), Chunk>, properties: &BlockProperties, circuit: Option<Circuit>, pipe: Option<Pipe>, body: RigidBody) -> Self {
+    fn new(block_pos: BlockKey, chunks: &FxHashMap<(i32, i32, i32), Chunk>, properties: &BlockProperties, circuit: Option<Circuit>, pipe: Option<Pipe>, body: RigidBody, memory: Rc<RefCell<Memory>>) -> Self {
         let block = chunks[&block_pos.0].grid[block_pos.1];
         let mut pos: Vector3<f64> = Vector3::new(block_pos.0.0 * CHUNK_SIZE as i32, block_pos.0.1 * CHUNK_SIZE as i32, block_pos.0.2 * CHUNK_SIZE as i32).cast().unwrap();
         pos += Vector3::new(block_pos.1.0 as f64 + 0.5, block_pos.1.1 as f64 + 0.5, block_pos.1.2 as f64 + 0.5);
         pos -= body.com_pos;
         let quat = block.quat();
-        let machine = Machine::new(properties.command_block_scripts.get(&block.id).unwrap().clone());
+        let machine = Machine::new(
+            properties.command_block_scripts.get(&block.id).unwrap().clone(),
+            memory.clone(),
+        );
         Self {
             info: CommandBlockInfo {
                 id: chunks[&block_pos.0].grid[block_pos.1].id,
@@ -245,6 +252,7 @@ impl CommandBlock {
         if let Err(e) = tick {
             match e {
                 MachineError::Stack => println!("Segmentation fault in block (type {})", self.info.id),
+                MachineError::Memory => println!("Memory overflow"),
                 MachineError::Ip => println!("Program overflow in block (type {})", self.info.id),
                 MachineError::Func => println!("Invalid function call in block (type {})", self.info.id),
                 MachineError::OpCode => println!("Invalid opcode in block (type {})", self.info.id),

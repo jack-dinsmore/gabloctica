@@ -1,11 +1,14 @@
+use std::{cell::RefCell, rc::Rc};
+
 use cgmath::{Rotation, Vector3};
 
-use crate::game::object::{computer::Instructions, internals::CommandBlockInfo};
+use crate::{game::object::{computer::{Instructions, memory::Memory}, internals::CommandBlockInfo}, quahog::Command};
 
 const MAX_LINES_PER_TICK: usize = 100;
 
 pub enum MachineError {
     Stack,
+    Memory,
     Ip,
     Func,
     OpCode,
@@ -13,16 +16,18 @@ pub enum MachineError {
 
 pub struct Machine {
     stack: Vec<f64>,
+    memory: Rc<RefCell<Memory>>,
     ip: usize,
     pub interrupts: Vec<f64>,
     instructions: Instructions,
 }
 
 impl Machine {
-    pub fn new(instructions: Instructions) -> Self {
+    pub fn new(instructions: Instructions, memory: Rc<RefCell<Memory>>) -> Self {
         Self {
             stack: Vec::new(),
             ip: 0,
+            memory,
             instructions,
             interrupts: Vec::new(),
         }
@@ -34,9 +39,13 @@ impl Machine {
             if self.ip > self.instructions.instructions.len() {
                 return Err(MachineError::Ip)
             }
-            match self.instructions.instructions[self.ip] {
-                0 => (),// Nop
-                1 => { // Push
+            let command = match Command::try_from(self.instructions.instructions[self.ip]) {
+                Ok(c) => c,
+                _ => return Err(MachineError::OpCode)
+            };
+            match command {
+                Command::Nop => (),
+                Command::Push => {
                     self.stack.push(f64::from_le_bytes([
                         self.instructions.instructions[self.ip+1],
                         self.instructions.instructions[self.ip+2],
@@ -49,12 +58,12 @@ impl Machine {
                     ]));
                     self.ip += 8;
                 },
-                2 => { self.stack.pop().ok_or(MachineError::Stack)?; }, // Pop
-                3 => { self.stack.push(*self.stack.last().ok_or(MachineError::Stack)?); } // Dup
-                4 => { self.stack.push(self.ip as f64); }, // Puship
-                5 => { self.ip = self.stack.pop().ok_or(MachineError::Stack)?.round() as usize; }, // jpop
+                Command::Pop => { self.stack.pop().ok_or(MachineError::Stack)?; },
+                Command::Dup => { self.stack.push(*self.stack.last().ok_or(MachineError::Stack)?); }
+                Command::Pip => { self.stack.push(self.ip as f64); },
+                Command::Jpop => { self.ip = self.stack.pop().ok_or(MachineError::Stack)?.round() as usize; },
                 
-                6 => { // Jmp
+                Command::Jmp => {
                     self.ip = u64::from_le_bytes([
                         self.instructions.instructions[self.ip+1],
                         self.instructions.instructions[self.ip+2],
@@ -66,7 +75,7 @@ impl Machine {
                         self.instructions.instructions[self.ip+8]
                     ]) as usize - 1;
                 },
-                7 => { // Jmp if not equal
+                Command::Jnz => {
                     if self.stack.pop().ok_or(MachineError::Stack)? != 0. {
                         self.ip = u64::from_le_bytes([
                             self.instructions.instructions[self.ip+1],
@@ -82,84 +91,81 @@ impl Machine {
                         self.ip += 8;
                     }
                 },
-                8 => { // Less
+                Command::Lt => {
                     let a = self.stack.pop().ok_or(MachineError::Stack)?;
                     let b = self.stack.pop().ok_or(MachineError::Stack)?;
                     self.stack.push((a < b) as i64 as f64)
                 },
-                9 => { // Greater
+                Command::Gt => {
                     let a = self.stack.pop().ok_or(MachineError::Stack)?;
                     let b = self.stack.pop().ok_or(MachineError::Stack)?;
                     self.stack.push((a > b) as i64 as f64)
                 }, 
-                10 => { // Less equal
+                Command::Le => {
                     let a = self.stack.pop().ok_or(MachineError::Stack)?;
                     let b = self.stack.pop().ok_or(MachineError::Stack)?;
                     self.stack.push((a <= b) as i64 as f64)
                 },
-                11 => { // Greater equal
+                Command::Ge => {
                     let a = self.stack.pop().ok_or(MachineError::Stack)?;
                     let b = self.stack.pop().ok_or(MachineError::Stack)?;
                     self.stack.push((a >= b) as i64 as f64)
                 },
-                12 => { // Equals
+                Command::Eq => {
                     let a = self.stack.pop().ok_or(MachineError::Stack)?;
                     let b = self.stack.pop().ok_or(MachineError::Stack)?;
                     self.stack.push((a == b) as i64 as f64)
                 },
-                13 => { // Float add
+                Command::Add => {
                     let a = self.stack.pop().ok_or(MachineError::Stack)?;
                     let b = self.stack.pop().ok_or(MachineError::Stack)?;
                     self.stack.push(a + b)
                 },
-                14 => { // Float sub
+                Command::Sub => {
                     let a = self.stack.pop().ok_or(MachineError::Stack)?;
                     let b = self.stack.pop().ok_or(MachineError::Stack)?;
                     self.stack.push(a - b)
                 },
-                15 => { // Float mul
+                Command::Mul => {
                     let a = self.stack.pop().ok_or(MachineError::Stack)?;
                     let b = self.stack.pop().ok_or(MachineError::Stack)?;
                     self.stack.push(a * b)
                 },
-                16 => { // Float div
+                Command::Div => {
                     let a = self.stack.pop().ok_or(MachineError::Stack)?;
                     let b = self.stack.pop().ok_or(MachineError::Stack)?;
                     self.stack.push(a / b)
                 },
-                17 => { // Float negate
+                Command::Neg => {
                     let a = self.stack.pop().ok_or(MachineError::Stack)?;
                     self.stack.push(-a)
                 },
-                18 => { // Float power
+                Command::Pow => {
                     let a = self.stack.pop().ok_or(MachineError::Stack)?;
                     let b = self.stack.pop().ok_or(MachineError::Stack)?;
                     self.stack.push(a.powf(b))
                 },
-                19 => { // And
+                Command::And => {
                     let a = self.stack.pop().ok_or(MachineError::Stack)?;
                     let b = self.stack.pop().ok_or(MachineError::Stack)?;
                     self.stack.push(((a != 0.) && (a != 0.)) as i64 as f64);
                 },
-                20 => { // Or
+                Command::Or => {
                     let a = self.stack.pop().ok_or(MachineError::Stack)?;
                     let b = self.stack.pop().ok_or(MachineError::Stack)?;
                     self.stack.push(((a != 0.) || (a != 0.)) as i64 as f64);
                 },
-                21 => { // Xor
+                Command::Xor => {
                     let a = self.stack.pop().ok_or(MachineError::Stack)?;
                     let b = self.stack.pop().ok_or(MachineError::Stack)?;
                     self.stack.push(((a != 0.) ^ (a != 0.)) as i64 as f64);
                 },
-                22 => { // not
+                Command::Not => {
                     let a = self.stack.pop().ok_or(MachineError::Stack)?;
                     let b = self.stack.pop().ok_or(MachineError::Stack)?;
                     self.stack.push((!(a != 0.)) as i64 as f64);
                 },
-                23 => { self.stack.remove(self.stack.len()-2); },// dupn
-                24 => { self.stack.push(*self.stack.get(self.stack.len()-2).ok_or(MachineError::Stack)?); },// dupn
-
-                25 => {// call
+                Command::Call => {
                     let function = u64::from_le_bytes([
                         self.instructions.instructions[self.ip+1],
                         self.instructions.instructions[self.ip+2],
@@ -174,20 +180,43 @@ impl Machine {
                     self.ip += 1;
                     return Ok(Some(function));
                 },
-                26 => {// tick
+                Command::Tick => {
                     self.ip += 1;
                     return Ok(None);
                 },
-                27 => {// Query interrupt
+                Command::Irp => {
                     self.stack.push(self.interrupts.pop().unwrap_or(0.));
                 },
-                28 => {// Swap
+                Command::Swp => {
                     let a = self.stack.pop().ok_or(MachineError::Stack)?;
                     let b = self.stack.pop().ok_or(MachineError::Stack)?;
                     self.stack.push(a);
                     self.stack.push(b);
                 },
-                _ => return Err(MachineError::OpCode)
+                Command::Pick => {
+                    let index = self.stack.pop().ok_or(MachineError::Stack)?;
+                    let index = (index.round() as u32) as usize;
+                    let b = self.stack.iter().nth(index).ok_or(MachineError::Stack)?;
+                    self.stack.push(*b);
+                },
+                Command::Alc => {
+                    self.stack.push(self.memory.borrow_mut().allocate() as f64)
+                },
+                Command::Drp => {
+                    let address = self.stack.pop().ok_or(MachineError::Stack)?.round() as u32;
+                    self.memory.borrow_mut().drop(address).ok_or(MachineError::Memory)?;
+                },
+                Command::Ld => {
+                    let address = self.stack.pop().ok_or(MachineError::Stack)?.round() as u32;
+                    let index = self.stack.pop().ok_or(MachineError::Stack)?.round() as u32;
+                    self.stack.push(self.memory.borrow().load(address, index).ok_or(MachineError::Memory)?);
+                },
+                Command::Str => {
+                    let item = self.stack.pop().ok_or(MachineError::Stack)?;
+                    let address = self.stack.pop().ok_or(MachineError::Stack)?.round() as u32;
+                    let index = self.stack.pop().ok_or(MachineError::Stack)?.round() as u32;
+                    self.memory.borrow_mut().store(address, index, item).ok_or(MachineError::Memory)?;
+                },
             }
             self.ip += 1;
         }
