@@ -52,6 +52,8 @@ pub enum Command {
     Jpop,       // Pop T to IP
     Swp,        // Swap T and N
     Pick,       // Pick T down in the stack
+    Roll,
+    Rolr,
 
     Alc,        // Allocate new vector and push the vector index
     Ld,         // Push the index N of vector T

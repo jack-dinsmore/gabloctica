@@ -77,7 +77,7 @@ impl Instruction {
 }
 
 pub(super) enum Branch {
-    If(Vec<(Ssa, SyntaxNode)>, Option<Ssa>), // ((body code, if condition), else code)
+    If(Vec<(Ssa, Ssa)>, Option<Ssa>), // ((body code, if condition), else code)
     Loop(Ssa),
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -92,7 +92,7 @@ impl Location {
             index
         }
     }
-    fn graduate(&self) -> Self{
+    pub fn graduate(&self) -> Self{
         Self {
             tier: self.tier + 1,
             index: self.index
@@ -176,14 +176,15 @@ impl Ssa {
                 for node in nodes {
                     match node {
                         SyntaxNode::Block(predicate, body) => {
-                            let (ssa, variables) = self.compile_branch_ssa(body, available_functions)?;
-                            is_action = is_action && ssa.is_action();
+                            let (body_ssa, variables) = self.compile_branch_ssa(body, available_functions)?;
+                            let (pred_ssa, _) = self.compile_branch_ssa(predicate, available_functions)?;
+                            is_action = is_action && body_ssa.is_action();
                             match &**predicate {
-                                SyntaxNode::Adjacent(nodes) => {
-                                    ifs.push((ssa, nodes.last().unwrap().clone()))
+                                SyntaxNode::Adjacent(_) => {
+                                    ifs.push((body_ssa, pred_ssa))
                                 },
                                 SyntaxNode::Unclassified(_) => {
-                                    els = Some(ssa)
+                                    els = Some(body_ssa)
                                 },
                                 _ => unreachable!()
                             };
@@ -383,30 +384,33 @@ impl Ssa {
         self.instruction_order = used_vars.to_vec();
 
         for branch in used_branches {
+            // Get all used variables
+            let mut variable_names = SortedSet::new();
+            for var in &used_vars {
+                if let Instruction::Theta(b, name) = &self.instructions[&var] {
+                    if *b == branch {
+                        variable_names.push(name);
+                    }
+                }
+            }
+            
             match &mut self.branches[branch] {
                 Branch::If(items, ssa) => {
                     for (ssa, _) in items {
+                        for v in &variable_names {
+                            self.return_variables.push(*self.declared_variables.get(*v).unwrap());
+                        }
                         ssa.order_instructions();
                     }
                     if let Some(ssa) = ssa {
+                        for v in &variable_names {
+                            self.return_variables.push(*self.declared_variables.get(*v).unwrap());
+                        }
                         ssa.order_instructions();
                     }
                 },
                 Branch::Loop(ssa) => {ssa.order_instructions()}
             }
-        }
-    }
-
-    fn check_var(&mut self, name: &str, typ: VariableType) -> Option<Location> {
-        match self.declared_variables.get(name) {
-            Some(v) => {
-                if typ == self.types[v] {
-                    Some(*v)
-                } else {
-                    None
-                }
-            },
-            None => None,
         }
     }
 
