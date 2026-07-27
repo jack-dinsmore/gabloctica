@@ -4,9 +4,8 @@
 // =================================
 
 use rustc_hash::FxHashMap;
-use sorted_vec::SortedSet;
 
-use crate::{Command, bytecode::VariableType, compiler::ssa::Location};
+use crate::{Command, compiler::ssa::Location};
 
 use super::ssa::{Ssa, Instruction};
 
@@ -43,6 +42,7 @@ impl<'a> Bytecode<'a> {
             functions: Vec::new(),
             last_used: ssa.get_last_used(),
         };
+        dbg!(&bytecode.last_used);
         for (instruction_index, op) in ssa.instruction_order.iter().enumerate() {
             bytecode.pop_unused(instruction_index);
             bytecode.write_bytecode(*op);
@@ -60,7 +60,18 @@ impl<'a> Bytecode<'a> {
 
     /// Pop all the unused items in the stack until a used item is at top
     fn pop_unused(&mut self, instruction_index: usize) {
-        todo!()
+        loop {
+            let top_instruction = match self.running_stack.last() {
+                Some(loc) => if loc.tier == 0 { loc.index } else { return },
+                None => return
+            };
+            match self.last_used.get(&Location::internal(top_instruction)) {
+                Some(index) => if *index >= instruction_index { return },
+                None => ()
+            };
+            self.bytecode.push(Command::Pop as u8);
+            self.running_stack.pop();
+        }
     }
 
     /// Write an operation to bytecode
@@ -184,11 +195,6 @@ impl<'a> Bytecode<'a> {
                 self.bytecode.push(Command::Not as u8);
                 self.running_stack.pop();
                 self.running_stack.push(Location::internal(op));
-            },
-            Instruction::Drp(adr) => {
-                set_state(&[*adr], &mut self.bytecode, &mut self.running_stack);
-                self.bytecode.push(Command::Drp as u8);
-                self.running_stack.pop();
             },
             Instruction::Ld(adr, idx) => {
                 set_state(&[*adr, *idx], &mut self.bytecode, &mut self.running_stack);

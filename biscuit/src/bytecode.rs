@@ -54,7 +54,6 @@ pub enum Command {
     Pick,       // Pick T down in the stack
 
     Alc,        // Allocate new vector and push the vector index
-    Drp,        // Drop vector T
     Ld,         // Push the index N of vector T
     St,         // Store T in index NN of vector N
     Stb,        // Store T at back of vector N

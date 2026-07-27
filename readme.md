@@ -3,7 +3,6 @@
 ## Biscuit
 * Return
 * Emulator
-* Implement thetas, meaning allow variables to be modified in code blocks.
 * Automatically drop tables whenever they go out of scope
 
 ## Ships

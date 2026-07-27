@@ -14,7 +14,6 @@ pub enum Instruction {
     Theta(usize, String),
     Action(usize),
 
-    Drp(Location),
     Ld(Location, Location), // Get index B f vector A
     St(Location, Location, Location), // Store C in index B of vector A 
     Stb(Location, Location), // Store C in back of vector A 
@@ -41,7 +40,7 @@ impl Instruction {
     fn is_action(&self) -> bool {
         match &self {
             Instruction::Action(_) | Instruction::Call(_, _) | Instruction::LocalCall(_, _) | Instruction::Stb(_, _) |
-            Instruction::St(_, _, _) | Instruction::Drp(_) => true,
+            Instruction::St(_, _, _) => true,
             _ => false,
         }
     }
@@ -53,20 +52,38 @@ impl Instruction {
             Instruction::Or(_, _) | Instruction::Xor(_, _) | Instruction::Not(_) | Instruction::Add(_, _) | 
             Instruction::Sub(_, _) | Instruction::Mul(_, _) | Instruction::Div(_, _) | Instruction::Neg(_) | 
             Instruction::Pow(_, _) => VariableType::Float,
-            Instruction::Drp(_) | Instruction::LocalCall(_, _) | Instruction::Action(_) => VariableType::Null,
+            Instruction::LocalCall(_, _) | Instruction::Action(_) => VariableType::Null,
             Instruction::Argument | Instruction::Call(_, _) | Instruction::Theta(_, _) => unreachable!(),
+        }
+    }
+    fn get_var_dependencies(&self) -> Vec<Location> {
+        match &self {
+            Instruction::Argument | Instruction::LiteralVector(_) | Instruction::LiteralFloat(_) | Instruction::Theta(_, _) |
+            Instruction::Action(_)=> vec![],
+            Instruction::Call(_, a) | Instruction::LocalCall(_, a) | Instruction::Not(a) | Instruction::Neg(a) => vec![*a],
+            Instruction::Ld(a, b) | Instruction::Stb(a, b) | Instruction::Lt(a, b) | Instruction::Gt(a, b) |
+            Instruction::Le(a, b) | Instruction::Ge(a, b) | Instruction::Eq(a, b) | Instruction::And(a, b) |
+            Instruction::Or(a, b) | Instruction::Xor(a, b) | Instruction::Add(a, b) | Instruction::Sub(a, b) |
+            Instruction::Mul(a, b) | Instruction::Div(a, b) | Instruction::Pow(a, b) => vec![*a, *b],
+            Instruction::St(a, b, c) => vec![*a, *b, *c],
+        }
+    }
+    fn get_branch_dependencies(&self) -> Vec<usize> {
+        match &self {
+            Instruction::Theta(branch, _) | Instruction::Action(branch) => { vec![*branch] },
+            _ => Vec::new()
         }
     }
 }
 
-enum Branch {
+pub(super) enum Branch {
     If(Vec<(Ssa, SyntaxNode)>, Option<Ssa>), // ((body code, if condition), else code)
     Loop(Ssa),
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Location {
-    tier: u32,
-    index: u32,
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub(super) struct Location {
+    pub tier: u32,
+    pub index: u32,
 }
 impl Location {
     pub fn internal(index: u32) -> Self {
@@ -79,6 +96,15 @@ impl Location {
         Self {
             tier: self.tier + 1,
             index: self.index
+        }
+    }
+}
+impl std::fmt::Debug for Location {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.tier == 0 {
+            write!(f, "{:04}", self.index)
+        } else {
+            write!(f, "{}_{:04}", self.tier, self.index)
         }
     }
 }
@@ -185,18 +211,7 @@ impl Ssa {
                     _ => {return node.raise("Invalid syntax 17");}
                 };
                 match first {
-                    "del" => {
-                        let mut last_instruction = Location::internal(self.instruction_counter-1);
-                        for item in &nodes[1..] {
-                            let name = match &item {
-                                SyntaxNode::Unclassified(token) => &token.get_inner(),
-                                _ => {return node.raise("Only variables can be deleted");},
-                            };
-                            let var = self.check_var(name, VariableType::List).ok_or(item.raise_str(&format!("`{}` is not a valid list", name)))?;
-                            last_instruction = self.push_instruction(Instruction::Drp(var));
-                        }
-                        last_instruction
-                    },
+                    // There aren't any keywords yet
                     _ => {
                         // Function call
                         if nodes.len() != 2 {
@@ -322,10 +337,11 @@ impl Ssa {
     pub fn get_last_used(&self) -> FxHashMap<Location, usize> {
         let mut last_usage = FxHashMap::default();
         for (i, op) in self.instruction_order.iter().enumerate() {
-            let loc = Location::internal(*op);
-            match last_usage.get_mut(&loc) {
-                Some(index) => {*index = i;},
-                None => {last_usage.insert(loc, i);},
+            for loc in self.instructions[op].get_var_dependencies() {
+                match last_usage.get_mut(&loc) {
+                    Some(index) => {*index = i;},
+                    None => {last_usage.insert(loc, i);},
+                }
             }
         }
         last_usage
@@ -333,42 +349,52 @@ impl Ssa {
 
     // Get the order of instructions, including skipping unnecessary ones
     pub fn order_instructions(&mut self) {
-        // let mut used = SortedSet::new();
-        // for i in 0..self.instruction_counter {
-        //     let instruction = &self.instructions.get(&i).unwrap().0;
-        //     // Use arguments
-        //     match instruction {
-        //         Instruction::Argument | Instruction::LiteralVector(_) | Instruction::LiteralFloat(_) | Instruction::Loop(_) |
-        //         Instruction::Theta => (),
-        //         Instruction::Drp(a) | Instruction::Not(a) | Instruction::Neg(a) |
-        //         Instruction::Call(_, a) | Instruction::LocalCall(_, a)  => {
-        //             used.push(*a);
-        //         }
-        //         Instruction::Ld(a, b) | Instruction::Lt(a, b) | Instruction::Gt(a, b) |
-        //         Instruction::Le(a, b) | Instruction::Ge(a, b) | Instruction::Eq(a, b) | Instruction::And(a, b) |
-        //         Instruction::Or(a, b) | Instruction::Xor(a, b) | Instruction::Add(a, b) | Instruction::Sub(a, b) |
-        //         Instruction::Mul(a, b) | Instruction::Div(a, b) | Instruction::Pow(a, b) | Instruction::Stb(a, b) => {
-        //             used.push(*a);
-        //             used.push(*b);
-        //         },
-        //         Instruction::St(a, b, c) => {
-        //             used.push(*a);
-        //             used.push(*b);
-        //             used.push(*c);
-        //         },
-        //         Instruction::If(v, _) => {
-        //             for (_, a) in v {
-        //                 used.push(*a);
-        //             }
-        //         }
-        //     };
-        //     match instruction {
-        //         Instruction::Loop(_) | Instruction::If(_, _) | Instruction::Drp(_) | Instruction::Call(_, _) | Instruction::LocalCall(_, _) | Instruction::St(_, _, _) | Instruction::Stb(_, _) => {used.push(i);},
-        //         _ => ()
-        //     };
-        // }
-        // self.instruction_order = used.to_vec();
-        todo!()
+        let mut used_branches = SortedSet::new();
+        let mut used_vars = SortedSet::new();
+        let mut used_queue = Vec::new();
+
+        // Add all the return variables
+        for v in &self.return_variables {
+            if v.tier == 0 { 
+                used_queue.push(v.index);
+            }
+        }
+
+        // Add all the functions
+        for (index, intruction) in self.instructions.iter() {
+            if intruction.is_action() {
+                used_queue.push(*index);
+            }
+        }
+        
+        // Figure out which other variables are used by the above
+        while let Some(next_item) = used_queue.pop() {
+            if used_vars.push(next_item).1.is_some() {
+                // The variable was already used
+                continue;
+            };
+            for var in self.instructions[&next_item].get_var_dependencies() {
+                if var.tier == 0 { used_queue.push(var.index); }
+            }
+            for branch in self.instructions[&next_item].get_branch_dependencies() {
+                used_branches.push(branch);
+            }
+        }
+        self.instruction_order = used_vars.to_vec();
+
+        for branch in used_branches {
+            match &mut self.branches[branch] {
+                Branch::If(items, ssa) => {
+                    for (ssa, _) in items {
+                        ssa.order_instructions();
+                    }
+                    if let Some(ssa) = ssa {
+                        ssa.order_instructions();
+                    }
+                },
+                Branch::Loop(ssa) => {ssa.order_instructions()}
+            }
+        }
     }
 
     fn check_var(&mut self, name: &str, typ: VariableType) -> Option<Location> {
