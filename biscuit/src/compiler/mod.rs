@@ -1,6 +1,11 @@
+// Functions to perform the full compilation process
+mod ssa;
+mod implementer;
+
 use lazy_static::lazy_static;
 use rustc_hash::FxHashMap;
-use crate::{parser::SyntaxNode, ssa::{Bytecode, Ssa, VariableType}};
+use crate::{bytecode::VariableType, compiler::implementer::Bytecode, parser::SyntaxNode};
+use ssa::Ssa;
 
 lazy_static! {
     static ref CONSTANT_PRECURSOR: SyntaxNode = {
@@ -106,7 +111,9 @@ impl Function {
         for (name, typ) in &self.arguments {
             arguments.insert(name.to_owned(), *typ);
         }
-        Ssa::compile(&self.lines, &arguments, available_functions)
+        let mut ssa = Ssa::new(&self.lines, &arguments, available_functions)?;
+        ssa.order_instructions();
+        Ok(ssa)
     }
 }
 
@@ -176,12 +183,14 @@ fn compile_tree(tree: &SyntaxNode) -> Result<Vec<u8>, String> {
 
     // Write to bytecode
     let mut names = vec!["main".to_owned()];
-    let mut compiled_functions = vec![Bytecode::new(&ssa["main"], 0)];
+    let mut compiled_functions = vec![Bytecode::new(&ssa["main"])];
     for (name, ssa) in &ssa {
         if name == "main" { continue; }
         names.push(name.to_owned());
-        compiled_functions.push(Bytecode::new(ssa, 0));
+        compiled_functions.push(Bytecode::new(ssa));
     }
+
+    // Get all the function locations
     let mut locations = FxHashMap::default();
     let mut net_loc = 0;
     for (name, bytecode) in names.iter().zip(&compiled_functions) {

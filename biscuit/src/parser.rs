@@ -49,6 +49,7 @@ pub enum SyntaxNode {
     Binop(&'static str, Box<SyntaxNode>, Box<SyntaxNode>),
     Unop(&'static str, Box<SyntaxNode>),
     Block(Box<SyntaxNode>, Box<SyntaxNode>),
+    IfChain(Vec<SyntaxNode>),
 }
 impl SyntaxNode {
     fn reduce(&mut self) -> Result<(), String> {
@@ -100,15 +101,7 @@ impl SyntaxNode {
                     i += 1;
                 }
             },
-            SyntaxNode::Parenthesis(_, n) | SyntaxNode::List(_, n) | SyntaxNode::Unop(_, n) => {
-                n.strip_comment()?;
-            },
-            SyntaxNode::Binop(_, n1, n2) | SyntaxNode::Block(n1, n2) => {
-                n1.strip_comment()?;
-                n2.strip_comment()?;
-            },
-            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax 9"),
-            SyntaxNode::Number(_) => unreachable!()
+            _ => unreachable!(),
         }
         Ok(())
     }
@@ -127,60 +120,8 @@ impl SyntaxNode {
                     i += 1;
                 }
             },
-            SyntaxNode::Parenthesis(_, n) | SyntaxNode::List(_, n) | SyntaxNode::Unop(_, n) => {
-                n.strip_comment()?;
-            },
-            SyntaxNode::Binop(_, n1, n2) | SyntaxNode::Block(n1, n2) => {
-                n1.strip_comment()?;
-                n2.strip_comment()?;
-            },
-            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax 9"),
-            SyntaxNode::Number(_) => unreachable!()
+            _ => unreachable!()
         }
-        Ok(())
-    }
-
-    fn reduce_parens(&mut self, symbol_open: &'static str, symbol_close: &'static str) -> Result<(), String> {
-        match self {
-            SyntaxNode::Adjacent(nodes) => {
-                let mut parentheses = Vec::new();
-                let mut i = 0;
-                while i < nodes.len() {
-                    match &nodes[i] {
-                        Unclassified(t) => {
-                            if t == symbol_open {
-                                parentheses.push(i);
-                                i += 1
-                            } else if t == symbol_close {
-                                let start_index = parentheses.pop().ok_or(t.raise_str("Parenthesis was not opened"))?;
-                                let inner_node = SyntaxNode::Adjacent(nodes[start_index+1..i].to_vec());
-                                let paren = SyntaxNode::Parenthesis(symbol_open, Box::new(inner_node));
-                                nodes.splice(start_index..=i, [paren]);
-                                i = start_index+1
-                            } else {
-                                i += 1
-                            }
-                        },
-                        _ => {
-                            nodes[i].reduce_parens(symbol_open, symbol_close)?;
-                            i += 1;
-                        }
-                    };
-                }
-                if !parentheses.is_empty() {
-                    return self.raise("Parenthesis was not closed");
-                }
-            }
-            SyntaxNode::Parenthesis(_, n) | SyntaxNode::List(_, n) | SyntaxNode::Unop(_, n) => {
-                n.reduce_parens(symbol_open, symbol_close)?;
-            },
-            SyntaxNode::Binop(_, n1, n2) | SyntaxNode::Block(n1, n2) => {
-                n1.reduce_parens(symbol_open, symbol_close)?;
-                n2.reduce_parens(symbol_open, symbol_close)?;
-            },
-            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax 10"),
-            SyntaxNode::Number(_) => unreachable!()
-        };
         Ok(())
     }
 
@@ -207,15 +148,7 @@ impl SyntaxNode {
                     }
                 }
             }
-            SyntaxNode::Parenthesis(_, n) | SyntaxNode::List(_, n) | SyntaxNode::Unop(_, n) => {
-                n.reduce_blocks()?;
-            },
-            SyntaxNode::Binop(_, n1, n2) | SyntaxNode::Block(n1, n2) => {
-                n1.reduce_blocks()?;
-                n2.reduce_blocks()?;
-            },
-            SyntaxNode::Unclassified(_) => (),
-            SyntaxNode::Number(_) => unreachable!()
+            _ => unreachable!()
         };
         Ok(())
     }
@@ -257,23 +190,57 @@ impl SyntaxNode {
                     return nodes[nodes.len() - 1].raise("Last line must end in a semicolon");
                 }
             }
-
-            SyntaxNode::Parenthesis(_, n) | SyntaxNode::List(_, n) | SyntaxNode::Unop(_, n) => {
-                n.reduce_semicolon()?;
-            },
-            SyntaxNode::Binop(_, n1, n2) => {
-                n1.reduce_semicolon()?;
-                n2.reduce_semicolon()?;
-            },
             SyntaxNode::Block(_, n2) => {
                 n2.reduce_semicolon()?;
             },
-            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax 11"),
-            SyntaxNode::Number(_) => unreachable!()
+            _ => unreachable!()
         };
         Ok(())
     }
 
+    fn reduce_parens(&mut self, symbol_open: &'static str, symbol_close: &'static str) -> Result<(), String> {
+        match self {
+            SyntaxNode::Adjacent(nodes) => {
+                let mut parentheses = Vec::new();
+                let mut i = 0;
+                while i < nodes.len() {
+                    match &nodes[i] {
+                        Unclassified(t) => {
+                            if t == symbol_open {
+                                parentheses.push(i);
+                                i += 1
+                            } else if t == symbol_close {
+                                let start_index = parentheses.pop().ok_or(t.raise_str("Parenthesis was not opened"))?;
+                                let inner_node = SyntaxNode::Adjacent(nodes[start_index+1..i].to_vec());
+                                let paren = SyntaxNode::Parenthesis(symbol_open, Box::new(inner_node));
+                                nodes.splice(start_index..=i, [paren]);
+                                i = start_index+1
+                            } else {
+                                i += 1
+                            }
+                        },
+                        _ => {
+                            nodes[i].reduce_parens(symbol_open, symbol_close)?;
+                            i += 1;
+                        }
+                    };
+                }
+                if !parentheses.is_empty() {
+                    return self.raise("Parenthesis was not closed");
+                }
+            },
+            SyntaxNode::Block(a, b) => {
+                a.reduce_parens(symbol_open, symbol_close)?;
+                b.reduce_parens(symbol_open, symbol_close)?;
+            }
+            SyntaxNode::Parenthesis(_, a) => {
+                a.reduce_parens(symbol_open, symbol_close)?;
+            }
+            _ => unreachable!()
+        };
+        Ok(())
+    }
+    
     fn reduce_list(&mut self, symbol: &'static str) -> Result<(), String> {
         match self {
             SyntaxNode::Adjacent(nodes) => {
@@ -291,55 +258,14 @@ impl SyntaxNode {
                     };
                 }
             }
-            SyntaxNode::Parenthesis(_, n) | SyntaxNode::List(_, n) | SyntaxNode::Unop(_, n) => {
+            SyntaxNode::Parenthesis(_, n) => {
                 n.reduce_list(symbol)?;
             },
-            SyntaxNode::Binop(_, n1, n2) | SyntaxNode::Block(n1, n2) => {
+            SyntaxNode::Block(n1, n2) => {
                 n1.reduce_list(symbol)?;
                 n2.reduce_list(symbol)?;
             },
-            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax 11"),
-            SyntaxNode::Number(_) => unreachable!()
-        };
-        Ok(())
-    }
-
-    fn reduce_binop(&mut self, symbols: &[&'static str]) -> Result<(), String> {
-        match self {
-            SyntaxNode::Adjacent(nodes) => {
-                let mut i = 0;
-                while i < nodes.len() {
-                    if let Unclassified(t) = &nodes[i] {
-                        match symbols.iter().position(|x| t == *x) {
-                            Some(index) => {
-                                let op = symbols[index];
-                                if i == 0 {
-                                    return t.raise("Binary operation encountered with no left side");
-                                } else if i == nodes.len()-1 {
-                                    return t.raise("Binary operation encountered with no right side");
-                                }
-                                let new_node = SyntaxNode::Binop(op, Box::new(nodes[i-1].clone()), Box::new(nodes[i+1].clone()));
-                                nodes.drain(i..=i+1);
-                                nodes[i-1] = new_node;
-                                continue;
-                            },
-                            None => (),
-                        }
-                    } else {
-                        nodes[i].reduce_binop(symbols)?;
-                    }
-                    i += 1;
-                }
-            }
-            SyntaxNode::Parenthesis(_, n) | SyntaxNode::List(_, n) | SyntaxNode::Unop(_, n) => {
-                n.reduce_binop(symbols)?;
-            },
-            SyntaxNode::Binop(_, n1, n2) | SyntaxNode::Block(n1, n2) => {
-                n1.reduce_binop(symbols)?;
-                n2.reduce_binop(symbols)?;
-            },
-            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax 12"),
-            SyntaxNode::Number(_) => unreachable!()
+            _ => unreachable!()
         };
         Ok(())
     }
@@ -372,15 +298,53 @@ impl SyntaxNode {
                     i += 1;
                 }
             }
-            SyntaxNode::Parenthesis(_, n) | SyntaxNode::List(_, n) | SyntaxNode::Unop(_, n) => {
+            SyntaxNode::Parenthesis(_, n) | SyntaxNode::List(_, n) => {
                 n.reduce_total_binop(symbols)?;
             },
             SyntaxNode::Binop(_, n1, n2) | SyntaxNode::Block(n1, n2) => {
                 n1.reduce_total_binop(symbols)?;
                 n2.reduce_total_binop(symbols)?;
             },
-            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax 13"),
-            SyntaxNode::Number(_) => unreachable!()
+            _ => unreachable!()
+        };
+        Ok(())
+    }
+
+    fn reduce_binop(&mut self, symbols: &[&'static str]) -> Result<(), String> {
+        match self {
+            SyntaxNode::Adjacent(nodes) => {
+                let mut i = 0;
+                while i < nodes.len() {
+                    if let Unclassified(t) = &nodes[i] {
+                        match symbols.iter().position(|x| t == *x) {
+                            Some(index) => {
+                                let op = symbols[index];
+                                if i == 0 {
+                                    return t.raise("Binary operation encountered with no left side");
+                                } else if i == nodes.len()-1 {
+                                    return t.raise("Binary operation encountered with no right side");
+                                }
+                                let new_node = SyntaxNode::Binop(op, Box::new(nodes[i-1].clone()), Box::new(nodes[i+1].clone()));
+                                nodes.drain(i..=i+1);
+                                nodes[i-1] = new_node;
+                                continue;
+                            },
+                            None => (),
+                        }
+                    } else {
+                        nodes[i].reduce_binop(symbols)?;
+                    }
+                    i += 1;
+                }
+            }
+            SyntaxNode::Parenthesis(_, n) | SyntaxNode::List(_, n) => {
+                n.reduce_binop(symbols)?;
+            },
+            SyntaxNode::Binop(_, n1, n2) | SyntaxNode::Block(n1, n2) => {
+                n1.reduce_binop(symbols)?;
+                n2.reduce_binop(symbols)?;
+            },
+            _ => unreachable!()
         };
         Ok(())
     }
@@ -417,8 +381,7 @@ impl SyntaxNode {
                 n1.reduce_unop(symbols)?;
                 n2.reduce_unop(symbols)?;
             },
-            SyntaxNode::Unclassified(token) => return token.raise("Invalid syntax 14"),
-            SyntaxNode::Number(_) => unreachable!()
+            _ => unreachable!()
         };
         Ok(())
     }
@@ -449,6 +412,7 @@ impl SyntaxNode {
                 }
             },
             SyntaxNode::Number(_) => (),
+            _ => unreachable!(),
         };
     }
 
@@ -472,7 +436,82 @@ impl SyntaxNode {
                 n2.reduce_singletons();
             },
             SyntaxNode::Unclassified(_) | SyntaxNode::Number(_) => (),
+            _ => unimplemented!()
         };
+    }
+
+    fn reduce_ifs(&mut self) -> Result<(), String> {
+        match self {
+            SyntaxNode::Adjacent(nodes) => {
+                let mut start_index = None;
+                let mut i = 0;
+                while i < nodes.len() {
+                    let end_i = match &nodes[i] {
+                        SyntaxNode::Block(predicate, _) => {
+                            match &**predicate {
+                                SyntaxNode::Adjacent(n) => {
+                                    let first = n.first().ok_or(nodes[i].raise_str("You cannot have empty braces"))?;
+                                    match first {
+                                        Unclassified(t) => {
+                                            if t == "if" {
+                                                // It's an if statement
+                                                match start_index {
+                                                    None => { start_index = Some(i); None },
+                                                    Some(i) => Some(i-1)
+                                                }
+                                            } else if t == "else" {
+                                                // It's an else if statement
+                                                if let None = start_index { return first.raise("`else if` must follow an `if` statement"); }
+                                                None
+                                            } else {
+                                                // It's something else
+                                                Some(i-1)
+                                            }
+                                        },
+                                        _ => { return first.raise("Code blocks must start with a keyword"); }
+                                    }
+                                },
+                                SyntaxNode::Unclassified(t) => {
+                                    if t == "else" {
+                                        // It's an else statement
+                                        if let None = start_index { return nodes[i].raise("`else` must follow an `if` statement"); }
+                                        Some(i)
+                                    } else {
+                                        // It's something else
+                                        Some(i-1)
+                                    }
+                                },
+                                _ => { return nodes[i].raise("Invalid syntax"); }
+                            }
+                        },
+                        _ => Some(i-1)
+                    };
+                    match (end_i, start_index) {
+                        (Some(j), Some(start)) => {
+                            let if_nodes = nodes[start..=j].to_vec();
+                            nodes.splice(start..=j, [SyntaxNode::IfChain(if_nodes)]);
+                            i = j + 1;
+                            start_index = None;
+                        }
+                        _ => ()
+                    };
+                    i += 1;
+                }
+            },
+            Unclassified(_) => (),
+            SyntaxNode::Number(_) => (),
+            Parenthesis(_, syntax_node) => syntax_node.reduce_ifs()?,
+            SyntaxNode::List(_, _) => (),
+            SyntaxNode::Binop(_, _, _) => (),
+            SyntaxNode::Unop(_, _) => (),
+            SyntaxNode::Block(_, syntax_node1) => syntax_node1.reduce_ifs()?,
+            SyntaxNode::IfChain(nodes) => {
+                for node in nodes {
+                    node.reduce_ifs()?
+                }
+            },
+        }
+        Ok(())
     }
 
     fn internal_raise<T>(&self, message: &str) -> Option<Result<T, String>> {
@@ -480,6 +519,10 @@ impl SyntaxNode {
             Unclassified(token) => Some(token.raise(message)),
             SyntaxNode::Number(token) => Some(token.raise(message)),
             SyntaxNode::Adjacent(syntax_nodes) => match syntax_nodes.first() {
+                Some(n) => n.internal_raise(message),
+                None => None,
+            },
+            SyntaxNode::IfChain(syntax_nodes) => match syntax_nodes.first() {
                 Some(n) => n.internal_raise(message),
                 None => None,
             },
@@ -517,6 +560,7 @@ impl std::fmt::Debug for SyntaxNode {
             Self::Unclassified(arg0) => write!(f, "`{:?}`", arg0),
             Self::Number(arg0) => write!(f, "Number({:?})", arg0),
             Self::Adjacent(arg0) => write!(f, "{:?}", arg0),
+            Self::IfChain(arg0) => write!(f, "{:?}", arg0),
             Self::Parenthesis(op, arg1) => write!(f, "Parens `{}` ({:?})", op, arg1),
             Self::List(op, arg1) => write!(f, "List `{}` ({:?})", op, arg1),
             Self::Binop(op, arg1, arg2) => write!(f, "Binop `{}` ({:?}, {:?})", op, arg1, arg2),

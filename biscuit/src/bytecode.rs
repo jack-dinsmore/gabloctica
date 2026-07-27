@@ -3,8 +3,6 @@ use num_enum::TryFromPrimitive;
 use rustc_hash::FxHashMap;
 use strum::IntoEnumIterator;
 
-use crate::ssa::VariableType;
-
 lazy_static! {
     static ref COMMAND_MAP : FxHashMap<String, Command> = {
         let mut map = FxHashMap::default();
@@ -14,21 +12,28 @@ lazy_static! {
         }
         map
     };
-    static ref FUNCTION_MAP : FxHashMap<String, Function> = {
+    static ref FUNCTION_MAP : FxHashMap<String, GlobalFunction> = {
         let mut map = FxHashMap::default();
-        for v in Function::iter() {
+        for v in GlobalFunction::iter() {
             map.insert(v.to_string().to_lowercase(), v);
             map.insert(v.to_string().to_uppercase(), v);
         }
         map
     };
-    pub static ref FUNCTION_MAP_LOWER : FxHashMap<String, Function> = {
+    pub static ref FUNCTION_MAP_LOWER : FxHashMap<String, GlobalFunction> = {
         let mut map = FxHashMap::default();
-        for v in Function::iter() {
+        for v in GlobalFunction::iter() {
             map.insert(v.to_string().to_lowercase(), v);
         }
         map
     };
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum VariableType {
+    Null,
+    Float,
+    List,
 }
 
 #[repr(u8)]
@@ -75,7 +80,7 @@ pub enum Command {
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, strum_macros::Display, strum_macros::EnumIter, TryFromPrimitive)]
-pub enum Function {
+pub enum GlobalFunction {
     Dbg,
     Tick,
     Interrupt,
@@ -111,7 +116,7 @@ impl Command {
     }
 }
 
-impl Function {
+impl GlobalFunction {
     pub fn from_string(s: &str) -> Option<Self> {
         match FUNCTION_MAP.get(s) {
             Some(k) => Some(k.to_owned()),
@@ -121,9 +126,9 @@ impl Function {
 
     pub fn return_type(&self) -> VariableType {
         match self {
-            Function::Dbg => VariableType::Null,
-            Function::Tick => VariableType::Null,
-            Function::Interrupt => VariableType::Null,
+            GlobalFunction::Dbg => VariableType::Null,
+            GlobalFunction::Tick => VariableType::Null,
+            GlobalFunction::Interrupt => VariableType::Null,
         }
     }
 }

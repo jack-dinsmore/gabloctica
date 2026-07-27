@@ -3,7 +3,6 @@ mod parser;
 mod memory;
 mod compiler;
 mod bytecode;
-mod ssa;
 mod assembler;
 mod disassembler;
 use std::{fs::File, io::Read};

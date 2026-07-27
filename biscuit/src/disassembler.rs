@@ -1,7 +1,7 @@
 use rustc_hash::FxHashMap;
 use sorted_vec::SortedVec;
 
-use crate::{Command, bytecode::Function};
+use crate::{Command, bytecode::GlobalFunction};
 
 // Compile a string (usually read from a file) of Biscuit binary to assembly
 pub fn disassemble_bytes(s: &[u8], _filename: &str) -> Result<String, String> {
@@ -55,7 +55,7 @@ pub fn disassemble_bytes(s: &[u8], _filename: &str) -> Result<String, String> {
                 line = format!("{} label{}", line, label_index);
             },
             Command::Call => {
-                let function: Function = Function::try_from(*iter.next().ok_or("Corrupted file")?).unwrap();
+                let function = GlobalFunction::try_from(*iter.next().ok_or("Corrupted file")?).unwrap();
                 line = format!("{} {}", line, function.to_string().to_uppercase());
             },
             _ => ()

@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap;
 
-use crate::{Command, bytecode::Function};
+use crate::{Command, bytecode::GlobalFunction};
 
 pub fn assemble_str(text: &str, _filename: &str) -> Result<Vec<u8>, String> {
     let mut output = Vec::new();
@@ -42,7 +42,7 @@ pub fn assemble_str(text: &str, _filename: &str) -> Result<Vec<u8>, String> {
                 }
             } else if command.takes_func_arg() {
                 // Push an unsigned integer
-                let func = Function::from_string(arg).ok_or(format!("Line {}: Function {} not recognized", line_number+1, arg))?;
+                let func = GlobalFunction::from_string(arg).ok_or(format!("Line {}: Function {} not recognized", line_number+1, arg))?;
                 output.push(func as u8);
             } else if command.takes_label_arg() {
                 // Push a label
