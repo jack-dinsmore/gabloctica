@@ -72,6 +72,7 @@ impl SyntaxNode {
         self.reduce_binop(&["+", "-"])?;
         self.reduce_number();
         self.reduce_singletons();
+        self.reduce_ifs()?;
         dbg!(&self);
         Ok(())
     }
@@ -131,13 +132,15 @@ impl SyntaxNode {
                 let mut start_predicate = 0;
                 let mut i = 0;
                 while i < nodes.len() {
+                    if let Parenthesis("{", inner) = &mut nodes[i] {
+                        inner.reduce_blocks()?;
+                    }
                     match &nodes[i] {
-                        Unclassified(token) => if token.s == ";" {
-                            start_predicate = i;
-                        } else {
+                        Unclassified(token) => {
+                            if token.s == ";" { start_predicate = i+1; }
                             i += 1;
                         },
-                        Parenthesis("{", inner) =>{
+                        Parenthesis("{", inner) => {
                             let predicate = SyntaxNode::Adjacent(nodes[start_predicate..i].to_vec());
                             let block = SyntaxNode::Block(Box::new(predicate), inner.clone());
                             nodes.splice(start_predicate..=i, [block]);
@@ -173,7 +176,7 @@ impl SyntaxNode {
                         SyntaxNode::Block(_, _) => {
                             let mut block_copy = nodes[i].clone();
                             if let SyntaxNode::Block(_, body) = &mut block_copy { body.reduce_semicolon()?; }
-                            if start_index > i {
+                            if start_index < i {
                                 let line = SyntaxNode::Adjacent(nodes[start_index..i].to_vec());
                                 nodes.splice(start_index..=i, [line, block_copy]);
                                 start_index += 2;
@@ -185,9 +188,6 @@ impl SyntaxNode {
                         },
                         _ => i += 1
                     };
-                }
-                if start_index != nodes.len() {
-                    return nodes[nodes.len() - 1].raise("Last line must end in a semicolon");
                 }
             }
             SyntaxNode::Block(_, n2) => {
@@ -305,6 +305,7 @@ impl SyntaxNode {
                 n1.reduce_total_binop(symbols)?;
                 n2.reduce_total_binop(symbols)?;
             },
+            SyntaxNode::Unclassified(_) => (),
             _ => unreachable!()
         };
         Ok(())
@@ -344,6 +345,7 @@ impl SyntaxNode {
                 n1.reduce_binop(symbols)?;
                 n2.reduce_binop(symbols)?;
             },
+            SyntaxNode::Unclassified(_) => (),
             _ => unreachable!()
         };
         Ok(())
@@ -381,6 +383,7 @@ impl SyntaxNode {
                 n1.reduce_unop(symbols)?;
                 n2.reduce_unop(symbols)?;
             },
+            SyntaxNode::Unclassified(_) => (),
             _ => unreachable!()
         };
         Ok(())

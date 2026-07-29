@@ -176,16 +176,37 @@ impl Ssa {
                 for node in nodes {
                     match node {
                         SyntaxNode::Block(predicate, body) => {
+                            let condition = match &mut *predicate.clone() {
+                                SyntaxNode::Adjacent(nodes) => {
+                                    if let Some(SyntaxNode::Unclassified(t)) = nodes.first() {
+                                        if t == "else" {nodes.remove(0);}
+                                    }
+                                    if let Some(SyntaxNode::Unclassified(t)) = nodes.first() {
+                                        if t == "if" {nodes.remove(0);}
+                                    }
+                                    if nodes.len() != 1 {
+                                        return node.raise("If statements must contain exactly one condition");
+                                    }
+                                    Some(nodes[0].clone())
+                                }
+                                SyntaxNode::Unclassified(t) => {
+                                    if t != "else" {
+                                        return node.raise("Else statements must contain no conditions");
+                                    }
+                                    None
+                                }
+                                _ => unreachable!()
+                            };
+
                             let (body_ssa, variables) = self.compile_branch_ssa(body, available_functions)?;
-                            let (pred_ssa, _) = self.compile_branch_ssa(predicate, available_functions)?;
-                            is_action = is_action && body_ssa.is_action();
-                            match &**predicate {
-                                SyntaxNode::Adjacent(_) => {
-                                    ifs.push((body_ssa, pred_ssa))
-                                },
-                                SyntaxNode::Unclassified(_) => {
-                                    els = Some(body_ssa)
-                                },
+                            let pred_ssa = match condition {
+                                Some(c) => Some(self.compile_branch_ssa(&c, available_functions)?.0),
+                                None => None 
+                            };
+                            is_action = is_action || body_ssa.is_action();
+                            match pred_ssa {
+                                Some(pred_ssa) => ifs.push((body_ssa, pred_ssa)),
+                                None => els = Some(body_ssa),
                                 _ => unreachable!()
                             };
                             for v in variables {
@@ -428,11 +449,6 @@ impl Ssa {
 
     /// Compile an SSA from code in a branch, returning code and the theta variables
     fn compile_branch_ssa(&self, node: &SyntaxNode, available_functions: &FxHashMap<String, Function>) -> Result<(Self, SortedSet<String>), String> {
-        let lines : &[SyntaxNode] = match node {
-            SyntaxNode::Adjacent(nodes) => nodes,
-            _ => std::slice::from_ref(node)
-        };
-
         let declared_variables = FxHashMap::from_iter(self.declared_variables.iter().map(|(k, v)| (k.to_owned(), v.graduate())));
         let types = FxHashMap::from_iter(self.types.iter().map(|(k, v)| (k.graduate(), *v)));
         let mut ssa = Self {
@@ -444,9 +460,7 @@ impl Ssa {
             return_variables: Vec::new(),
             branches: Vec::new(),
         };
-        for line in lines {
-            ssa.process_node(line, available_functions)?;
-        }
+        ssa.process_node(node, available_functions)?;
 
         // Find all the external variables written to
         let mut variables = SortedSet::new();
@@ -497,9 +511,39 @@ impl Ssa {
 impl std::fmt::Debug for Ssa {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Ssa (")?;
+        writeln!(f, "CORE")?;
         let indices = SortedSet::from_unsorted(self.instructions.keys().collect());
         for index in indices {
-            writeln!(f, "    {:04} {:?}", index, self.instructions[index])?;
+            writeln!(f, "|    {:04} {:?}", index, self.instructions[index])?;
+        }
+        for (branch_index, branch) in self.branches.iter().enumerate() {
+            writeln!(f, "BRANCH {}", branch_index)?;
+            match branch {
+                Branch::If(items, ssa) => {
+                    for (ssa, condition) in items {
+                        let indices = SortedSet::from_unsorted(condition.instructions.keys().collect());
+                        for index in indices {
+                            writeln!(f, "|    {:04} {:?}", index, condition.instructions[index])?;
+                        }
+                        let indices = SortedSet::from_unsorted(ssa.instructions.keys().collect());
+                        for index in indices {
+                            writeln!(f, "+    {:04} {:?}", index, ssa.instructions[index])?;
+                        }
+                    }
+                    if let Some(ssa) = ssa {
+                        let indices = SortedSet::from_unsorted(ssa.instructions.keys().collect());
+                        for index in indices {
+                            writeln!(f, "-    {:04} {:?}", index, ssa.instructions[index])?;
+                        }
+                    }
+                },
+                Branch::Loop(ssa) => {
+                    let indices = SortedSet::from_unsorted(ssa.instructions.keys().collect());
+                    for index in indices {
+                        writeln!(f, "|    {:04} {:?}", index, ssa.instructions[index])?;
+                    }
+                },
+            }
         }
         write!(f, ")")
     }

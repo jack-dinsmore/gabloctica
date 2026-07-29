@@ -5,17 +5,20 @@ use crate::{Command, bytecode::GlobalFunction};
 
 // Compile a string (usually read from a file) of Biscuit binary to assembly
 pub fn disassemble_bytes(s: &[u8], _filename: &str) -> Result<String, String> {
-    let mut iter = s.iter();
+    let mut iter = s.iter().enumerate();
     let mut lines = Vec::new();
     let mut label_index = 0usize;
     let mut labels = FxHashMap::default();
+    let mut instruction_to_line_map = FxHashMap::default();
 
     loop {
-        let next = match iter.next() {
-            Some(c) => *c,
+        let (index, next) = match iter.next() {
+            Some(t) => t,
             None => break,
         };
-        let command = match Command::try_from(next) {
+        instruction_to_line_map.insert(index, lines.len());
+
+        let command = match Command::try_from(*next) {
             Ok(c) => c,
             _ => return Err("Invalid code".to_owned())
         };
@@ -24,14 +27,14 @@ pub fn disassemble_bytes(s: &[u8], _filename: &str) -> Result<String, String> {
         match command {
             Command::Push => {
                 let mut arg = f64::from_le_bytes([
-                    *iter.next().ok_or("Corrupted file")?,
-                    *iter.next().ok_or("Corrupted file")?,
-                    *iter.next().ok_or("Corrupted file")?,
-                    *iter.next().ok_or("Corrupted file")?,
-                    *iter.next().ok_or("Corrupted file")?,
-                    *iter.next().ok_or("Corrupted file")?,
-                    *iter.next().ok_or("Corrupted file")?,
-                    *iter.next().ok_or("Corrupted file")?
+                    *iter.next().ok_or("Corrupted file")?.1,
+                    *iter.next().ok_or("Corrupted file")?.1,
+                    *iter.next().ok_or("Corrupted file")?.1,
+                    *iter.next().ok_or("Corrupted file")?.1,
+                    *iter.next().ok_or("Corrupted file")?.1,
+                    *iter.next().ok_or("Corrupted file")?.1,
+                    *iter.next().ok_or("Corrupted file")?.1,
+                    *iter.next().ok_or("Corrupted file")?.1
                 ]);
                 if (arg - arg.round()).abs() < 1e-10 {
                     arg = arg.round();
@@ -41,21 +44,21 @@ pub fn disassemble_bytes(s: &[u8], _filename: &str) -> Result<String, String> {
             
             Command::Jmp | Command::Jnz=> {
                 let label_pos = u64::from_le_bytes([
-                    *iter.next().ok_or("Corrupted file")?,
-                    *iter.next().ok_or("Corrupted file")?,
-                    *iter.next().ok_or("Corrupted file")?,
-                    *iter.next().ok_or("Corrupted file")?,
-                    *iter.next().ok_or("Corrupted file")?,
-                    *iter.next().ok_or("Corrupted file")?,
-                    *iter.next().ok_or("Corrupted file")?,
-                    *iter.next().ok_or("Corrupted file")?
+                    *iter.next().ok_or("Corrupted file")?.1,
+                    *iter.next().ok_or("Corrupted file")?.1,
+                    *iter.next().ok_or("Corrupted file")?.1,
+                    *iter.next().ok_or("Corrupted file")?.1,
+                    *iter.next().ok_or("Corrupted file")?.1,
+                    *iter.next().ok_or("Corrupted file")?.1,
+                    *iter.next().ok_or("Corrupted file")?.1,
+                    *iter.next().ok_or("Corrupted file")?.1
                 ]) as usize;
                 label_index += 1;
                 labels.insert(label_pos, format!("label{}", label_index));
                 line = format!("{} label{}", line, label_index);
             },
             Command::Call => {
-                let function = GlobalFunction::try_from(*iter.next().ok_or("Corrupted file")?).unwrap();
+                let function = GlobalFunction::try_from(*iter.next().ok_or("Corrupted file")?.1).unwrap();
                 line = format!("{} {}", line, function.to_string().to_uppercase());
             },
             _ => ()
@@ -64,9 +67,11 @@ pub fn disassemble_bytes(s: &[u8], _filename: &str) -> Result<String, String> {
         lines.push(format!("\t{}", line));
     }
 
-    let keys = labels.keys().collect::<SortedVec<_>>();
-    for key in keys.iter().rev() {
-        lines.insert(**key, labels[key].clone());
+
+    let instruction_nos = labels.keys().collect::<SortedVec<_>>();
+    for instruction_no in instruction_nos.iter().rev() {
+        let line_no = instruction_to_line_map.get(*instruction_no).unwrap();
+        lines.insert(*line_no, labels[instruction_no].clone());
     }
     let text = lines.join("\n");
     Ok(text)

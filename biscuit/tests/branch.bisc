@@ -1,0 +1,10 @@
+fn main() {
+    a = 1;
+    b = a + 1;
+    if b == 2 {
+        dbg(1);
+    } else {
+        dbg(0);
+    }
+    tick();
+}

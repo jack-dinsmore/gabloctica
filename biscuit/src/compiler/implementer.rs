@@ -235,8 +235,8 @@ impl<'a> Bytecode<'a> {
                         let mut terminal_locations = Vec::new();
 
                         // Embed the branch code, with branching logic
-                        for (ssa, if_statement) in items {
-                            let branch = self.compile_branch(&if_statement);
+                        for (ssa, condition) in items {
+                            let branch = self.compile_branch(&condition);
                             self.embed_branch(branch);
 
                             self.bytecode.push(Command::Jnz as u8);
@@ -259,7 +259,7 @@ impl<'a> Bytecode<'a> {
                             branch.roll_scope_names(&theta_names);
                             self.embed_branch(branch);
                         }
-
+                        
                         for loc in terminal_locations {
                             self.bytecode.splice(loc..loc+8, (self.bytecode.len() as u64).to_le_bytes());
                         }
