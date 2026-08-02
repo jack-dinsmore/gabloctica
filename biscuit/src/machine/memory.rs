@@ -1,5 +1,6 @@
 use rustc_hash::FxHashMap;
 
+#[derive(Clone)]
 pub struct Memory {
     vector_map: FxHashMap<u32, Vec<f64>>,
     next_address: u32,
@@ -31,6 +32,13 @@ impl Memory {
         }
     }
 
+    pub fn access<'a>(&'a self, address: u32) -> Option<&'a [f64]> {
+        match self.vector_map.get(&address) {
+            Some(v) => Some(v),
+            None => None,
+        }
+    }
+
     pub fn store(&mut self, address: u32, index: u32, item: f64) -> Option<()> {
         let index = index as usize;
         match self.vector_map.get_mut(&address) {
@@ -42,6 +50,16 @@ impl Memory {
                 } else {
                     return None
                 }
+                Some(())
+            },
+            None => None,
+        }
+    }
+
+    pub fn store_back(&mut self, address: u32, item: f64) -> Option<()> {
+        match self.vector_map.get_mut(&address) {
+            Some(v) => {
+                v.push(item);
                 Some(())
             },
             None => None,

@@ -1,14 +1,16 @@
 /// This mod compiles quahog code into stack machine bytecode.
 mod parser;
-mod memory;
 mod compiler;
-mod bytecode;
+pub mod bytecode;
 mod assembler;
 mod disassembler;
+pub mod machine;
+pub mod util;
+
 use std::{fs::File, io::Read};
 
-pub use bytecode::Command;
-
+pub use bytecode::{Command, GlobalFunction};
+pub use machine::{Instructions, Machine, MachineError, MachineOutput};
 pub use {compiler::compile_str, assembler::assemble_str, disassembler::disassemble_bytes};
 
 /// Compile a file of Biscuit code to binary

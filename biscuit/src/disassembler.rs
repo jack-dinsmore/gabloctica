@@ -64,7 +64,7 @@ pub fn disassemble_bytes(s: &[u8], _filename: &str) -> Result<String, String> {
             _ => ()
         };
 
-        lines.push(format!("\t{}", line));
+        lines.push(format!("    {}", line));
     }
 
 

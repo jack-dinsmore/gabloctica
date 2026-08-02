@@ -1,6 +1,4 @@
 mod interp;
-pub mod vendor;
-pub use vendor::{Vendor, Tagged};
 
 use std::{cell::RefCell, rc::Rc};
 

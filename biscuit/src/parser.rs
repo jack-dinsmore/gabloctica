@@ -73,7 +73,6 @@ impl SyntaxNode {
         self.reduce_number();
         self.reduce_singletons();
         self.reduce_ifs()?;
-        dbg!(&self);
         Ok(())
     }
 

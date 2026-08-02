@@ -29,7 +29,6 @@ impl<'a> Bytecode<'a> {
             last_used: ssa.get_last_used(),
             written_branches: SortedSet::new(),
         };
-        dbg!(&bytecode.last_used);
         for (instruction_index, op) in ssa.instruction_order.iter().enumerate() {
             bytecode.pop_unused(instruction_index);
             bytecode.write_bytecode(*op, instruction_index);
@@ -56,8 +55,7 @@ impl<'a> Bytecode<'a> {
                 Some(index) => if *index >= instruction_index { return },
                 None => ()
             };
-            self.bytecode.push(Command::Pop as u8);
-            self.running_stack.pop();
+            self.pop()
         }
     }
 
@@ -285,8 +283,7 @@ impl<'a> Bytecode<'a> {
                 // Roll
                 todo!()
             } else {
-                self.bytecode.push(Command::Pop as u8);
-                self.running_stack.pop();
+                self.pop()
             }
         }
     }
@@ -381,6 +378,16 @@ impl<'a> Bytecode<'a> {
             }
             self.running_stack[length-n..].rotate_left(n - shift);
         }
+    }
+
+    fn pop(&mut self) {
+        let op = self.running_stack.last().unwrap();
+        match self.ssa.types[op] {
+            crate::bytecode::VariableType::Null => unreachable!(),
+            crate::bytecode::VariableType::Float => self.bytecode.push(Command::Pop as u8),
+            crate::bytecode::VariableType::List => self.bytecode.push(Command::Drp as u8),
+        };
+        self.running_stack.pop();
     }
 
     fn roll_state(&mut self, target: &[Location]) {

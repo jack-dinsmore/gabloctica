@@ -1,4 +1,8 @@
 use std::path::{Path, PathBuf};
+use biscuit::util::Vendor;
+use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
+mod gui;
+use biscuit::machine::InstructionData;
 
 use clap::{Args, Parser, Subcommand};
 
@@ -112,11 +116,50 @@ impl Dis {
 
 #[derive(Args)]
 struct Run {
+    #[arg()]
+    input: String,
 
+    #[arg(short, long)]
+    output: Option<String>,
 }
 impl Run {
     fn run(self) -> Result<(), String> {
-        println!("run");
+        let input = Path::new(&self.input);
+        let output = match &self.output {
+            Some(v) => PathBuf::from(v),
+            None => input.with_extension("b"),
+        };
+        let bytes = biscuit::compile_file(input.to_string_lossy().as_ref())?;
+        std::fs::write(&output, &bytes).map_err(|_| "Could not write output file".to_owned())?;
+
+        let asm_output = match &self.output {
+            Some(v) => PathBuf::from(v),
+            None => input.with_extension("basm"),
+        };
+        let text = biscuit::disassemble_file(output.to_string_lossy().as_ref())?;
+        std::fs::write(&asm_output, &text).map_err(|_| "Could not write output file".to_owned())?;
+
+        let mut terminal = ratatui::init();
+        let mut script_vendor = Vendor::new();
+        let instructions = script_vendor.insert(InstructionData::from_compiled(&bytes));
+        let mut app = gui::App::new(instructions, text);
+
+        loop {
+            terminal.draw(|f| app.draw(f)).unwrap();
+
+            if let Event::Key(key) = event::read().unwrap() {
+                if key.kind == KeyEventKind::Press {
+                    match key.code {
+                        KeyCode::Char('q') | KeyCode::Esc => break,
+                        _ => app.on_key(key.code),
+                    };
+                }
+            }
+        }
+
+        ratatui::restore();
         Ok(())
+
+
     }
 }

@@ -176,7 +176,6 @@ fn compile_tree(tree: &SyntaxNode) -> Result<Vec<u8>, String> {
         return tree.raise("No function named main");
     }
     let ssa = compiler.compile("main")?;
-    dbg!(&ssa);
     // let const_ssa = compiler.compile("const")?; // TODO implement constants
     
     // Optimize IR
