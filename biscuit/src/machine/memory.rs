@@ -20,8 +20,9 @@ impl Memory {
         address
     }
 
-    pub fn drop(&mut self, address: u32) -> Option<()> {
-        self.vector_map.remove(&(address as u32)).map(|_| ())
+    /// Drop an array if it exists
+    pub fn drop(&mut self, address: u32) {
+        let _ = self.vector_map.remove(&(address as u32));
     }
 
     pub fn load(&self, address: u32, index: u32) -> Option<f64> {

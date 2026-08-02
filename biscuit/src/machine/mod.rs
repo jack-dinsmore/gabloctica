@@ -205,7 +205,7 @@ impl Machine {
                 Command::Pick => {
                     let index = self.stack.pop().ok_or(MachineError::Stack)?;
                     let index = (index.round() as u32) as usize;
-                    let b = self.stack.iter().nth(index).ok_or(MachineError::Stack)?;
+                    let b = self.stack.iter().nth(self.stack.len() - index - 1).ok_or(MachineError::Stack)?;
                     self.stack.push(*b);
                 },
                 Command::Alc => {
@@ -213,23 +213,23 @@ impl Machine {
                 },
                 Command::Drp => {
                     let address = self.stack.pop().ok_or(MachineError::Stack)?.round() as u32;
-                    self.memory.drop(address).ok_or(MachineError::Memory)?;
+                    self.memory.drop(address);
                 },
                 Command::Ld => {
-                    let address = self.stack.pop().ok_or(MachineError::Stack)?.round() as u32;
                     let index = self.stack.pop().ok_or(MachineError::Stack)?.round() as u32;
+                    let address = self.stack.last().ok_or(MachineError::Stack)?.round() as u32;
                     self.stack.push(self.memory.load(address, index).ok_or(MachineError::Memory)?);
                 },
                 Command::St => {
-                    let item = self.stack.pop().ok_or(MachineError::Stack)?;
-                    let address = self.stack.pop().ok_or(MachineError::Stack)?.round() as u32;
                     let index = self.stack.pop().ok_or(MachineError::Stack)?.round() as u32;
+                    let item = self.stack.pop().ok_or(MachineError::Stack)?;
+                    let address = self.stack.last().ok_or(MachineError::Stack)?.round() as u32;
                     self.memory.store(address, index, item).ok_or(MachineError::Memory)?;
                 },
                 Command::Stb => {
                     let item = self.stack.pop().ok_or(MachineError::Stack)?;
-                    let index = self.stack.pop().ok_or(MachineError::Stack)?.round() as u32;
-                    self.memory.store_back(index, item).ok_or(MachineError::Memory)?;
+                    let address = self.stack.last().ok_or(MachineError::Stack)?.round() as u32;
+                    self.memory.store_back(address, item).ok_or(MachineError::Memory)?;
                 },
                 Command::Roll => {
                     let dist = self.stack.pop().ok_or(MachineError::Stack)?.round() as usize;

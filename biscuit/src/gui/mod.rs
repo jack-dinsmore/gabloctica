@@ -10,6 +10,7 @@ pub struct App {
     machine: Machine,
     ip_map: FxHashMap<usize, usize>,
     err_state: bool,
+    output_text: String,
 }
 
 impl App {
@@ -34,6 +35,7 @@ impl App {
             machine,
             ip_map,
             err_state: false,
+            output_text: "".to_owned(),
         }
     }
 }
@@ -43,11 +45,12 @@ impl App {
         // Split into two vertical panels.
         let panels = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(25), Constraint::Percentage(25)])
             .split(f.area());
 
         self.render_left(f, panels[0]);
-        self.render_right(f, panels[1]);
+        self.render_center(f, panels[1]);
+        self.render_right(f, panels[2]);
     }
 
     /// Called on every arrow press. Fill this in yourself.
@@ -58,18 +61,15 @@ impl App {
                 let copy = self.machine.clone();
                 let result = match self.machine.run_to_call() {
                     Ok(MachineOutput::Call{func, args}) => {
-                        match func {
-                            GlobalFunction::Dbg => println!("Debug, {:?}", args),
-                            GlobalFunction::Tick => println!("Tick, {:?}", args),
-                            GlobalFunction::Interrupt => println!("Interrupt, {:?}", args),
-                        };
+                        self.output_text = format!("{}{} {:?}\n", self.output_text, func, args);
                         Ok(())
                     },
                     Ok(MachineOutput::None) => Ok(()),
                     Err(e) => Err(e),
                 };
-                if let Err(_e) = result {
+                if let Err(e) = result {
                     self.machine = copy;
+                    self.output_text = format!("{}{:?}", self.output_text, e);
                     self.err_state = true;
                 };
             },
@@ -79,7 +79,7 @@ impl App {
 
     /// Left panel: one 3-row slot per line; the selected slot gets a red box.
     fn render_left(&self, f: &mut Frame, area: Rect) {
-        let block = Block::default().borders(Borders::ALL).title("Code");
+        let block = Block::default().borders(Borders::ALL).title("CODE");
         let inner = block.inner(area);
         f.render_widget(block, area);
 
@@ -108,8 +108,8 @@ impl App {
     }
 
     /// Right panel: plain text, no box.
-    fn render_right(&self, f: &mut Frame, area: Rect) {
-        let block = Block::default().borders(Borders::ALL).title("Right");
+    fn render_center(&self, f: &mut Frame, area: Rect) {
+        let block = Block::default().borders(Borders::ALL).title("STACK");
         let inner = block.inner(area);
         f.render_widget(block, area);
 
@@ -122,4 +122,17 @@ impl App {
         f.render_widget(para, inner);
     }
 
+    /// Right panel: plain text, no box.
+    fn render_right(&self, f: &mut Frame, area: Rect) {
+        let block = Block::default().borders(Borders::ALL).title("OUTPUT");
+        let inner = block.inner(area);
+        f.render_widget(block, area);
+
+        let color = if self.err_state { Color::DarkGray } else { Color::White };
+
+        let mut para = Paragraph::new((&self.output_text).as_str());
+        let style = Style::default().fg(color);
+        para = para.style(style);
+        f.render_widget(para, inner);
+    }
 }

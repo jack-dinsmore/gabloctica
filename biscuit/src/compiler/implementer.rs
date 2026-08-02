@@ -21,6 +21,7 @@ pub struct Bytecode<'a> {
 }
 impl<'a> Bytecode<'a> {
     pub fn new(ssa: &'a Ssa) -> Self {
+        dbg!(ssa);
         let mut bytecode = Self {
             ssa,
             bytecode: Vec::new(),
@@ -182,16 +183,14 @@ impl<'a> Bytecode<'a> {
                 self.running_stack.push(Location::internal(op));
             },
             Instruction::Ld(adr, idx) => {
-                self.set_state(&[*adr, *idx]);
+                self.set_state(&[*idx, *adr]);
                 self.bytecode.push(Command::Ld as u8);
                 self.running_stack.pop();
                 self.running_stack.pop();
                 self.running_stack.push(Location::internal(op));
             },
             Instruction::St(adr, idx, val) => {
-                self.set_state(&[*val]);
-                self.set_state(&[*idx]);
-                self.set_state(&[*adr]);
+                self.set_state(&[*idx, *val, *adr]);
                 self.bytecode.push(Command::St as u8);
                 self.running_stack.pop();
                 self.running_stack.pop();
@@ -199,8 +198,7 @@ impl<'a> Bytecode<'a> {
                 self.running_stack.push(Location::internal(op));
             },
             Instruction::Stb(adr, val) => {
-                self.set_state(&[*val]);
-                self.set_state(&[*adr]);
+                self.set_state(&[*val, *adr]);
                 self.bytecode.push(Command::Stb as u8);
                 self.running_stack.pop();
                 self.running_stack.pop();
@@ -337,6 +335,7 @@ impl<'a> Bytecode<'a> {
         }
     }
 
+    /// Sets the state of the stack so that the first listed item is at the top, the second is next, etc.
     fn set_state(&mut self, target: &[Location]) {
         for op in target.iter().rev() {
             let top = self.running_stack.last();
@@ -344,9 +343,9 @@ impl<'a> Bytecode<'a> {
                 self.bytecode.push(Command::Dup as u8);
                 self.running_stack.push(*op);
             } else {
-                let pos = self.running_stack.iter().position(|i| i == op).unwrap() as f64;
+                let pos = self.running_stack.len() - self.running_stack.iter().position(|i| i == op).unwrap() - 1;
                 self.bytecode.push(Command::Push as u8);
-                self.bytecode.extend(&pos.to_le_bytes());
+                self.bytecode.extend(&(pos as f64).to_le_bytes());
                 self.bytecode.push(Command::Pick as u8);
                 self.running_stack.push(*op);
             }
