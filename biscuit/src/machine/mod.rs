@@ -211,7 +211,7 @@ impl Machine {
                 Command::Alc => {
                     self.stack.push(self.memory.allocate() as f64)
                 },
-                Command::Drp => {
+                Command::Drop => {
                     let address = self.stack.pop().ok_or(MachineError::Stack)?.round() as u32;
                     self.memory.drop(address);
                 },

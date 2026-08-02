@@ -1,4 +1,4 @@
-use biscuit::{GlobalFunction, Instructions, Machine, MachineOutput, bytecode::Command};
+use biscuit::{Instructions, Machine, MachineOutput, bytecode::Command};
 use ratatui::{
     Frame, crossterm::event::KeyCode, layout::{Constraint, Direction, Layout, Rect}, style::{Color, Style}, widgets::{Block, Borders, Paragraph},
 };
@@ -19,16 +19,16 @@ impl App {
         
         // Get ip map
         let mut ip = 0;
-        let mut line_index = 0;
         let mut ip_map = FxHashMap::default();
-        while ip < instructions.instructions.len() {
+        for (line_index, line) in code.split('\n').enumerate() {
+            if !line.starts_with("    ") {continue;}
             ip_map.insert(ip, line_index);
-            ip += match Command::try_from(instructions.instructions[ip]).unwrap() {
-                Command::Call => 2,
-                Command::Jmp | Command::Jnz | Command::Push => 9,
-                _ => 1
+            let command = line.split(' ').nth(4).unwrap();
+            ip += match command {
+                "call" => 2,
+                "jmp" | "jnz" | "push" => 9,
+                _ => 1,
             };
-            line_index += 1;
         }
         Self {
             code: code,
@@ -69,7 +69,7 @@ impl App {
                 };
                 if let Err(e) = result {
                     self.machine = copy;
-                    self.output_text = format!("{}{:?}", self.output_text, e);
+                    self.output_text = format!("{}{:?} Error", self.output_text, e);
                     self.err_state = true;
                 };
             },

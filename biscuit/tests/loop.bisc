@@ -1,0 +1,8 @@
+fn main() {
+    loop {
+        a = 1;
+        b = a + 1;
+        dbg(b);
+        tick();
+    }
+}

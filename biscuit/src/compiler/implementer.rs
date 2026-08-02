@@ -10,7 +10,7 @@ use crate::{Command, compiler::ssa::{Branch, Location}};
 
 use super::ssa::{Ssa, Instruction};
 
-
+#[derive(Debug)]
 pub struct Bytecode<'a> {
     ssa: &'a Ssa,
     bytecode: Vec<u8>,
@@ -384,7 +384,7 @@ impl<'a> Bytecode<'a> {
         match self.ssa.types[op] {
             crate::bytecode::VariableType::Null => unreachable!(),
             crate::bytecode::VariableType::Float => self.bytecode.push(Command::Pop as u8),
-            crate::bytecode::VariableType::List => self.bytecode.push(Command::Drp as u8),
+            crate::bytecode::VariableType::List => self.bytecode.push(Command::Drop as u8),
         };
         self.running_stack.pop();
     }

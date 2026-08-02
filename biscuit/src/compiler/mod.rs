@@ -20,7 +20,7 @@ lazy_static! {
 
 pub struct Function {
     pub name: String,
-    lines: Vec<SyntaxNode>,
+    node: SyntaxNode,
     pub return_value: VariableType,
     arguments: Vec<(String, VariableType)>,
 }
@@ -93,14 +93,9 @@ impl Function {
             _ => return header.raise("Function declaractions must have parentheses")
         }
 
-        let lines = match body {
-            SyntaxNode::Adjacent(nodes) => nodes,
-            _ => return header.raise("Braces must contain expression"),
-        };
-
         Ok(Self {
             name: function_name.to_owned(),
-            lines: lines.clone(),
+            node: body.clone(),
             return_value,
             arguments,
         })
@@ -111,7 +106,7 @@ impl Function {
         for (name, typ) in &self.arguments {
             arguments.insert(name.to_owned(), *typ);
         }
-        let mut ssa = Ssa::new(&self.lines, &arguments, available_functions)?;
+        let mut ssa = Ssa::new(&self.node, &arguments, available_functions)?;
         ssa.order_instructions();
         Ok(ssa)
     }

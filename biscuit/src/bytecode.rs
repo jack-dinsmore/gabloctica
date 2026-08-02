@@ -59,7 +59,7 @@ pub enum Command {
     Ld,         // Push the index N of vector T
     St,         // Store T in index NN of vector N
     Stb,        // Store T at back of vector N
-    Drp,        // Drop a vector
+    Drop,        // Drop a vector
     
     Lt,         // Push T < N
     Gt,         // Push T > N

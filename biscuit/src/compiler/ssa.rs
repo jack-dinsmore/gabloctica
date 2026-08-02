@@ -56,16 +56,31 @@ impl Instruction {
             Instruction::Argument | Instruction::Call(_, _) | Instruction::Theta(_, _) => unreachable!(),
         }
     }
-    fn get_var_dependencies(&self) -> Vec<Location> {
+    fn get_var_dependencies(&self, branches: &[Branch], tier: u32) -> Vec<Location> {
         match &self {
-            Instruction::Argument | Instruction::LiteralVector(_) | Instruction::LiteralFloat(_) | Instruction::Theta(_, _) |
-            Instruction::Action(_)=> vec![],
-            Instruction::Call(_, a) | Instruction::LocalCall(_, a) | Instruction::Not(a) | Instruction::Neg(a) => vec![*a],
+            Instruction::Argument | Instruction::LiteralVector(_) | Instruction::LiteralFloat(_) => vec![],
+            Instruction::Theta(branch, _) | Instruction::Action(branch) => todo!(), // How do I know whether a branch is using the instructions or not? I think I have to determine the used commands in all blocks first, then figure out which blocks use others' variables.
+            Instruction::Call(_, a) | Instruction::LocalCall(_, a) | Instruction::Not(a) | Instruction::Neg(a) => {
+                let mut output = Vec::new();
+                if a.tier == tier {output.push(*a);}
+                output
+            },
             Instruction::Ld(a, b) | Instruction::Stb(a, b) | Instruction::Lt(a, b) | Instruction::Gt(a, b) |
             Instruction::Le(a, b) | Instruction::Ge(a, b) | Instruction::Eq(a, b) | Instruction::And(a, b) |
             Instruction::Or(a, b) | Instruction::Xor(a, b) | Instruction::Add(a, b) | Instruction::Sub(a, b) |
-            Instruction::Mul(a, b) | Instruction::Div(a, b) | Instruction::Pow(a, b) => vec![*a, *b],
-            Instruction::St(a, b, c) => vec![*a, *b, *c],
+            Instruction::Mul(a, b) | Instruction::Div(a, b) | Instruction::Pow(a, b) => {
+                let mut output = Vec::new();
+                if a.tier == tier {output.push(*a);}
+                if b.tier == tier {output.push(*b);}
+                output
+            },
+            Instruction::St(a, b, c) => {
+                let mut output = Vec::new();
+                if a.tier == tier {output.push(*a);}
+                if b.tier == tier {output.push(*b);}
+                if c.tier == tier {output.push(*c);}
+                output
+            },
         }
     }
     fn get_branch_dependencies(&self) -> Vec<usize> {
@@ -119,7 +134,7 @@ pub(super) struct Ssa {
     pub branches: Vec<Branch>, // The hash map maps from the local block variable to the main block variable
 }
 impl Ssa {
-    pub fn new(lines: &[SyntaxNode], arguments: &FxHashMap<String, VariableType>, available_functions: &FxHashMap<String, Function>) -> Result<Self, String> {
+    pub fn new(node: &SyntaxNode, arguments: &FxHashMap<String, VariableType>, available_functions: &FxHashMap<String, Function>) -> Result<Self, String> {
         let mut ssa = Self {
             instructions: FxHashMap::default(),
             types: FxHashMap::default(),
@@ -133,9 +148,7 @@ impl Ssa {
             let var = ssa.push_instruction_typ(Instruction::Argument, *typ);
             ssa.declared_variables.insert(name.to_owned(), var);
         }
-        for line in lines {
-            ssa.process_node(line, available_functions)?;
-        }
+        ssa.process_node(node, available_functions)?;
         Ok(ssa)
     }
 
@@ -226,59 +239,65 @@ impl Ssa {
                 }
                 Location::internal(self.instruction_counter-1)
             },
-            // Keyword phrase or function call
+            // Keyword phrase, function call, or just a bunch of commands
             SyntaxNode::Adjacent(nodes) => {
-                let first: &str = match &nodes[0] {
-                    SyntaxNode::Unclassified(text) => &text.get_inner(),
-                    _ => {return node.raise("Invalid syntax 17");}
-                };
-                match first {
-                    // There aren't any keywords yet
-                    _ => {
-                        // Function call
-                        if nodes.len() != 2 {
-                            return node.raise("Invalid syntax 18");
-                        }
-                        let arguments = match &nodes[1] {
-                            SyntaxNode::Parenthesis("(", token) => token,
-                            _ => {return node.raise("Invalid function call 1");}
-                        };
-                        let arguments: &[SyntaxNode] = match &**arguments {
-                            SyntaxNode::List(",", nodes) => {
-                                match &**nodes {
-                                    SyntaxNode::Adjacent(tokens) => tokens,
-                                    _ => {return node.raise("Invalid function call 4");}
-                                }
-                            },
-                            SyntaxNode::Adjacent(tokens) => if tokens.is_empty() {
-                                // There were no arguments
-                                &[]
-                            } else {
-                                return node.raise("Invalid function call 2");
-                            },
-                            _ => {
-                                // There was a single argument
-                                std::slice::from_ref(arguments)
+                match &nodes[0] {
+                    SyntaxNode::Unclassified(text) => match text.get_inner() {
+                        // There aren't any keywords yet
+                        _ => {
+                            // Function call
+                            if nodes.len() != 2 {
+                                return node.raise("Invalid syntax 18");
                             }
-                        };
-                        let mut arg_v = self.push_instruction(Instruction::LiteralVector(Vec::new()));
-                        for argument in arguments {
-                            let node = self.process_node(argument, available_functions)?;
-                            arg_v = self.push_instruction(Instruction::Stb(arg_v, node));
-                        }
-                        
-                        match FUNCTION_MAP_LOWER.get(first) {
-                            Some(f) => {
-                                let typ = f.return_type();
-                                self.push_instruction_typ(Instruction::Call(*f as u8, arg_v), typ)
-                            },
-                            None => match available_functions.get(first) {
-                                Some(f) => {
-                                    self.push_instruction_typ(Instruction::LocalCall(f.name.clone(), arg_v), f.return_value)
+                            let arguments = match &nodes[1] {
+                                SyntaxNode::Parenthesis("(", token) => token,
+                                _ => {return node.raise("Invalid function call 1");}
+                            };
+                            let arguments: &[SyntaxNode] = match &**arguments {
+                                SyntaxNode::List(",", nodes) => {
+                                    match &**nodes {
+                                        SyntaxNode::Adjacent(tokens) => tokens,
+                                        _ => {return node.raise("Invalid function call 4");}
+                                    }
                                 },
-                                None => {return node.raise(&format!("Unrecognized function {}", first));},
+                                SyntaxNode::Adjacent(tokens) => if tokens.is_empty() {
+                                    // There were no arguments
+                                    &[]
+                                } else {
+                                    return node.raise("Invalid function call 2");
+                                },
+                                _ => {
+                                    // There was a single argument
+                                    std::slice::from_ref(arguments)
+                                }
+                            };
+                            let mut arg_v = self.push_instruction(Instruction::LiteralVector(Vec::new()));
+                            for argument in arguments {
+                                let node = self.process_node(argument, available_functions)?;
+                                arg_v = self.push_instruction(Instruction::Stb(arg_v, node));
                             }
+                            
+                            let first = text.get_inner();
+                            match FUNCTION_MAP_LOWER.get(first) {
+                                Some(f) => {
+                                    let typ = f.return_type();
+                                    self.push_instruction_typ(Instruction::Call(*f as u8, arg_v), typ)
+                                },
+                                None => match available_functions.get(first) {
+                                    Some(f) => {
+                                        self.push_instruction_typ(Instruction::LocalCall(f.name.clone(), arg_v), f.return_value)
+                                    },
+                                    None => {return node.raise(&format!("Unrecognized function {}", first));},
+                                }
+                            }
+                        },
+                    },
+                    _ => {
+                        let mut value = Location::internal(0);
+                        for node in nodes {
+                            value = self.process_node(node, available_functions)?;
                         }
+                        value
                     }
                 }
             },
