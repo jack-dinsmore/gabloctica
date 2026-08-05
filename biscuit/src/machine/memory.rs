@@ -1,7 +1,7 @@
 use rustc_hash::FxHashMap;
 
 #[derive(Clone)]
-pub struct Memory {
+pub(crate) struct Memory {
     vector_map: FxHashMap<u32, Vec<f64>>,
     next_address: u32,
 }

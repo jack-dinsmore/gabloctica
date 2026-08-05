@@ -18,10 +18,10 @@ lazy_static! {
     };
 }
 
-pub struct Function {
-    pub name: String,
+struct Function {
+    name: String,
     node: SyntaxNode,
-    pub return_value: VariableType,
+    return_value: VariableType,
     arguments: Vec<(String, VariableType)>,
 }
 
@@ -107,7 +107,7 @@ impl Function {
             arguments.insert(name.to_owned(), *typ);
         }
         let mut ssa = Ssa::new(&self.node, &arguments, available_functions)?;
-        ssa.order_instructions();
+        ssa.order();
         Ok(ssa)
     }
 }
@@ -117,7 +117,7 @@ struct Compiler {
 }
 
 impl Compiler {
-    pub fn new(tree: &SyntaxNode) -> Result<Self, String> {
+    fn new(tree: &SyntaxNode) -> Result<Self, String> {
         let mut constants = Vec::new();
         let mut functions = FxHashMap::default();
 
@@ -150,7 +150,7 @@ impl Compiler {
         })
     }
 
-    pub fn compile(&self, name: &str) -> Result<FxHashMap<String, Ssa>, String> {
+    fn compile(&self, name: &str) -> Result<FxHashMap<String, Ssa>, String> {
         let mut compiled = FxHashMap::default();
         let mut queue = vec![name.to_owned()];
         while !queue.is_empty() {

@@ -29,6 +29,3 @@ winit = "0.30.12"
 console_error_panic_hook = "0.1.7"
 console_log = "1.0"
 wasm-bindgen-futures = "0.4.49"
-
-[profile.dev.package.faer]
-opt-level = 3

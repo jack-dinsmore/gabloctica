@@ -11,12 +11,11 @@ use crate::{Command, compiler::ssa::{Branch, Location}};
 use super::ssa::{Ssa, Instruction};
 
 #[derive(Debug)]
-pub struct Bytecode<'a> {
+pub(crate) struct Bytecode<'a> {
     ssa: &'a Ssa,
     bytecode: Vec<u8>,
     running_stack: Vec<Location>,
     functions: Vec<(usize, String)>,
-    last_used: FxHashMap<Location, usize>,
     written_branches: SortedSet<usize>,
 }
 impl<'a> Bytecode<'a> {
@@ -27,12 +26,11 @@ impl<'a> Bytecode<'a> {
             bytecode: Vec::new(),
             running_stack: Vec::new(),
             functions: Vec::new(),
-            last_used: ssa.get_last_used(),
             written_branches: SortedSet::new(),
         };
-        for (instruction_index, op) in ssa.instruction_order.iter().enumerate() {
+        for (instruction_index, (location, _)) in ssa.iter().enumerate() {
             bytecode.pop_unused(instruction_index);
-            bytecode.write_bytecode(*op, instruction_index);
+            bytecode.write_bytecode(location);
         }
         bytecode.dump_scope();
         bytecode
@@ -52,8 +50,12 @@ impl<'a> Bytecode<'a> {
                 Some(loc) => if loc.tier == 0 { loc.index } else { return },
                 None => return
             };
-            match self.last_used.get(&Location::internal(top_instruction)) {
-                Some(index) => if *index >= instruction_index { return },
+            let last_used = match self.ssa {
+                Ssa::Ordered { last_used, .. } => last_used,
+                Ssa::Unordered { .. } => unreachable!(),
+            };
+            match last_used.get(&top_instruction) {
+                Some(index) => if *index >= instruction_index as u32 { return },
                 None => ()
             };
             self.pop()
@@ -61,7 +63,7 @@ impl<'a> Bytecode<'a> {
     }
 
     /// Write an operation to bytecode
-    fn write_bytecode(&mut self, op: u32, instruction_index: usize) {
+    fn write_bytecode(&mut self, op: u32) {
         let instruction = &self.ssa.instructions[&op];
         match instruction {
             Instruction::Argument => self.running_stack.push(Location::internal(op)),
@@ -220,8 +222,8 @@ impl<'a> Bytecode<'a> {
                     Branch::If(items, ssa) => {
                         // Determine the final layout
                         let mut theta_names = Vec::new();
-                        for loc in &self.ssa.instruction_order[instruction_index..] {
-                            if let Instruction::Theta(b, n) = &self.ssa.instructions[loc] {
+                        for (_, instruction) in self.ssa.iter() {
+                            if let Instruction::Theta(b, n) = instruction {
                                 if b == branch {
                                     theta_names.push(n.clone());
                                 }
@@ -278,8 +280,10 @@ impl<'a> Bytecode<'a> {
     fn dump_scope(&mut self) {
         while self.running_stack.len() > self.ssa.return_variables.len() {
             if self.ssa.return_variables.contains(self.running_stack.last().unwrap()) {
-                // Roll
-                todo!()
+                self.bytecode.push(Command::Push as u8);
+                self.bytecode.extend(&(self.running_stack.len() as f64).to_le_bytes());
+                self.bytecode.push(Command::Roll as u8);
+                self.running_stack.rotate_left(1);
             } else {
                 self.pop()
             }
@@ -293,12 +297,11 @@ impl<'a> Bytecode<'a> {
             bytecode: Vec::new(),
             running_stack: self.running_stack.iter().map(|l| l.graduate()).collect(),
             functions: Vec::new(),
-            last_used: ssa.get_last_used(),
             written_branches: SortedSet::new(),
         };
-        for (instruction_index, op) in ssa.instruction_order.iter().enumerate() {
+        for (instruction_index, (location, _)) in ssa.iter().enumerate() {
             bytecode.pop_unused(instruction_index);
-            bytecode.write_bytecode(*op, instruction_index);
+            bytecode.write_bytecode(location);
         }
         bytecode.dump_scope();
         bytecode
@@ -353,7 +356,7 @@ impl<'a> Bytecode<'a> {
         // OPTIMIZE
     }
 
-    pub fn roll(&mut self, n: usize, shift: usize) {
+    fn roll(&mut self, n: usize, shift: usize) {
         let length = self.running_stack.len();
         if shift == 0 {return;}
         if n == 1 {return;}

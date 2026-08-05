@@ -1,159 +1,38 @@
 use rustc_hash::FxHashMap;
 use sorted_vec::SortedSet;
 
-use crate::{bytecode::{FUNCTION_MAP_LOWER, VariableType}, compiler::Function, parser::SyntaxNode};
+use crate::{bytecode::{FUNCTION_MAP_LOWER, VariableType}, compiler::{Function, ssa::{Branch, Instruction, Location, Ssa}}, parser::SyntaxNode};
 
-#[derive(Clone, Debug)]
-pub enum Instruction {
-    Argument,
-    LiteralVector(Vec<f64>),
-    LiteralFloat(f64),
 
-    Call(u8, Location),
-    LocalCall(String, Location),
-    Theta(usize, String),
-    Action(usize),
-
-    Ld(Location, Location), // Get index B f vector A
-    St(Location, Location, Location), // Store C in index B of vector A 
-    Stb(Location, Location), // Store C in back of vector A 
-    
-    Lt(Location, Location),
-    Gt(Location, Location),
-    Le(Location, Location), 
-    Ge(Location, Location), 
-    Eq(Location, Location),
-    
-    And(Location, Location),
-    Or(Location, Location),
-    Xor(Location, Location),
-    Not(Location),
-
-    Add(Location, Location),
-    Sub(Location, Location),
-    Mul(Location, Location),
-    Div(Location, Location),
-    Neg(Location),
-    Pow(Location, Location),
-}
-impl Instruction {
-    fn is_action(&self) -> bool {
-        match &self {
-            Instruction::Action(_) | Instruction::Call(_, _) | Instruction::LocalCall(_, _) | Instruction::Stb(_, _) |
-            Instruction::St(_, _, _) => true,
-            _ => false,
-        }
-    }
-    fn typ(&self) -> VariableType {
-        match &self {
-            Instruction::LiteralVector(_) | Instruction::St(_, _, _) | Instruction::Stb(_, _) => VariableType::List,
-            Instruction::Ld(_, _) | Instruction::LiteralFloat(_) | Instruction::Lt(_, _) | Instruction::Gt(_, _) | 
-            Instruction::Le(_, _) |  Instruction::Ge(_, _) | Instruction::Eq(_, _) | Instruction::And(_, _) |
-            Instruction::Or(_, _) | Instruction::Xor(_, _) | Instruction::Not(_) | Instruction::Add(_, _) | 
-            Instruction::Sub(_, _) | Instruction::Mul(_, _) | Instruction::Div(_, _) | Instruction::Neg(_) | 
-            Instruction::Pow(_, _) => VariableType::Float,
-            Instruction::LocalCall(_, _) | Instruction::Action(_) => VariableType::Null,
-            Instruction::Argument | Instruction::Call(_, _) | Instruction::Theta(_, _) => unreachable!(),
-        }
-    }
-    fn get_var_dependencies(&self, branches: &[Branch], tier: u32) -> Vec<Location> {
-        match &self {
-            Instruction::Argument | Instruction::LiteralVector(_) | Instruction::LiteralFloat(_) => vec![],
-            Instruction::Theta(branch, _) | Instruction::Action(branch) => todo!(), // How do I know whether a branch is using the instructions or not? I think I have to determine the used commands in all blocks first, then figure out which blocks use others' variables.
-            Instruction::Call(_, a) | Instruction::LocalCall(_, a) | Instruction::Not(a) | Instruction::Neg(a) => {
-                let mut output = Vec::new();
-                if a.tier == tier {output.push(*a);}
-                output
-            },
-            Instruction::Ld(a, b) | Instruction::Stb(a, b) | Instruction::Lt(a, b) | Instruction::Gt(a, b) |
-            Instruction::Le(a, b) | Instruction::Ge(a, b) | Instruction::Eq(a, b) | Instruction::And(a, b) |
-            Instruction::Or(a, b) | Instruction::Xor(a, b) | Instruction::Add(a, b) | Instruction::Sub(a, b) |
-            Instruction::Mul(a, b) | Instruction::Div(a, b) | Instruction::Pow(a, b) => {
-                let mut output = Vec::new();
-                if a.tier == tier {output.push(*a);}
-                if b.tier == tier {output.push(*b);}
-                output
-            },
-            Instruction::St(a, b, c) => {
-                let mut output = Vec::new();
-                if a.tier == tier {output.push(*a);}
-                if b.tier == tier {output.push(*b);}
-                if c.tier == tier {output.push(*c);}
-                output
-            },
-        }
-    }
-    fn get_branch_dependencies(&self) -> Vec<usize> {
-        match &self {
-            Instruction::Theta(branch, _) | Instruction::Action(branch) => { vec![*branch] },
-            _ => Vec::new()
-        }
-    }
-}
-
-pub(super) enum Branch {
-    If(Vec<(Ssa, Ssa)>, Option<Ssa>), // ((body code, if condition), else code)
-    Loop(Ssa),
-}
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub(super) struct Location {
-    pub tier: u32,
-    pub index: u32,
-}
-impl Location {
-    pub fn internal(index: u32) -> Self {
-        Self {
-            tier: 0,
-            index
-        }
-    }
-    pub fn graduate(&self) -> Self{
-        Self {
-            tier: self.tier + 1,
-            index: self.index
-        }
-    }
-}
-impl std::fmt::Debug for Location {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.tier == 0 {
-            write!(f, "{:04}", self.index)
-        } else {
-            write!(f, "{}_{:04}", self.tier, self.index)
-        }
-    }
-}
-
-pub(super) struct Ssa {
+#[derive(Clone)]
+pub(crate) struct SsaData {
     pub instructions: FxHashMap<u32, Instruction>,
     pub types: FxHashMap<Location, VariableType>,
     pub declared_variables: FxHashMap<String, Location>,
     instruction_counter: u32,
-    pub instruction_order: Vec<u32>, // Contains all the instructions in the order in which they should be performed.
     pub return_variables: Vec<Location>,
     pub branches: Vec<Branch>, // The hash map maps from the local block variable to the main block variable
 }
-impl Ssa {
+impl SsaData {
     pub fn new(node: &SyntaxNode, arguments: &FxHashMap<String, VariableType>, available_functions: &FxHashMap<String, Function>) -> Result<Self, String> {
-        let mut ssa = Self {
+        let mut data = Self {
             instructions: FxHashMap::default(),
             types: FxHashMap::default(),
             declared_variables: FxHashMap::default(),
             instruction_counter: 0,
-            instruction_order: Vec::new(),
             return_variables: Vec::new(),
             branches: Vec::new(),
         };
         for (name, typ) in arguments.iter() {
-            let var = ssa.push_instruction_typ(Instruction::Argument, *typ);
-            ssa.declared_variables.insert(name.to_owned(), var);
+            let var = data.push_instruction_typ(Instruction::Argument, *typ);
+            data.declared_variables.insert(name.to_owned(), var);
         }
-        ssa.process_node(node, available_functions)?;
-        Ok(ssa)
+        data.process_node(node, available_functions)?;
+        Ok(data)
     }
 
     /// Add a node to the SSA
-    pub fn process_node(&mut self, node: &SyntaxNode, available_functions: &FxHashMap<String, Function>) -> Result<Location, String> {
+    fn process_node(&mut self, node: &SyntaxNode, available_functions: &FxHashMap<String, Function>) -> Result<Location, String> {
         Ok(match node {
             // Non-if statement block
             SyntaxNode::Block(header, body) => {
@@ -212,15 +91,14 @@ impl Ssa {
                             };
 
                             let (body_ssa, variables) = self.compile_branch_ssa(body, available_functions)?;
-                            let pred_ssa = match condition {
-                                Some(c) => Some(self.compile_branch_ssa(&c, available_functions)?.0),
+                            let condition_ssa = match condition {
+                                Some(c) => Some(self.compile_condition_ssa(&c, available_functions)?.0),
                                 None => None 
                             };
                             is_action = is_action || body_ssa.is_action();
-                            match pred_ssa {
-                                Some(pred_ssa) => ifs.push((body_ssa, pred_ssa)),
+                            match condition_ssa {
+                                Some(condition_ssa) => ifs.push((body_ssa, condition_ssa)),
                                 None => els = Some(body_ssa),
-                                _ => unreachable!()
                             };
                             for v in variables {
                                 thetas.push(v);
@@ -375,91 +253,12 @@ impl Ssa {
         })
     }
 
-    pub fn get_last_used(&self) -> FxHashMap<Location, usize> {
-        let mut last_usage = FxHashMap::default();
-        for (i, op) in self.instruction_order.iter().enumerate() {
-            for loc in self.instructions[op].get_var_dependencies() {
-                match last_usage.get_mut(&loc) {
-                    Some(index) => {*index = i;},
-                    None => {last_usage.insert(loc, i);},
-                }
-            }
-        }
-        last_usage
-    }
-
-    // Get the order of instructions, including skipping unnecessary ones
-    pub fn order_instructions(&mut self) {
-        let mut used_branches = SortedSet::new();
-        let mut used_vars = SortedSet::new();
-        let mut used_queue = Vec::new();
-
-        // Add all the return variables
-        for v in &self.return_variables {
-            if v.tier == 0 { 
-                used_queue.push(v.index);
-            }
-        }
-
-        // Add all the functions
-        for (index, intruction) in self.instructions.iter() {
-            if intruction.is_action() {
-                used_queue.push(*index);
-            }
-        }
-        
-        // Figure out which other variables are used by the above
-        while let Some(next_item) = used_queue.pop() {
-            if used_vars.push(next_item).1.is_some() {
-                // The variable was already used
-                continue;
-            };
-            for var in self.instructions[&next_item].get_var_dependencies() {
-                if var.tier == 0 { used_queue.push(var.index); }
-            }
-            for branch in self.instructions[&next_item].get_branch_dependencies() {
-                used_branches.push(branch);
-            }
-        }
-        self.instruction_order = used_vars.to_vec();
-
-        for branch in used_branches {
-            // Get all used variables
-            let mut variable_names = SortedSet::new();
-            for var in &used_vars {
-                if let Instruction::Theta(b, name) = &self.instructions[&var] {
-                    if *b == branch {
-                        variable_names.push(name);
-                    }
-                }
-            }
-            
-            match &mut self.branches[branch] {
-                Branch::If(items, ssa) => {
-                    for (ssa, _) in items {
-                        for v in &variable_names {
-                            self.return_variables.push(*self.declared_variables.get(*v).unwrap());
-                        }
-                        ssa.order_instructions();
-                    }
-                    if let Some(ssa) = ssa {
-                        for v in &variable_names {
-                            self.return_variables.push(*self.declared_variables.get(*v).unwrap());
-                        }
-                        ssa.order_instructions();
-                    }
-                },
-                Branch::Loop(ssa) => {ssa.order_instructions()}
-            }
-        }
-    }
-
-    pub fn push_instruction(&mut self, instruction: Instruction) -> Location {
+    fn push_instruction(&mut self, instruction: Instruction) -> Location {
         let typ = instruction.typ();
         self.push_instruction_typ(instruction, typ)
     }
 
-    pub fn push_instruction_typ(&mut self, instruction: Instruction, typ: VariableType) -> Location {
+    fn push_instruction_typ(&mut self, instruction: Instruction, typ: VariableType) -> Location {
         self.instructions.insert(self.instruction_counter, instruction);
         self.types.insert(Location::internal(self.instruction_counter), typ);
         self.instruction_counter += 1;
@@ -467,30 +266,37 @@ impl Ssa {
     }
 
     /// Compile an SSA from code in a branch, returning code and the theta variables
-    fn compile_branch_ssa(&self, node: &SyntaxNode, available_functions: &FxHashMap<String, Function>) -> Result<(Self, SortedSet<String>), String> {
+    fn compile_condition_ssa(&self, node: &SyntaxNode, available_functions: &FxHashMap<String, Function>) -> Result<(Ssa, SortedSet<String>), String> {
+        let (mut ssa, thetas) = self.compile_branch_ssa(node, available_functions)?;
+        let last_variable = Location::internal(ssa.instruction_counter-1);
+        ssa.return_variables.push(last_variable);
+        Ok((ssa, thetas))
+    }
+
+    /// Compile an SSA from code in a branch, returning code and the theta variables
+    fn compile_branch_ssa(&self, node: &SyntaxNode, available_functions: &FxHashMap<String, Function>) -> Result<(Ssa, SortedSet<String>), String> {
         let declared_variables = FxHashMap::from_iter(self.declared_variables.iter().map(|(k, v)| (k.to_owned(), v.graduate())));
         let types = FxHashMap::from_iter(self.types.iter().map(|(k, v)| (k.graduate(), *v)));
-        let mut ssa = Self {
+        let mut data = Self {
             instructions: FxHashMap::default(),
             declared_variables,
             types,
             instruction_counter: 0,
-            instruction_order: Vec::new(),
             return_variables: Vec::new(),
             branches: Vec::new(),
         };
-        ssa.process_node(node, available_functions)?;
+        data.process_node(node, available_functions)?;
 
         // Find all the external variables written to
         let mut variables = SortedSet::new();
         for (name, loc) in self.declared_variables.iter() {
-            let branch_loc = ssa.declared_variables.get(name).unwrap();
+            let branch_loc = data.declared_variables.get(name).unwrap();
             if *branch_loc != loc.graduate() {
                 variables.push(name.to_owned());
             }
         }
     
-        Ok((ssa, variables))
+        Ok((Ssa::Unordered { data }, variables))
     }
 
     pub fn get_used_functions(&self) -> Vec<String> {
@@ -520,14 +326,14 @@ impl Ssa {
         funcs
     }
 
-    pub fn is_action(&self) -> bool {
+    fn is_action(&self) -> bool {
         for intruction in self.instructions.values() {
             if intruction.is_action() { return true; }
         }
         false
     }
 }
-impl std::fmt::Debug for Ssa {
+impl std::fmt::Debug for SsaData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Ssa (")?;
         writeln!(f, "CORE")?;

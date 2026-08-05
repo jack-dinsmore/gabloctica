@@ -6,7 +6,7 @@ use crate::{Command, bytecode::GlobalFunction, machine::memory::Memory, util::Ta
 pub type Instructions = Tagged<InstructionData>;
 
 pub struct InstructionData {
-    pub instructions: Cow<'static, [u8]>,
+    instructions: Cow<'static, [u8]>,
 }
 impl InstructionData {
     pub fn from_compiled(instructions: &[u8]) -> Self {
@@ -37,7 +37,6 @@ pub struct Machine {
     pub stack: Vec<f64>,
     memory: Memory,
     pub ip: usize,
-    pub interrupts: Vec<f64>,
     instructions: Instructions,
     max_lines_per_tick: usize
 }
@@ -50,7 +49,6 @@ impl Machine {
             ip: 0,
             memory,
             instructions,
-            interrupts: Vec::new(),
             max_lines_per_tick,
         }
     }
@@ -60,6 +58,9 @@ impl Machine {
         for _ in 0..self.max_lines_per_tick {
             if self.ip > self.instructions.instructions.len() {
                 return Err(MachineError::Ip)
+            }
+            if self.ip >= self.instructions.instructions.len() {
+                return Err(MachineError::Ip);
             }
             let command = match Command::try_from(self.instructions.instructions[self.ip]) {
                 Ok(c) => c,
@@ -108,7 +109,7 @@ impl Machine {
                             self.instructions.instructions[self.ip+6],
                             self.instructions.instructions[self.ip+7],
                             self.instructions.instructions[self.ip+8]
-                        ]) as usize;
+                        ]) as usize - 1;
                     } else {
                         self.ip += 8;
                     }

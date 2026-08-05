@@ -1,4 +1,4 @@
-use biscuit::{Instructions, Machine, MachineOutput, bytecode::Command};
+use biscuit::{Instructions, Machine, MachineOutput};
 use ratatui::{
     Frame, crossterm::event::KeyCode, layout::{Constraint, Direction, Layout, Rect}, style::{Color, Style}, widgets::{Block, Borders, Paragraph},
 };
@@ -85,19 +85,23 @@ impl App {
 
         let color = if self.err_state { Color::DarkGray } else { Color::White };
 
-        let selected = self.ip_map[&self.machine.ip];
+        let selected = match self.ip_map.get(&self.machine.ip) {
+            Some(v) => *v,
+            None => usize::MAX
+        };
+        let height = inner.height - 1;
+        let start_index = height * (selected as u16 / height);
+        let stop_index = start_index + height;
 
-        for (i, line) in self.code.split('\n').enumerate() {
-            if i as u16 >= inner.height {
-                break;
-            }
+        for (i, line) in self.code.split('\n').enumerate().skip(start_index as usize) {
+            if i as u16 > stop_index {break;}
             let row = Rect {
                 x: inner.x,
-                y: inner.y + i as u16,
+                y: inner.y + i as u16 - start_index,
                 width: inner.width,
                 height: 1,
             };
-            let mut para = Paragraph::new(line);
+            let mut para = Paragraph::new(format!("{i:04}{}", line));
             let mut style = Style::default().fg(color);
             if i == selected {
                 style = style.bg(Color::Red);

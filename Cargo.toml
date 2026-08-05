@@ -2,3 +2,6 @@
 [workspace]
 members = ["biscuit", "astranesse"]
 resolver = "2"
+
+[profile.dev.package.faer]
+opt-level = 3
