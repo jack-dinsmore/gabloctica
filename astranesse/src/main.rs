@@ -3,7 +3,6 @@ mod graphics;
 mod physics;
 mod game;
 mod util;
-mod quahog;
 
 use std::time::Instant;
 

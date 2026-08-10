@@ -10,7 +10,7 @@ use rustc_hash::FxHashMap;
 use crate::game::object::computer::BlockProperties;
 pub use crate::game::object::internals::{Internals, Interrupt};
 use crate::graphics::{Block, CHUNK_SIZE, Graphics, GridTexture, ModelUniform, Renderer, StorageBuffer};
-use crate::physics::{Collider, MoI, Physics, RigidBody, RigidBodyInit};
+use crate::physics::{Collider, MoI, Physics, RigidBody, RigidBodyInit, RigidBodyData};
 use crate::util::my_fmod;
 use chunk::Chunk;
 pub use internals::BlockKey;
@@ -61,7 +61,7 @@ impl Object {
     pub fn new(graphics: &Graphics, physics: &mut Physics, loader: ObjectLoader) -> Self {
         let mut initial_data = loader.get_initial_data();
         initial_data.collider = Some(Collider::empty_object());
-        let body = RigidBody::new(&mut physics.rb_vendor, initial_data);
+        let body = RigidBodyData::new(&mut physics.rb_vendor, initial_data);
         let buffer_size = loader.estimate_max_rendered_chunks()*std::mem::size_of::<ModelUniform>();
         let storage_buffer = StorageBuffer::new(graphics, buffer_size as usize);
         let internals = Internals::new();

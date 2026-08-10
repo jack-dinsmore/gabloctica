@@ -3,17 +3,17 @@ mod collisions;
 
 use faer::{Mat, Side, prelude::Solve};
 use cgmath::{InnerSpace, Matrix3, Vector3};
-pub use rigid_body::{RigidBody, RigidBodyInit, MoI};
+pub use rigid_body::{RigidBodyData, RigidBody, RigidBodyInit, MoI};
 pub use collisions::{shapes, Collider, CollisionReport};
-use crate::{physics::rigid_body::RigidBodyData, util::Vendor};
+use biscuit::util::Vendor;
 
 pub const NEWTON_G: f64 = 5.;
 const GRAVITY_THRESH: f64 = 10.;
 
 pub struct Physics {
-    pub rb_vendor: Vendor<RigidBodyData>,
     collision_pairs: Vec<(RigidBody, RigidBody)>,
     collision_normals: Vec<Vector3<f64>>,
+    pub rb_vendor: Vendor<RigidBodyData>,
 }
 
 impl Physics {

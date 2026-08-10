@@ -460,7 +460,7 @@ impl SyntaxNode {
                                                 // It's an if statement
                                                 match start_index {
                                                     None => { start_index = Some(i); None },
-                                                    Some(i) => Some(i-1)
+                                                    Some(i) => Some(i)
                                                 }
                                             } else if t == "else" {
                                                 // It's an else if statement
@@ -468,7 +468,7 @@ impl SyntaxNode {
                                                 None
                                             } else {
                                                 // It's something else
-                                                Some(i-1)
+                                                Some(i)
                                             }
                                         },
                                         _ => { return first.raise("Code blocks must start with a keyword"); }
@@ -481,19 +481,19 @@ impl SyntaxNode {
                                         Some(i)
                                     } else {
                                         // It's something else
-                                        Some(i-1)
+                                        Some(i)
                                     }
                                 },
                                 _ => { return nodes[i].raise("Invalid syntax"); }
                             }
                         },
-                        _ => Some(i-1)
+                        _ => Some(i)
                     };
                     match (end_i, start_index) {
                         (Some(j), Some(start)) => {
-                            let if_nodes = nodes[start..=j].to_vec();
-                            nodes.splice(start..=j, [SyntaxNode::IfChain(if_nodes)]);
-                            i = j + 1;
+                            let if_nodes = nodes[start..j].to_vec();
+                            nodes.splice(start..j, [SyntaxNode::IfChain(if_nodes)]);
+                            i = j;
                             start_index = None;
                         }
                         _ => ()
@@ -674,7 +674,7 @@ fn reduce_pragmas(tokens: &mut Vec<Token<String>>) -> Result<(), String> {
                         let lib_name: String = tokens[i+3..end_index].iter().map(|t| &t.s as &str).collect();
 
                         match &lib_name as &str {
-                            "math" => load_str(include_str!("../../assets/quahog/math.qhg"), "assets/quahog/math.qhg"),
+                            "math" => load_str(include_str!("../../assets/lib/math.bisc"), "assets/lib/math.bisc"),
                             _ => tokens[i].raise(&format!("Could not find library {}", lib_name)),
                         }
                     },

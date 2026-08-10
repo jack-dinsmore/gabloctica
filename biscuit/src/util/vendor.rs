@@ -1,6 +1,7 @@
 use std::ops::{Deref, DerefMut};
 use rustc_hash::FxHashMap;
 
+/// A vendor is a device designed to hold the owned data for a reference which can be passed around.
 pub struct Vendor<D>(Box<TagVendor<D>>);
 impl<D> Vendor<D> {
     pub fn new() -> Self {

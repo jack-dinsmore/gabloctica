@@ -10,7 +10,7 @@ pub mod util;
 use std::{fs::File, io::Read};
 
 pub use bytecode::{Command, GlobalFunction};
-pub use machine::{Instructions, Machine, MachineError, MachineOutput};
+pub use machine::{Instructions, InstructionData, Machine, MachineError, MachineOutput};
 pub use {compiler::compile_str, assembler::assemble_str, disassembler::disassemble_bytes};
 
 /// Compile a file of Biscuit code to binary

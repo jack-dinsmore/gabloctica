@@ -1,7 +1,10 @@
 use rustc_hash::FxHashMap;
 use sorted_vec::SortedSet;
-use crate::{game::object::computer::compiler::compile, util::{Tagged, Vendor}};
+use biscuit::util::Vendor;
+use lazy_static::lazy_static;
+use biscuit::{Instructions, InstructionData};
 
+include!(concat!(env!("OUT_DIR"), "/scripts.rs"));
 
 pub struct BlockProperties {
     pub command_blocks: SortedSet<u8>,
@@ -9,7 +12,6 @@ pub struct BlockProperties {
     pub pipe_blocks: SortedSet<u8>,
     pub command_block_scripts: FxHashMap<u8, Instructions>,
     pub chair_blocks: SortedSet<u8>,
-    preloaded_scripts: FxHashMap<String, &'static str>,
     script_vendor: Vendor<InstructionData>,
 }
 
@@ -20,14 +22,9 @@ impl BlockProperties {
             conductor_blocks: SortedSet::new(),
             pipe_blocks: SortedSet::new(),
             chair_blocks: SortedSet::new(),
-            preloaded_scripts: FxHashMap::default(),
             command_block_scripts: FxHashMap::default(),
             script_vendor: Vendor::new(),
         }
-    }
-
-    pub fn preload_script(&mut self, script: &'static str, name: &str) {
-        self.preloaded_scripts.insert(name.to_owned(), script);
     }
 
     pub fn load_manifest(&mut self, text: &str) {
@@ -43,9 +40,12 @@ impl BlockProperties {
             let is_chair = arguments.next().unwrap() == "T";
 
             if is_command {
-                let data = InstructionData::new(name, &self.preloaded_scripts);
-                let instructions = self.script_vendor.insert(data);
-                self.command_block_scripts.insert(id, instructions);
+                let script = match COMPILED_SCRIPTS.get(&name.as_str()) {
+                    Some(s) => s,
+                    None => panic!("Could not find the script {}", name)
+                };
+                let script = self.script_vendor.insert(InstructionData::from_compiled(script));
+                self.command_block_scripts.insert(id, script);
             }
 
             if is_conductor { self.conductor_blocks.push(id); }

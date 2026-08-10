@@ -111,7 +111,7 @@ impl Game {
         let post_info = PostInfo::new(&graphics, &camera);
 
         let mut planets: Vec<Planet> = vec![
-            // Planet::new(PlanetInit::default()),
+            Planet::new(PlanetInit::default()),
         ];
         let mut objects = vec![
             Rc::new(RefCell::new(Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos: Vector3::new(12., 7., 42.), vel: Vector3::new(0., 0., 0.) })))),
@@ -125,7 +125,6 @@ impl Game {
             Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 50.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
         ];
 
-        
         // Set cursor to center of screen
         let size = graphics.window.inner_size();
         let center = PhysicalPosition::new(
@@ -135,18 +134,16 @@ impl Game {
         graphics.window.set_cursor_position(center).unwrap();
 
         // Load block texture
-        let texture = GridTexture::new(&graphics, &camera, include_bytes!("../../assets/texture.png"));
+        let texture = GridTexture::new(&graphics, &camera, include_bytes!("../../../assets/texture.png"));
 
-        let font = Font::new(&mut graphics, &camera, include_bytes!("../../assets/Rockwell.ttc"));
+        let font = Font::new(&mut graphics, &camera, include_bytes!("../../../assets/Rockwell.ttc"));
 
         let mut galaxy = Galaxy::new(&graphics);
         galaxy.update_skybox(&graphics, &camera, Vector3::new(-1e7, 0., 0.));
 
         // Load block properties
         let mut block_properties = BlockProperties::new();
-        block_properties.preload_script(include_str!("../../assets/scripts/chair.txt"), "chair");
-        block_properties.preload_script(include_str!("../../assets/scripts/engine.txt"), "engine");
-        block_properties.load_manifest(include_str!("../../assets/blocks.txt"));
+        block_properties.load_manifest(include_str!("../../../assets/blocks.txt"));
 
         Self {
             graphics,

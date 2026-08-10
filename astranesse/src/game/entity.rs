@@ -1,6 +1,6 @@
 use cgmath::{Quaternion, Vector3, Zero};
 
-use crate::{game::object::{BlockKey, Object}, graphics::CHUNK_SIZE, physics::{Physics, RigidBody, RigidBodyInit, shapes::BoxData}, util::RcCell};
+use crate::{game::object::{BlockKey, Object}, graphics::CHUNK_SIZE, physics::{Physics, RigidBody, RigidBodyData, RigidBodyInit, shapes::BoxData}, util::RcCell};
 
 pub struct Entity {
     pub body: RigidBody,
@@ -15,7 +15,7 @@ impl Entity {
         }));
         init.moi = crate::physics::MoI::new_diagonal(Vector3::new(1e8, 1e8, 1e8));
         Self {
-            body: RigidBody::new(&mut physics.rb_vendor, init),
+            body: RigidBodyData::new(&mut physics.rb_vendor, init),
             chair: None,
         }
     }

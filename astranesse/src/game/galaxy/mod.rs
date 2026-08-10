@@ -105,7 +105,7 @@ impl Galaxy {
     }
 
     pub fn update_skybox(&mut self, graphics: &Graphics, camera: &Camera, camera_pos: Vector3<f32>) {
-        let size = 32; // 512
+        let size = 32;//512;
         let mut image = ImageBuffer::from_pixel(3*size, 2*size, Rgba([0, 0, 0, 255]));
 
         // Partition the stars
@@ -195,18 +195,21 @@ impl Galaxy {
             }
         }
 
-        for i in 0..MAX_STEPS {
-            let pos = camera + dir * (i+1) as f32 * d_step * 1e8;
+        let mut dist = 0.;
+        let mut step = d_step*1e8;
+        while dist < 1e8 {
+            dist += step;
+            let pos = camera + dir*dist;
             if pos.z.abs() > self.dust_h*3. {continue;}
             let rad2 = pos.x*pos.x + pos.y*pos.y;
             let mut brightness = (-pos.z.abs()/self.star_h).exp();
             brightness *= 1. / (1. + rad2/(self.halflight_r*self.halflight_r));
 
-            if let Some(c) = star_step_indices.get(&i) {
-                color[0] += c[0];
-                color[1] += c[1];
-                color[2] += c[2];
-            }
+            // if let Some(c) = star_step_indices.get(&i) {
+            //     color[0] += c[0];
+            //     color[1] += c[1];
+            //     color[2] += c[2];
+            // }
 
             let mut dust = (-pos.z.abs()/self.dust_h).exp();
 
@@ -224,6 +227,8 @@ impl Galaxy {
             color[0] *= 1. - dust * 1.5 * d_step;
             color[1] *= 1. - dust * 2. * d_step;
             color[2] *= 1. - dust * 2.5 * d_step;
+
+            step = d_step*1e8 / (brightness.max(0.02));
         }
         color
     }

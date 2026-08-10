@@ -1,13 +1,15 @@
-use std::{cell::RefCell, rc::Rc};
-
 use cgmath::{Quaternion, Vector3};
 use rustc_hash::FxHashMap;
 use sorted_vec::SortedSet;
-use crate::{game::object::{Chunk, computer::{BlockProperties, Memory, machine::{Machine, MachineError}}}, graphics::CHUNK_SIZE, physics::RigidBody, util::{Tagged, Vendor}};
+use crate::{game::object::{Chunk, computer::{BlockProperties}}, graphics::CHUNK_SIZE, physics::RigidBody};
+use biscuit::{MachineOutput, util::{Tagged, Vendor}};
+use biscuit::{Machine, MachineError};
 
 type Pipe = Tagged<PipeData>;
 type Circuit = Tagged<CircuitData>;
 pub type BlockKey = ((i32, i32, i32), (u32, u32, u32));
+
+const MAX_LINES_PER_TICK: usize = 1000;
 
 fn bucket_fill(chunks: &FxHashMap<(i32, i32, i32), Chunk>, targets: &SortedSet<u8>, commands: &SortedSet<u8>) -> FxHashMap<BlockKey, u32>{
     let mut attached = FxHashMap::default();
@@ -69,7 +71,6 @@ pub struct Internals {
     blocks: FxHashMap<BlockKey, CommandBlock>,
     circuits: Vendor<CircuitData>,
     pipes: Vendor<PipeData>,
-    memory: Rc<RefCell<Memory>>,
 }
 impl Internals {
     pub fn new() -> Self {
@@ -77,7 +78,6 @@ impl Internals {
             circuits: Vendor::new(),
             pipes: Vendor::new(),
             blocks: FxHashMap::default(),
-            memory: Rc::new(RefCell::new(Memory::new())),
         }
     }
 
@@ -117,7 +117,7 @@ impl Internals {
                             None => None
                         };
 
-                        self.blocks.insert(block, CommandBlock::new(block, chunks, properties, circuit, pipe, body.clone(), self.memory.clone()));
+                        self.blocks.insert(block, CommandBlock::new(block, chunks, properties, circuit, pipe, body.clone()));
                     }
                 }
             }
@@ -136,16 +136,7 @@ impl Internals {
     pub fn interrupt(&mut self, block: BlockKey, interrupt: Interrupt) {
         if let Some(b) = self.blocks.get_mut(&block) {
             // Call an interrupt on block b
-            let irps = &mut b.machine.interrupts;
-            match interrupt {
-                Interrupt::Interact => irps.push(1.),
-                Interrupt::Forward(f) => {irps.push(f); irps.push(2.);},
-                Interrupt::Backward(f) => {irps.push(f); irps.push(3.);},
-                Interrupt::Left(f) => {irps.push(f); irps.push(4.);},
-                Interrupt::Right(f) => {irps.push(f); irps.push(5.);},
-                Interrupt::Up(f) => {irps.push(f); irps.push(6.);},
-                Interrupt::Down(f) => {irps.push(f); irps.push(7.);},
-            }
+            b.interrupts.push(interrupt);
         }
     }
 }
@@ -220,10 +211,11 @@ pub struct CommandBlockInfo {
 pub struct CommandBlock {
     info: CommandBlockInfo,
     machine: Machine,
+    interrupts: Vec<Interrupt>,
 }
 
 impl CommandBlock {
-    fn new(block_pos: BlockKey, chunks: &FxHashMap<(i32, i32, i32), Chunk>, properties: &BlockProperties, circuit: Option<Circuit>, pipe: Option<Pipe>, body: RigidBody, memory: Rc<RefCell<Memory>>) -> Self {
+    fn new(block_pos: BlockKey, chunks: &FxHashMap<(i32, i32, i32), Chunk>, properties: &BlockProperties, circuit: Option<Circuit>, pipe: Option<Pipe>, body: RigidBody) -> Self {
         let block = chunks[&block_pos.0].grid[block_pos.1];
         let mut pos: Vector3<f64> = Vector3::new(block_pos.0.0 * CHUNK_SIZE as i32, block_pos.0.1 * CHUNK_SIZE as i32, block_pos.0.2 * CHUNK_SIZE as i32).cast().unwrap();
         pos += Vector3::new(block_pos.1.0 as f64 + 0.5, block_pos.1.1 as f64 + 0.5, block_pos.1.2 as f64 + 0.5);
@@ -231,7 +223,7 @@ impl CommandBlock {
         let quat = block.quat();
         let machine = Machine::new(
             properties.command_block_scripts.get(&block.id).unwrap().clone(),
-            memory.clone(),
+            MAX_LINES_PER_TICK
         );
         Self {
             info: CommandBlockInfo {
@@ -244,21 +236,28 @@ impl CommandBlock {
                 quat,
             },
             machine,
+            interrupts: Vec::new(),
         }
     }
 
     fn update(&mut self, delta_t: f64) {
-        let tick = self.machine.tick(&mut self.info);
-        if let Err(e) = tick {
-            match e {
-                MachineError::Stack => println!("Segmentation fault in block (type {})", self.info.id),
-                MachineError::Memory => println!("Memory overflow"),
-                MachineError::Ip => println!("Program overflow in block (type {})", self.info.id),
-                MachineError::Func => println!("Invalid function call in block (type {})", self.info.id),
-                MachineError::OpCode => println!("Invalid opcode in block (type {})", self.info.id),
+        match self.machine.run_to_call() {
+            Err(e) => {
+                match e {
+                    MachineError::Stack => println!("Segmentation fault in block (type {})", self.info.id),
+                    MachineError::Memory => println!("Memory overflow"),
+                    MachineError::Ip => println!("Program overflow in block (type {})", self.info.id),
+                    MachineError::Func => println!("Invalid function call in block (type {})", self.info.id),
+                    MachineError::OpCode => println!("Invalid opcode in block (type {})", self.info.id),
+                };
+                self.machine.reset();
+            },
+            Ok(MachineOutput::Call {func, args}) => match func {
+                biscuit::GlobalFunction::Dbg => { dbg!(&args); },
+                biscuit::GlobalFunction::Tick => {  },
+                biscuit::GlobalFunction::Interrupt => { dbg!(&args); },
             }
-            ;
-            self.machine.reset();
+            Ok(MachineOutput::None) => ()
         }
     }
 }

@@ -1,5 +1,6 @@
+use biscuit::util::{Tagged, Vendor};
 use cgmath::{InnerSpace, Matrix3, Quaternion, SquareMatrix, Vector3, Zero};
-use crate::{physics::collisions::Collider, util::{Vendor, Tagged}};
+use crate::{physics::collisions::Collider};
 
 pub type RigidBody = Tagged<RigidBodyData>;
 
@@ -128,8 +129,8 @@ pub struct RigidBodyData {
     pub(super) torques: Vector3<f64>,
 }
 
-impl RigidBody{
-    pub fn new(vendor: &mut Vendor<RigidBodyData>, init: RigidBodyInit) -> Self {
+impl RigidBodyData {
+    pub fn new(vendor: &mut Vendor<RigidBodyData>, init: RigidBodyInit) ->Tagged<Self> {
         // Initialize data
         let data = RigidBodyData {
             pos: init.pos,
