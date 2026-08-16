@@ -1,5 +1,5 @@
 mod shader;
-mod grid;
+mod chunk;
 mod vertex;
 mod camera;
 mod resource;
@@ -7,14 +7,14 @@ mod lighting;
 mod font;
 mod block;
 
-pub use grid::{CubeGrid, GridTexture, CHUNK_SIZE, ModelUniform};
+pub use chunk::{GraphicalChunk, GridTexture, ModelUniform};
 pub use camera::Camera;
 pub use lighting::Lighting;
 pub use shader::Shader;
 pub use vertex::*;
 pub use font::Font;
 pub use resource::*;
-pub use block::Block;
+pub use block::GraphicalBlock;
 
 use std::sync::Arc;
 use winit::{dpi::PhysicalSize, event_loop::EventLoopProxy, window::Window};

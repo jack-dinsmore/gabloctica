@@ -1,10 +1,10 @@
 use cgmath::{Quaternion, Vector3, Zero};
 
-use crate::{game::object::{BlockKey, Object}, graphics::CHUNK_SIZE, physics::{Physics, RigidBody, RigidBodyData, RigidBodyInit, shapes::BoxData}, util::RcCell};
+use crate::{game::object::{BlockGlobalPos, Object}, util::CHUNK_SIZE, physics::{Physics, RigidBody, RigidBodyData, RigidBodyInit, shapes::BoxData}, util::RcCell};
 
 pub struct Entity {
     pub body: RigidBody,
-    pub chair: Option<(RcCell<Object>, BlockKey, Vector3<f64>)>,
+    pub chair: Option<(RcCell<Object>, BlockGlobalPos, Vector3<f64>)>,
 }
 
 impl Entity {
@@ -20,7 +20,7 @@ impl Entity {
         }
     }
 
-    pub fn set_chair(&mut self, object: &RcCell<Object>, block_key: BlockKey) {
+    pub fn set_chair(&mut self, object: &RcCell<Object>, block_key: BlockGlobalPos) {
         let block_pos = Vector3::new(
             block_key.0.0 as f64 * CHUNK_SIZE as f64 + block_key.1.0 as f64 + 0.5,
             block_key.0.1 as f64 * CHUNK_SIZE as f64 + block_key.1.1 as f64 + 0.5,

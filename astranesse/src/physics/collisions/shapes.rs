@@ -1,8 +1,7 @@
 use cgmath::{InnerSpace, Vector3};
 use rustc_hash::FxHashMap;
 
-use crate::graphics::CHUNK_SIZE;
-
+use crate::util::CHUNK_SIZE;
 use super::algo::ColliderType;
 
 

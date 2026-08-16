@@ -1,193 +1,83 @@
 use cgmath::{Matrix3, Vector3, Zero};
-use rustc_hash::FxHashMap;
 
-use crate::{graphics::{CHUNK_SIZE, Camera, CubeGrid, Graphics, ModelUniform, Renderer, StorageBuffer}, physics::RigidBody};
+use crate::{game::object::{BlockGlobalPos, BlockId, BlockProperties}, graphics::Graphics, physics::RigidBody, util::{CHUNK_SIZE, Grid, outer}};
 
-pub struct Chunk {
-    pub(super) grid: CubeGrid,
+#[derive(Copy, Clone, Debug)]
+pub struct PhysicalBlock {
+    pub id: BlockId,
+    pub ori: u8,
+    pub mass: f64,
+}
+impl PhysicalBlock {
+    pub fn new(id: BlockId, ori: u8, properties: &BlockProperties) -> Self {
+        Self {
+            id,
+            ori,
+            mass: 0.01,
+        }
+    }
+    pub fn is_null(&self) -> bool {
+        self.id == 0
+    }
+}
+impl Default for PhysicalBlock {
+    fn default() -> Self {
+        Self { id: 0, ori: 0, mass: 0. }
+    }
+}
+
+pub struct PhysicalChunk {
+    pub grid: Grid<PhysicalBlock>,
     pub mass_m0: f64,
     pub mass_m1: Vector3<f64>,
     pub mass_m2: Matrix3<f64>,
-    /// 0_0_z-_z+_y-_y+_x-_x+. One means transparent.
-    pub flush: u8,
-    /// 0_0_z-_z+_y-_y+_x-_x+. One means hidden.
-    pub exposed: u8,
-    /// 0_0_z-_z+_y-_y+_x-_x+. One means hidden.
-    pub detail: usize,
 }
 
-impl Chunk {
-    pub fn empty(graphics: &Graphics, pos: Vector3<f64>) -> Self {
-        let mut grid = CubeGrid::new(graphics);
-        grid.global_pos = pos;
+impl PhysicalChunk {
+    pub fn empty(graphics: &Graphics, chunk_pos: (i32, i32, i32)) -> Self {
         Self {
-            grid,
+            grid: Grid::new(),
             mass_m0: 0.,
             mass_m1: Vector3::zero(),
             mass_m2: Matrix3::zero(),
-            flush: 0,
-            detail: 1,
-            exposed: 0xff, // Ensures that the chunk model will be updated next frame
         }
     }
 
     // Update the rigid body collider to have the current block layout.
-    pub fn update_metadata(&mut self, blocks: &mut [u16; (CHUNK_SIZE*CHUNK_SIZE) as usize]) {
-        // Update the collider
+    pub fn place_block(&mut self, block: PhysicalBlock, block_pos: BlockGlobalPos, body: &mut RigidBody) {
+        self.grid[block_pos.1] = block;
+        self.update_collider(block_pos.0, body);
+    }
+
+    pub fn update_collider(&mut self, chunk_pos: (i32, i32, i32), body: &mut RigidBody) {
         self.mass_m0 = 0.;
         self.mass_m1 = Vector3::zero();
         self.mass_m2 = Matrix3::zero();
 
+        let collider = body.get_object_collider_mut();
+        let collider_blocks = match collider.chunks.get_mut(&chunk_pos) {
+            Some(collider_blocks) => collider_blocks,
+            None => {
+                collider.chunks.insert(chunk_pos, [0; (CHUNK_SIZE*CHUNK_SIZE) as usize]);
+                collider.chunks.get_mut(&chunk_pos).unwrap()
+            },
+        };
         for z in 0..CHUNK_SIZE {
-            let zf = z as f64 + 0.5;
             for y in 0..CHUNK_SIZE {
-                let yf = y as f64 + 0.5;
-                let mut block: u16 = 0;
+                let mut collider_row: u16 = 0;
                 for x in 0..CHUNK_SIZE {
-                    let xf = x as f64 + 0.5;
-                    if !self.grid[(x,y,z)].is_null() {
-                        block |= 1 << x;
+                    let pos = Vector3::new(x as f64, y as f64, z as f64);
+                    let grid_block = self.grid[(x,y,z)];
+                    if !grid_block.is_null() {
+                        collider_row |= 1 << x;
 
-                        let block_mass = 1.;
-                        self.mass_m0 += block_mass;
-                        self.mass_m1.x += xf * block_mass;
-                        self.mass_m1.y += yf * block_mass;
-                        self.mass_m1.z += zf * block_mass;
-                        self.mass_m2.x[0]+= xf*xf * block_mass;
-                        self.mass_m2.x[1] += xf*yf * block_mass;
-                        self.mass_m2.x[2] += xf*zf * block_mass;
-                        self.mass_m2.y[0] += yf*xf * block_mass;
-                        self.mass_m2.y[1] += yf*yf * block_mass;
-                        self.mass_m2.y[2] += yf*zf * block_mass;
-                        self.mass_m2.z[0] += zf*xf * block_mass;
-                        self.mass_m2.z[1] += zf*yf * block_mass;
-                        self.mass_m2.z[2] += zf*zf * block_mass;
+                        self.mass_m0 += grid_block.mass;
+                        self.mass_m1 += pos * grid_block.mass;
+                        self.mass_m2 += outer(pos, pos) * grid_block.mass;
                     }
                 }
-                blocks[(y+CHUNK_SIZE*z) as usize] = block;
+                collider_blocks[(y+CHUNK_SIZE*z) as usize] = collider_row;
             }
         }
-
-        self.updated_flush();
-    }
-
-    fn updated_flush(&mut self) {
-        self.flush = 0;
-        let mut break_pos = false;
-        let mut break_neg = false;
-        for z in 0..CHUNK_SIZE {
-            for y in 0..CHUNK_SIZE {
-                if self.grid[(0,y,z)].is_null() {
-                    self.flush |= 1 << 0;
-                    break_pos = true;
-                }
-                if self.grid[(CHUNK_SIZE-1,y,z)].is_null() {
-                    self.flush |= 1 << 1;
-                    break_neg = true;
-                }
-                if break_neg && break_pos {
-                    break;
-                }
-            }
-        }
-        let mut break_pos = false;
-        let mut break_neg = false;
-        for z in 0..CHUNK_SIZE {
-            for x in 0..CHUNK_SIZE {
-                if self.grid[(x,0,z)].is_null() {
-                    self.flush |= 1 << 2;
-                    break_pos = true;
-                }
-                if self.grid[(x,CHUNK_SIZE-1,z)].is_null() {
-                    self.flush |= 1 << 3;
-                    break_neg = true;
-                }
-                if break_neg && break_pos {
-                    break;
-                }
-            }
-        }
-        let mut break_pos = false;
-        let mut break_neg = false;
-        for y in 0..CHUNK_SIZE {
-            for x in 0..CHUNK_SIZE {
-                if self.grid[(x,y,0)].is_null() {
-                    self.flush |= 1 << 4;
-                    break_pos = true;
-                }
-                if self.grid[(x,y,CHUNK_SIZE-1)].is_null() {
-                    self.flush |= 1 << 5;
-                    break_neg = true;
-                }
-                if break_neg && break_pos {
-                    break;
-                }
-            }
-        }
-    }
-
-    /// Update the exposed flag. Return true if it was changed
-    pub fn update_exposed(my_coord: (i32, i32, i32), chunks: &FxHashMap<(i32, i32, i32), Chunk>, exposed: &mut FxHashMap<(i32, i32, i32), u8>) {
-        let mut new_exposed = 0;
-        let fore = (my_coord.0+1, my_coord.1, my_coord.2);
-        let back = (my_coord.0-1, my_coord.1, my_coord.2);
-        let left = (my_coord.0, my_coord.1+1, my_coord.2);
-        let right = (my_coord.0, my_coord.1-1, my_coord.2);
-        let up = (my_coord.0, my_coord.1, my_coord.2+1);
-        let down = (my_coord.0, my_coord.1, my_coord.2-1);
-        if let Some(c) = chunks.get(&fore) {
-            if (c.flush & (1<<1)) == 0 {
-                new_exposed |= 1 << 0;
-            }
-        }
-        if let Some(c) = chunks.get(&back) {
-            if (c.flush & (1<<0)) == 0 {
-                new_exposed |= 1 << 1;
-            }
-        }
-        if let Some(c) = chunks.get(&left) {
-            if (c.flush & (1<<3)) == 0 {
-                new_exposed |= 1 << 2;
-            }
-        }
-        if let Some(c) = chunks.get(&right) {
-            if (c.flush & (1<<2)) == 0 {
-                new_exposed |= 1 << 3;
-            }
-        }
-        if let Some(c) = chunks.get(&up) {
-            if (c.flush & (1<<5)) == 0 {
-                new_exposed |= 1 << 4;
-            }
-        }
-        if let Some(c) = chunks.get(&down) {
-            if (c.flush & (1<<4)) == 0 {
-                new_exposed |= 1 << 5;
-            }
-        }
-
-        exposed.insert(my_coord, new_exposed);
-    }
-    
-    /// Update the model buffer of the grid
-    pub(crate) fn update_model(&mut self, graphics: &Graphics) {
-        self.grid.update_model(graphics, self.detail, self.exposed);
-    }
-
-    /// Update the graphics buffer in the grid from the Rigid body.
-    pub fn get_uniform(&mut self, body: &RigidBody, camera: &Camera) -> ModelUniform {
-        self.grid.get_uniform(
-            (body.pos - body.ori * body.com_pos).cast().unwrap(),
-            body.ori.cast().unwrap(),
-            camera
-        )
-    }
-
-    pub fn draw(&self, renderer: &mut Renderer) {
-        self.grid.draw(renderer);
-    }
-    
-    pub(crate) fn copy_buffer(&self, renderer: &mut Renderer, buffer: &StorageBuffer, index:u32) {
-        self.grid.buffer.copy_from_storage_buffer(renderer, buffer, index as u64 *std::mem::size_of::<ModelUniform>() as u64);
     }
 }

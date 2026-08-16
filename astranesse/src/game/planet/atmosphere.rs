@@ -1,7 +1,7 @@
 use cgmath::{InnerSpace, Vector3};
 use faer::{ColRef, Mat, prelude::Solve};
 
-use crate::{game::planet::terrain::Terrain, util::SphericalInterpolator};
+use crate::{game::{object::BlockId, planet::terrain::Terrain}, util::SphericalInterpolator};
 
 /// Scale height of mountains deflecting wind around them
 const MOUNTAIN_SCALE: f32 = 1.;
@@ -301,7 +301,7 @@ impl Biome {
         }
     }
 
-    pub fn get_block(&self, depth: i32) -> u8 {
+    pub fn get_block(&self, depth: i32) -> BlockId {
         match self.typ {
             0 => 1,
             1 => 2,

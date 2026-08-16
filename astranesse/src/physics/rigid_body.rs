@@ -1,4 +1,4 @@
-use biscuit::util::{Tagged, Vendor};
+use crate::util::{Tagged, Vendor};
 use cgmath::{InnerSpace, Matrix3, Quaternion, SquareMatrix, Vector3, Zero};
 use crate::{physics::collisions::Collider};
 

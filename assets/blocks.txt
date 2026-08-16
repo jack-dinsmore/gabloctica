@@ -1,8 +1,9 @@
-# ID, Name, Conductor, pipe, command, chair
-1 dirt1     F F F F
-2 dirt2     F F F F
-3 dirt3     F F F F
-4 tank      T T F F
-5 engine    T F T F
-6 chair     T F T T
-7 metal     T F F F
+#ID     GID     Name,   Cond.   pipe    command chair   clutter
+0001    0001    dirt1   F       F       F       F       F
+0002    0002    dirt2   F       F       F       F       F
+0003    0003    dirt3   F       F       F       F       F
+0004    0004    tank    T       T       F       F       F
+0005    0005    engine  T       F       T       F       F
+0006    0006    chair   T       F       T       T       F
+0007    0007    metal   T       F       F       F       F
+0008    0100    rock    F       F       F       F       T

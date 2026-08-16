@@ -65,6 +65,9 @@ impl Terrain {
     }
 
     pub fn get_altitude(&self, mut pos: Vector3<f32>, face_index: u8) -> f32 {
+        if pos[0].is_nan() || pos[1].is_nan() || pos[2].is_nan() {
+            return f32::NAN;
+        }
         match face_index {
             0 => pos[0] = self.halfwidth as f32,
             1 => pos[0] = -self.halfwidth as f32,
@@ -75,7 +78,8 @@ impl Terrain {
             _ => unreachable!()
         }
         let posarray = [pos[0] as f64, pos[1] as f64, pos[2] as f64];
-        0.5 + self.get_divergence(pos).max(0.001) * self.noise.get(posarray) as f32
+        let alt = 0.5 + self.get_divergence(pos).max(0.001) * self.noise.get(posarray) as f32;
+        alt
     }
 
     pub fn get_interpolator(&self, resolution: usize) -> SphericalInterpolator<f32> {

@@ -1,14 +1,13 @@
 mod memory;
 use std::borrow::Cow;
 
-use crate::{Command, bytecode::GlobalFunction, machine::memory::Memory, util::Tagged};
+use crate::{Command, bytecode::GlobalFunction, machine::memory::Memory};
 
-pub type Instructions = Tagged<InstructionData>;
-
-pub struct InstructionData {
+#[derive(Clone)]
+pub struct Instructions {
     instructions: Cow<'static, [u8]>,
 }
-impl InstructionData {
+impl Instructions {
     pub fn from_compiled(instructions: &[u8]) -> Self {
         let instructions = Cow::Owned(instructions.to_vec());
         // Process the script

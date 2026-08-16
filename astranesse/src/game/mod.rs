@@ -11,11 +11,12 @@ use crate::game::entity::Entity;
 use crate::game::galaxy::Galaxy;
 use crate::game::object::Interrupt;
 use crate::game::object::ObjectLoader;
-use crate::game::object::computer::BlockProperties;
+use crate::game::object::BlockProperties;
 use crate::game::object::loader::ShipLoader;
 use crate::game::shading::PostInfo;
 use crate::graphics::*;
 use crate::physics::*;
+use crate::util::CHUNK_SIZE;
 use crate::util::RcCell;
 use crate::util::my_fmod;
 use cgmath::InnerSpace;
@@ -133,17 +134,14 @@ impl Game {
         );
         graphics.window.set_cursor_position(center).unwrap();
 
-        // Load block texture
+        // Load block information
         let texture = GridTexture::new(&graphics, &camera, include_bytes!("../../../assets/texture.png"));
+        let block_properties = BlockProperties::new();
 
         let font = Font::new(&mut graphics, &camera, include_bytes!("../../../assets/Rockwell.ttc"));
 
         let mut galaxy = Galaxy::new(&graphics);
         galaxy.update_skybox(&graphics, &camera, Vector3::new(-1e7, 0., 0.));
-
-        // Load block properties
-        let mut block_properties = BlockProperties::new();
-        block_properties.load_manifest(include_str!("../../../assets/blocks.txt"));
 
         Self {
             graphics,
@@ -234,15 +232,17 @@ impl Game {
         }
 
         if let Some(o) = collided_object {
+            let o_borrow = o.borrow();
             // Interacted with this block
             let place_pos = match report {
                 CollisionReport::Some { p2, .. } => {
-                    let offset = o.borrow().body.ori.invert() * forward;
+                    let offset = o_borrow.body.ori.invert() * forward;
                     p2 + offset*0.001
                 }
                 CollisionReport::None => unreachable!(),
             };
-            let interacted_block = o.borrow().get_block(place_pos);
+            let interacted_block = o_borrow.get_block(place_pos).clone();
+            std::mem::drop(o_borrow);
             if !interacted_block.is_null() {
                 let updated_chunk = (
                     (place_pos.x/CHUNK_SIZE as f64).floor() as i32,
@@ -256,7 +256,7 @@ impl Game {
                 );
                 let block_key = (updated_chunk, updated_block);
                 o.borrow_mut().interrupt(block_key, Interrupt::Interact);
-                if self.block_properties.chair_blocks.contains(&interacted_block.id) {
+                if self.block_properties[interacted_block.id].is_chair {
                     player.set_chair(o, block_key);
                 }
             }
@@ -268,9 +268,6 @@ impl Game {
 
     pub fn update(&mut self, delta_t: f64) {
         self.fps_counter.update(delta_t);
-        for object in &mut self.objects {
-            object.borrow_mut().update_graphics(&self.graphics, &self.block_properties, self.camera.pos.cast().unwrap());
-        }
 
         let my_planet = if !self.planets.is_empty() {
             let mut min_dist = f64::INFINITY;
@@ -292,7 +289,7 @@ impl Game {
         self.post_info.update_buffer(&self.graphics, &self.camera, my_planet);
 
         for object in &mut self.objects {
-            object.borrow_mut().update_internals(delta_t);
+            object.borrow_mut().update(&self.graphics, &self.block_properties, self.camera.pos.cast().unwrap(), delta_t);
         }
 
         {
@@ -350,7 +347,6 @@ impl Game {
         for entity in &mut self.entities {
             entity.update(delta_t);
         }
-
         {
             // Move camera look
             let player = &self.entities[0];

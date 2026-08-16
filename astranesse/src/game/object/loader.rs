@@ -1,32 +1,25 @@
 use cgmath::Vector3;
 use rustc_hash::FxHashMap;
 
-use crate::{game::planet::{Atmosphere, Terrain}, graphics::{Block, CHUNK_SIZE, Graphics}};
-
-use super::Chunk;
+use crate::{game::{object::{BlockProperties, chunk::{PhysicalBlock, PhysicalChunk}}, planet::{Atmosphere, Terrain}}, graphics::Graphics, util::CHUNK_SIZE};
 
 pub struct ShipLoader {
     pub pos: Vector3<f64>,
     pub vel: Vector3<f64>,
 }
 impl ShipLoader {
-    pub(super) fn load_all(&self, graphics: &crate::graphics::Graphics) -> FxHashMap<(i32, i32, i32), Chunk> {
+    pub(super) fn load_all(&self, graphics: &Graphics, properties: &BlockProperties) -> FxHashMap<(i32, i32, i32), PhysicalChunk> {
         let chunk_coord = (0, 0, 0);
-        let pos = Vector3::new(
-            chunk_coord.0 as f64 * CHUNK_SIZE as f64,
-            chunk_coord.1 as f64 * CHUNK_SIZE as f64,
-            chunk_coord.2 as f64 * CHUNK_SIZE as f64,
-        );
-        let mut chunk = Chunk::empty(graphics, pos);
+        let mut chunk = PhysicalChunk::empty(graphics, chunk_coord);
 
-        chunk.grid[(7,7,7)] = Block{id: 7, ori: 0};// Metal
-        chunk.grid[(6,8,7)] = Block{id: 4, ori: 1};// Tank
-        chunk.grid[(7,8,7)] = Block{id: 4, ori: 1};// Tank
-        chunk.grid[(8,8,7)] = Block{id: 5, ori: 3};// Engine
-        chunk.grid[(6,6,7)] = Block{id: 4, ori: 1};// Tank
-        chunk.grid[(7,6,7)] = Block{id: 4, ori: 1};// Tank
-        chunk.grid[(8,6,7)] = Block{id: 5, ori: 3};// Engine
-        chunk.grid[(7,7,8)] = Block{id: 6, ori: 0};// Chair
+        chunk.grid[(7,7,7)] = PhysicalBlock::new(7, 0, properties);// Metal
+        chunk.grid[(6,8,7)] = PhysicalBlock::new(4, 1, properties);// Tank
+        chunk.grid[(7,8,7)] = PhysicalBlock::new(4, 1, properties);// Tank
+        chunk.grid[(8,8,7)] = PhysicalBlock::new(5, 3, properties);// Engine
+        chunk.grid[(6,6,7)] = PhysicalBlock::new(4, 1, properties);// Tank
+        chunk.grid[(7,6,7)] = PhysicalBlock::new(4, 1, properties);// Tank
+        chunk.grid[(8,6,7)] = PhysicalBlock::new(5, 3, properties);// Engine
+        chunk.grid[(7,7,8)] = PhysicalBlock::new(6, 0, properties);// Chair
 
         let mut out = FxHashMap::default();
         out.insert(chunk_coord, chunk);
@@ -52,7 +45,7 @@ impl PlanetLoader {
         }
     }
 
-    pub(super) fn load_chunk(&self, graphics: &Graphics, chunk_coord: (i32, i32, i32)) -> Option<Chunk> {
+    pub(super) fn load_chunk(&self, graphics: &Graphics, properties: &BlockProperties, chunk_coord: (i32, i32, i32)) -> Option<PhysicalChunk> {
         // OPTIMIZE clean up given by wind analysis
         let chunk_coord_f = Vector3::new(chunk_coord.0 as f32, chunk_coord.1 as f32, chunk_coord.2 as f32);
         let mut intersecting_faces = Vec::new();
@@ -78,13 +71,13 @@ impl PlanetLoader {
             return None;
         }
         let pos = chunk_coord_f * CHUNK_SIZE as f32;
-        let mut chunk = Chunk::empty(graphics, pos.cast().unwrap());
-        if intersecting_faces.is_empty() {
-            chunk.grid.demo();
-        }
-
+        let mut chunk = PhysicalChunk::empty(graphics, chunk_coord);
         let recip = 1. / CHUNK_SIZE as f32;
-        if intersecting_faces.len() == 1 {
+        if intersecting_faces.is_empty() {
+            let biome = self.atmosphere.get_biome(chunk_coord_f, 0);
+            chunk.grid.fill(PhysicalBlock::new(1, 0, properties));
+        }
+        else if intersecting_faces.len() == 1 {
             let (face_index, chunk_alt) = intersecting_faces[0];
             let biome = self.atmosphere.get_biome(chunk_coord_f, face_index);
 
@@ -115,7 +108,7 @@ impl PlanetLoader {
                 }
             }
         }
-        if intersecting_faces.len() >= 2 {
+        else if intersecting_faces.len() >= 2 {
             for x in 0..CHUNK_SIZE {
                 let xx = x as f32 * recip;
                 for y in 0..CHUNK_SIZE {
@@ -154,7 +147,7 @@ impl PlanetLoader {
         Some(chunk)
     }
     
-    pub(super) fn unload_chunk(&self, chunk_coord: (i32, i32, i32), chunk: &Chunk) {
+    pub(super) fn unload_chunk(&self, chunk_coord: (i32, i32, i32), chunk: &PhysicalChunk) {
         // TODO implement unloading chunk with changes saved
     }
 }

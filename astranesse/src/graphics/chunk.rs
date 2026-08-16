@@ -1,9 +1,13 @@
-use std::ops::{Index, IndexMut};
-use cgmath::{Matrix4, Quaternion, Vector3};
+use cgmath::{Matrix4, Vector3};
 use image::{GenericImageView, ImageBuffer, Rgba};
+use rustc_hash::FxHashMap;
 
-use crate::graphics::{Block, BlockVertex, Camera, Graphics, Renderer, ResourceType, Texture};
+use crate::game::object::{BlockGlobalPos, BlockProperties};
+use crate::game::object::chunk::PhysicalChunk;
+use crate::graphics::{GraphicalBlock, BlockVertex, Camera, Graphics, Renderer, ResourceType, Texture};
 use crate::graphics::resource::{IndexBuffer, VertexBuffer, UniformBuffer, Uniform};
+use crate::physics::RigidBody;
+use crate::util::{CHUNK_SIZE, Grid};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -21,71 +25,86 @@ impl ModelUniform {
     }
 }
 
-pub const CHUNK_SIZE: u32 = 16;
-const VERTEX_CAPACITY: usize = 0x10000;//TODO
+const VERTEX_CAPACITY: usize = 0x10000;//TODO actually calculate this
 
-pub struct CubeGrid {
-    data: [Block; (CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize],
+pub struct GraphicalChunk {
+    grid: Grid<GraphicalBlock>,
     /// Offset of the chunk from the rigid body center (i.e. the center of mass)
-    pub global_pos: Vector3<f64>,
     vertex_buffer: VertexBuffer<BlockVertex>,
     index_buffer: IndexBuffer,
     n_indices: u32,
+    global_pos: Vector3<f64>,
 
     pub buffer: UniformBuffer<ModelUniform>,
-    detail: usize,
+    pub detail: usize,
+
+    /// 0_0_z-_z+_y-_y+_x-_x+. One means hidden.
+    pub exposed: u8,
+    /// 0_0_z-_z+_y-_y+_x-_x+. One means transparent.
+    pub flush: u8,
 }
 
-impl CubeGrid {
-    pub fn new(graphics: &Graphics) -> Self {
-        let data = [Block{id: 0, ori: 0}; (CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize];
+impl GraphicalChunk {
+    pub fn empty(graphics: &Graphics, chunk_pos: (i32, i32, i32)) -> Self {
+        let grid = Grid::new();
 
         let vertex_buffer = VertexBuffer::new(graphics, VERTEX_CAPACITY);
         let index_buffer = IndexBuffer::new(graphics, VERTEX_CAPACITY/4*6);
         let buffer = UniformBuffer::new(graphics);
+        let global_pos = Vector3::new(chunk_pos.0 as f64, chunk_pos.1 as f64, chunk_pos.2 as f64) * CHUNK_SIZE as f64;
 
         Self {
-            data,
-            global_pos: Vector3::new(0., 0., 0.),
+            grid,
             vertex_buffer,
             index_buffer,
             n_indices: 0,
             detail: 1,
+            exposed: 0xff, // Ensure the exposure flag will be updated next
+            flush: 0, // Ensure the exposure flag will be updated next
 
             buffer,
+            global_pos,
         }
     }
 
-    pub fn set_data(&mut self, data: [Block; (CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize]) {
-        self.data = data
-    }
+    pub fn from_physical(graphics: &Graphics, chunk_pos: (i32, i32, i32), chunk: &PhysicalChunk, properties: &BlockProperties) -> Self {
+        let mut output = Self::empty(graphics, chunk_pos);
 
-    pub fn demo(&mut self) {
-        for x in 0..CHUNK_SIZE {
-            for y in 0..CHUNK_SIZE {
-                for z in 0..CHUNK_SIZE {
-                    self[(x,y,z)] = Block {id: 1, ori: 0};
+        for i in 0..CHUNK_SIZE {
+            for j in 0..CHUNK_SIZE {
+                for k in 0..CHUNK_SIZE {
+                    output.grid[(i,j,k)] = GraphicalBlock::from_physical(chunk.grid[(i,j,k)], properties);
                 }
             }
         }
+
+        output.update_flush();
+        output.update_model(graphics);
+        output
     }
 
-    // Create vertex and index buffers from the block layout. face_mask should be set to one for hidden faces
-    pub fn update_model(&mut self, graphics: &Graphics, detail: usize, face_mask: u8) {
+    pub fn place_block(&mut self, block: GraphicalBlock, block_pos: BlockGlobalPos, graphics: &Graphics) {
+        self.grid[block_pos.1] = block;
+        self.update_flush();
+        self.update_model(graphics);
+    }
+
+    // Create vertex and index buffers from the block layout. exposed should be set to one for hidden faces
+    fn update_model(&mut self, graphics: &Graphics) {
         // Right now I'm just making vertices for every block, including faces that don't face outwards.
-        // OPTIMIZE implement face_mask
+        // OPTIMIZE implement exposed
         let mut vertices = Vec::new();
         let mut indices = Vec::new();
         let mut index_offset = 0u16;
-        let detail_skip = 2u32.pow(detail as u32-1);
+        let detail_skip = 2u32.pow(self.detail as u32-1);
         let last = CHUNK_SIZE - detail_skip;
         if detail_skip == 0 {
-            panic!("{}", detail); // TODO remove
+            panic!("{}", self.detail); // TODO remove
         }
         for x in (0..CHUNK_SIZE).step_by(detail_skip as usize) {
             for y in (0..CHUNK_SIZE).step_by(detail_skip as usize) {
                 for z in (0..CHUNK_SIZE).step_by(detail_skip as usize) {
-                    let block = self[(x,y,z)];
+                    let block = self.grid[(x,y,z)];
                     if block.is_null() {continue;}
 
                     let x0 = x;
@@ -95,7 +114,7 @@ impl CubeGrid {
                     let z0 = z << 8;
                     let z1 = (((z+detail_skip) % 16) << 8) | (((z+detail_skip)/16) << 26);
 
-                    if x == 0 || self[(x-detail_skip,y,z)].is_null() {
+                    if x == 0 || self.grid[(x-detail_skip,y,z)].is_null() {
                         let face = x0 | (1 << 12);
                         let uv = block.get_uv_forward();
                         vertices.push(BlockVertex {data: uv.0|y0|z0|face});
@@ -110,7 +129,7 @@ impl CubeGrid {
                         indices.push(2+index_offset);
                         index_offset += 4;
                     }
-                    if y == 0 || self[(x,y-detail_skip,z)].is_null() {
+                    if y == 0 || self.grid[(x,y-detail_skip,z)].is_null() {
                         let face = y0 | (3 << 12);
                         let uv = block.get_uv_left();
                         vertices.push(BlockVertex {data: uv.0|x0|z0|face});
@@ -125,7 +144,7 @@ impl CubeGrid {
                         indices.push(3+index_offset);
                         index_offset += 4;
                     }
-                    if z == 0 || self[(x,y,z-detail_skip)].is_null() {
+                    if z == 0 || self.grid[(x,y,z-detail_skip)].is_null() {
                         let face = z0 | (5 << 12);
                         let uv = block.get_uv_up();
                         vertices.push(BlockVertex {data: uv.0|x0|y0|face});
@@ -140,7 +159,7 @@ impl CubeGrid {
                         indices.push(2+index_offset);
                         index_offset += 4;
                     }
-                    if x == last || self[(x+detail_skip,y,z)].is_null() {
+                    if x == last || self.grid[(x+detail_skip,y,z)].is_null() {
                         let face = x1; // Normal or constant face
                         let uv = block.get_uv_backward();
                         vertices.push(BlockVertex {data: uv.0|y0|z0|face});
@@ -155,7 +174,7 @@ impl CubeGrid {
                         indices.push(3+index_offset);
                         index_offset += 4;
                     }
-                    if y == last || self[(x,y+detail_skip,z)].is_null() {
+                    if y == last || self.grid[(x,y+detail_skip,z)].is_null() {
                         let face = y1 | (2 << 12);
                         let uv = block.get_uv_right();
                         vertices.push(BlockVertex {data: uv.0|x0|z0|face});
@@ -170,7 +189,7 @@ impl CubeGrid {
                         indices.push(2+index_offset);
                         index_offset += 4;
                     }
-                    if z == last || self[(x,y,z+detail_skip)].is_null() {
+                    if z == last || self.grid[(x,y,z+detail_skip)].is_null() {
                         let face = z1 | (4 << 12);
                         let uv = block.get_uv_down();
                         vertices.push(BlockVertex {data: uv.0|x0|y0|face});
@@ -195,10 +214,136 @@ impl CubeGrid {
         graphics.queue.write_buffer(&self.vertex_buffer.buffer, 0, bytemuck::cast_slice(&vertices));
         graphics.queue.write_buffer(&self.index_buffer.buffer, 0, bytemuck::cast_slice(&indices));
         self.n_indices = indices.len() as u32;
-        self.detail = detail;
     }
 
-    pub fn get_uniform(&self, pos: Vector3<f64>, ori: Quaternion<f64>, camera: &Camera) -> ModelUniform {
+    /// Recalculate whether the chunk is flush
+    fn update_flush(&mut self) {
+        self.flush = 0;
+        let mut break_pos = false;
+        let mut break_neg = false;
+        for z in 0..CHUNK_SIZE {
+            for y in 0..CHUNK_SIZE {
+                if self.grid[(0,y,z)].is_null() {
+                    self.flush |= 1 << 0;
+                    break_pos = true;
+                }
+                if self.grid[(CHUNK_SIZE-1,y,z)].is_null() {
+                    self.flush |= 1 << 1;
+                    break_neg = true;
+                }
+                if break_neg && break_pos {
+                    break;
+                }
+            }
+        }
+        let mut break_pos = false;
+        let mut break_neg = false;
+        for z in 0..CHUNK_SIZE {
+            for x in 0..CHUNK_SIZE {
+                if self.grid[(x,0,z)].is_null() {
+                    self.flush |= 1 << 2;
+                    break_pos = true;
+                }
+                if self.grid[(x,CHUNK_SIZE-1,z)].is_null() {
+                    self.flush |= 1 << 3;
+                    break_neg = true;
+                }
+                if break_neg && break_pos {
+                    break;
+                }
+            }
+        }
+        let mut break_pos = false;
+        let mut break_neg = false;
+        for y in 0..CHUNK_SIZE {
+            for x in 0..CHUNK_SIZE {
+                if self.grid[(x,y,0)].is_null() {
+                    self.flush |= 1 << 4;
+                    break_pos = true;
+                }
+                if self.grid[(x,y,CHUNK_SIZE-1)].is_null() {
+                    self.flush |= 1 << 5;
+                    break_neg = true;
+                }
+                if break_neg && break_pos {
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Update the cubes adjacent to my_coord so that adjacent faces are removed.
+    pub fn update_exposed(my_coord: (i32, i32, i32), chunks: &mut FxHashMap<(i32, i32, i32), Self>, graphics: &Graphics) {
+        let mut my_exposed = chunks.get(&my_coord).unwrap().exposed;
+        let my_flush = chunks.get(&my_coord).unwrap().flush;
+        if (my_flush & (1<<0)) == 0 {
+            if let Some(c) = chunks.get_mut(&(my_coord.0+1, my_coord.1, my_coord.2)) {
+                if (c.flush & (1<<1)) == 0 {
+                    my_exposed |= 1 << 0;
+                    c.set_exposed(c.exposed | (1<<1), graphics)
+                }
+            }
+        }
+        if (my_flush & (1<<1)) == 0 {
+            if let Some(c) = chunks.get_mut(&(my_coord.0-1, my_coord.1, my_coord.2)) {
+                if (c.flush & (1<<0)) == 0 {
+                    my_exposed |= 1 << 1;
+                    c.set_exposed(c.exposed | (1<<0), graphics)
+                }
+            }
+        }
+        if (my_flush & (1<<2)) == 0 {
+            if let Some(c) = chunks.get_mut(&(my_coord.0, my_coord.1+1, my_coord.2)) {
+                if (c.flush & (1<<3)) == 0 {
+                    my_exposed |= 1 << 2;
+                    c.set_exposed(c.exposed | (1<<3), graphics)
+                }
+            }
+        }
+        if (my_flush & (1<<3)) == 0 {
+            if let Some(c) = chunks.get_mut(&(my_coord.0, my_coord.1-1, my_coord.2)) {
+                if (c.flush & (1<<2)) == 0 {
+                    my_exposed |= 1 << 3;
+                    c.set_exposed(c.exposed | (1<<2), graphics)
+                }
+            }
+        }
+        if (my_flush & (1<<4)) == 0 {
+            if let Some(c) = chunks.get_mut(&(my_coord.0, my_coord.1, my_coord.2+1)) {
+                if (c.flush & (1<<5)) == 0 {
+                    my_exposed |= 1 << 4;
+                    c.set_exposed(c.exposed | (1<<5), graphics)
+                }
+            }
+        }
+        if (my_flush & (1<<5)) == 0 {
+            if let Some(c) = chunks.get_mut(&(my_coord.0, my_coord.1, my_coord.2-1)) {
+                if (c.flush & (1<<4)) == 0 {
+                    my_exposed |= 1 << 5;
+                    c.set_exposed(c.exposed | (1<<4), graphics)
+                }
+            }
+        }
+
+        chunks.get_mut(&my_coord).unwrap().set_exposed(my_exposed, graphics);
+    }
+
+    pub fn set_detail(&mut self, detail: usize, graphics: &Graphics) {
+        if detail == self.detail {return;}
+        self.detail = detail;
+        self.update_model(graphics); // Update the model with the new detail
+    }
+
+    fn set_exposed(&mut self, exposed: u8, graphics: &Graphics) {
+        if exposed == self.exposed { return; }
+        self.exposed = exposed;
+        self.update_model(graphics);
+    }
+
+    /// Update the graphics buffer in the grid from the Rigid body.
+    pub fn get_uniform(&self, body: &RigidBody, camera: &Camera) -> ModelUniform {
+        let pos = (body.pos - body.ori * body.com_pos).cast().unwrap();
+        let ori = body.ori.cast().unwrap();
         let model = Matrix4::from_translation(pos + ori * self.global_pos - camera.pos)
             * Matrix4::from(ori);
         ModelUniform::new(model.cast().unwrap())
@@ -210,21 +355,11 @@ impl CubeGrid {
         self.index_buffer.bind(renderer);
         renderer.draw_indices(self.n_indices);
     }
-}
-impl Index<(u32, u32, u32)> for CubeGrid {
-    type Output = Block;
 
-    fn index(&self, index: (u32, u32, u32)) -> &Self::Output {
-        &self.data[(index.0 + index.1*CHUNK_SIZE + index.2*CHUNK_SIZE*CHUNK_SIZE) as usize]
+    pub(crate) fn copy_buffer(&self, renderer: &mut Renderer, buffer: &super::StorageBuffer, index:u32) {
+        self.buffer.copy_from_storage_buffer(renderer, buffer, index as u64 *std::mem::size_of::<ModelUniform>() as u64);
     }
 }
-
-impl IndexMut<(u32, u32, u32)> for CubeGrid {
-    fn index_mut(&mut self, index: (u32, u32, u32)) -> &mut Self::Output {
-        &mut self.data[(index.0 + index.1*CHUNK_SIZE + index.2*CHUNK_SIZE*CHUNK_SIZE) as usize]
-    }
-}
-
 
 pub struct GridTexture {
     textures: [Texture; 4],

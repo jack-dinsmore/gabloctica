@@ -1,5 +1,12 @@
 # Todo
 
+## Graphics: 
+* Billboards and ground clutter
+* Fix the ship collision thing
+    - I think the offset is pulling it into the ground, hence the problem
+* Static friction
+* Fog
+
 ## Biscuit
 * Finish machine implementation
 * Emulator
@@ -10,9 +17,6 @@
 ## Ships
 * Updating the command block properties and circuits etc when a block is placed
 * Speed up bucket fill for planets
-
-## Graphics: 
-* Fog
 
 * Ground clutter
 * Color clamping?

@@ -1,4 +1,4 @@
-use std::ops::{Deref, DerefMut};
+use std::{fmt::Debug, ops::{Deref, DerefMut}};
 use rustc_hash::FxHashMap;
 
 /// A vendor is a device designed to hold the owned data for a reference which can be passed around.
@@ -90,7 +90,6 @@ impl<D> Iterator for TagVendorIterator<D> {
 }
 
 
-#[derive(Debug)]
 pub struct Tagged<D> {
     vendor: *mut TagVendor<D>,
     tag: u32,
@@ -139,5 +138,11 @@ impl<D> Eq for Tagged<D> {}
 impl<D> PartialOrd for Tagged<D> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.tag.partial_cmp(&other.tag)
+    }
+}
+
+impl<D: Debug> Debug for Tagged<D> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.deref())
     }
 }

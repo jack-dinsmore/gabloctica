@@ -89,9 +89,6 @@ struct VertexOutput {
     @location(1) normal: vec3<f32>,
     @location(2) texpos: vec2<f32>,
     @location(3) shadow_pos: vec4<f32>,
-    @location(4) rotation_v1: vec3<f32>,
-    @location(5) rotation_v2: vec3<f32>,
-    @location(6) rotation_v3: vec3<f32>,
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniform;
@@ -124,7 +121,7 @@ fn vs_main(
     if (((vert.data>>12) & 0xf) == 5) { normal.z = -1.; }
 
     out.texpos = vec2(
-        f32((vert.data>>20) & 0xf) / 12.,
+        f32((vert.data>>20) & 0xf) / 6.,
         f32((vert.data>>16) & 0xf) / TEXTURE_SIZE,
     );
 
@@ -142,19 +139,12 @@ fn vs_main(
     out.normal = rotation * normal;
     out.clip_position = camera.view_proj * out.position;
     out.shadow_pos = camera.shadow_proj * out.position;
-    out.rotation_v1 = rotation[0];
-    out.rotation_v2 = rotation[1];
-    out.rotation_v3 = rotation[2];
     return out;
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let rotation = mat3x3(in.rotation_v1, in.rotation_v2, in.rotation_v3);
     var color = textureSample(t_diffuse, s_diffuse, in.texpos);
-    let normal_color = textureSample(t_diffuse, s_diffuse, vec2(in.texpos.x + 0.5, in.texpos.y));
-    let local_normal_offset = 2. * normal_color.xyz - 1.;
-    let global_normal_offset = rotation * local_normal_offset;
     let to_light = normalize(lights.pos.xyz - in.position.xyz);
 
     var shadow_coords = in.shadow_pos.xyz / in.shadow_pos.w;
@@ -162,9 +152,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var closest_depth = textureSample(t_shadow, s_shadow, shadow_coords.xy * 0.5 + 0.5);
     let shadow = step(closest_depth + 0.0005, shadow_coords.z);
 
-    let normal = normalize(in.normal.xyz + global_normal_offset.xyz);
-
-    var illum = (1. - shadow) * dot(normal, to_light);
+    var illum = (1. - shadow) * dot(in.normal.xyz, to_light);
 
     illum = max(illum, 0.1);
 

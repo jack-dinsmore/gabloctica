@@ -5,7 +5,7 @@ use faer::{Mat, Side, prelude::Solve};
 use cgmath::{InnerSpace, Matrix3, Vector3};
 pub use rigid_body::{RigidBodyData, RigidBody, RigidBodyInit, MoI};
 pub use collisions::{shapes, Collider, CollisionReport};
-use biscuit::util::Vendor;
+use crate::util::Vendor;
 
 pub const NEWTON_G: f64 = 5.;
 const GRAVITY_THRESH: f64 = 10.;
@@ -32,7 +32,7 @@ impl Physics {
             for (j, mut part) in &mut self.rb_vendor.iter().enumerate() {
                 if j == i {continue;}
                 if part.mass > GRAVITY_THRESH {continue;}
-
+                
                 let dist = part.pos - planet.pos;
                 let force = -NEWTON_G * planet.mass * part.mass * dist / dist.magnitude().powi(3);
                 part.add_force(force);

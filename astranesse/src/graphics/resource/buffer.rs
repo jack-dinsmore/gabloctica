@@ -4,6 +4,7 @@ use super::*;
 use bytemuck::NoUninit;
 use wgpu::util::DeviceExt;
 
+// TODO implement destroying unused resources if it's not already done
 pub struct UniformBuffer<T: Uniform> {
     pub(in crate::graphics) buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,

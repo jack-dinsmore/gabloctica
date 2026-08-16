@@ -1,14 +1,39 @@
 use cgmath::{Quaternion, Vector3};
+use crate::game::object::{BlockProperties, GraphicId, chunk::PhysicalBlock};
 
 #[derive(Clone, Copy, Debug)]
-pub struct Block {
-    pub id: u8,
-    pub ori: u8,
+pub struct GraphicalBlock {
+    id: GraphicId,
+    ori: u8,
+}
+impl Default for GraphicalBlock {
+    fn default() -> Self {
+        Self { id: 0, ori: 0 }
+    }
+}
+impl GraphicalBlock {
+    pub fn new(id: GraphicId) -> Self {
+        Self {
+            id,
+            ori: 0,
+        }
+    }
+    
+    pub fn from_physical(block: PhysicalBlock, properties: &BlockProperties) -> GraphicalBlock {
+        if block.id == 0 {
+            Self::default()
+        } else {
+            Self {
+                id: properties[block.id].graphic_id,
+                ori: block.ori,
+            }
+        }
+    }
 }
 
 // Orientations convert to quaternions through::
 
-impl Block {
+impl GraphicalBlock {
     /// Get the orientation of a block given the direction the player was facing when it was placed
     pub fn ori(forward: Vector3<f32>, up: Vector3<f32>) -> u8 {
         let l_inf_norm = forward.x.abs().max(forward.y.abs().max(forward.z.abs()));

@@ -1,8 +1,7 @@
 use std::path::{Path, PathBuf};
-use biscuit::util::Vendor;
+use biscuit::Instructions;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
 mod gui;
-use biscuit::machine::InstructionData;
 
 use clap::{Args, Parser, Subcommand};
 
@@ -140,9 +139,7 @@ impl Run {
         std::fs::write(&asm_output, &text).map_err(|_| "Could not write output file".to_owned())?;
 
         let mut terminal = ratatui::init();
-        let mut script_vendor = Vendor::new();
-        let instructions = script_vendor.insert(InstructionData::from_compiled(&bytes));
-        let mut app = gui::App::new(instructions, text);
+        let mut app = gui::App::new(Instructions::from_compiled(&bytes), text);
 
         loop {
             terminal.draw(|f| app.draw(f)).unwrap();
