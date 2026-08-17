@@ -3,7 +3,7 @@ use crate::game::object::{BlockProperties, GraphicId, chunk::PhysicalBlock};
 
 #[derive(Clone, Copy, Debug)]
 pub struct GraphicalBlock {
-    id: GraphicId,
+    pub id: GraphicId,
     ori: u8,
 }
 impl Default for GraphicalBlock {
@@ -28,6 +28,12 @@ impl GraphicalBlock {
                 ori: block.ori,
             }
         }
+    }
+    
+    pub(crate) fn is_opaque(&self) -> bool {
+        if self.id == 0 { return false; }
+        if self.id > 0x100 {return false; }
+        true
     }
 }
 

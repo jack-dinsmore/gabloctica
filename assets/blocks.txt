@@ -6,4 +6,4 @@
 0005    0005    engine  T       F       T       F       F
 0006    0006    chair   T       F       T       T       F
 0007    0007    metal   T       F       F       F       F
-0008    0100    rock    F       F       F       F       T
+0008    0101    rock    F       F       F       F       T

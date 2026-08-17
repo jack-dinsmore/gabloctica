@@ -12,7 +12,7 @@ const GRAVITY_THRESH: f64 = 10.;
 
 pub struct Physics {
     collision_pairs: Vec<(RigidBody, RigidBody)>,
-    collision_normals: Vec<Vector3<f64>>,
+    collision_reports: Vec<CollisionReport>,
     pub rb_vendor: Vendor<RigidBodyData>,
 }
 
@@ -21,7 +21,7 @@ impl Physics {
         Self {
             rb_vendor: Vendor::new(),
             collision_pairs: Vec::new(),
-            collision_normals: Vec::new(),
+            collision_reports: Vec::new(),
         }
     }
 
@@ -39,13 +39,44 @@ impl Physics {
             }
         }
 
+        // Friction
+        for ((a, b), report) in self.collision_pairs.iter_mut().zip(&self.collision_reports) {
+            let relative_force = a.forces - b.forces;
+            match report {
+                CollisionReport::Some { normal, depth, p1, p2 } => {
+                    let rel_vel = a.vel - b.vel; // TODO rotation
+                    let force = if rel_vel.magnitude() < 0.001 {
+                        // Static
+                        let coeff = (a.static_coeff + b.static_coeff) / 2.;
+                        let mut force_dir = a.forces - b.forces;
+                        force_dir -= force_dir.dot(*normal) * force_dir;
+                        force_dir = force_dir.normalize();
+                        force_dir * normal.dot(relative_force) * coeff
+                    } else {
+                        // Kinetic
+                        let coeff = (a.kinetic_coeff + b.kinetic_coeff) / 2.;
+                        let mut force_dir = rel_vel;
+                        force_dir -= force_dir.dot(*normal) * force_dir;
+                        force_dir = force_dir.normalize();
+                        force_dir * normal.dot(relative_force) * coeff
+                    };
+                    a.add_force(force);
+                    b.add_force(force);
+                    a.add_torque(p1.cross(force));
+                    b.add_torque(p2.cross(force));
+                },
+                CollisionReport::None => unreachable!(),
+            }
+        }
+
         // Collisions
         self.collision_pairs.clear();
-        self.collision_normals.clear();
+        self.collision_reports.clear();
         for (i, mut a) in self.rb_vendor.iter().enumerate() {
             for (j, mut  b) in self.rb_vendor.iter().enumerate() {
                 if j >= i {break;}
-                if let CollisionReport::Some { normal, depth, p1, p2 } = Collider::check_collision(&a, &b) {
+                let report = Collider::check_collision(&a, &b);
+                if let CollisionReport::Some { normal, depth, p1, p2 } = report {
                     // handle collisions
                     let denom = (1. / a.mass + 1. / b.mass) + 
                         a.moi.mul_inv(p1.cross(normal)).cross(p1).dot(normal) + 
@@ -62,7 +93,7 @@ impl Physics {
                     b.pos += normal*depth * a_mass_frac;
 
                     self.collision_pairs.push((a.clone(), b.clone()));
-                    self.collision_normals.push(normal);
+                    self.collision_reports.push(report);
                 }
             }
         }
@@ -82,14 +113,17 @@ impl Physics {
     }
 
     pub fn resolve_normal_forces(&mut self) {
-        if self.collision_normals.is_empty() {return;}
-        let dimension = self.collision_normals.len();
+        if self.collision_reports.is_empty() {return;}
+        let dimension = self.collision_reports.len();
         let mut m: Mat<f64> = Mat::zeros(dimension, dimension);
         let mut k = Mat::zeros(dimension, 1);
         for i in 0..dimension {
             let a = self.collision_pairs[i].0.clone();
             let b = self.collision_pairs[i].1.clone();
-            let normal = self.collision_normals[i];
+            let normal = match self.collision_reports[i] {
+                CollisionReport::None => unreachable!(),
+                CollisionReport::Some { normal, .. } => normal,
+            };
             k[(i, 0)] = (a.forces / a.mass - b.forces / b.mass).dot(normal);
             m[(i,i)] += 1./a.mass + 1./b.mass;
             for j in (i+1)..dimension {
@@ -116,15 +150,19 @@ impl Physics {
         m.llt(Side::Upper).unwrap().solve_in_place(&mut k);
 
         for (i, (a, b)) in self.collision_pairs.iter_mut().enumerate() {
-            let normal = self.collision_normals[i] * k[(i, 0)];
+            let mut normal = match self.collision_reports[i] {
+                CollisionReport::None => unreachable!(),
+                CollisionReport::Some { normal, .. } => normal,
+            };
+            normal *= k[(i, 0)];
             a.add_force(normal);
             b.add_force(-normal);
         }
     }
 
     pub fn resolve_normal_torques(&mut self) {
-        let n_pairs = self.collision_normals.len();
-        if self.collision_normals.is_empty() {return;}
+        let n_pairs = self.collision_reports.len();
+        if self.collision_reports.is_empty() {return;}
         let dimension = n_pairs*3;
         let mut m: Mat<f64> = Mat::zeros(dimension, dimension);
         let mut k = Mat::zeros(dimension,  1);
@@ -171,7 +209,10 @@ impl Physics {
         m.llt(Side::Upper).unwrap().solve_in_place(&mut k);
 
         for (i, (a, b)) in self.collision_pairs.iter_mut().enumerate() {
-            let normal = self.collision_normals[i];
+            let normal = match self.collision_reports[i] {
+                CollisionReport::None => unreachable!(),
+                CollisionReport::Some { normal, .. } => normal,
+            };
             let mut accel = Vector3::new(
                 k[(3*i+0, 0)],
                 k[(3*i+1, 0)],

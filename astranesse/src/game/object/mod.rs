@@ -5,7 +5,7 @@ pub mod computer;
 mod internals;
 mod blocks;
 
-use cgmath::{InnerSpace, Matrix3, Rotation, Vector3, Zero};
+use cgmath::{InnerSpace, Matrix3, Quaternion, Rotation, Vector3, Zero};
 use loader::{PlanetLoader, ShipLoader};
 use rustc_hash::FxHashMap;
 use crate::game::object::chunk::PhysicalBlock;
@@ -35,6 +35,7 @@ impl ObjectLoader {
             ObjectLoader::OneShot(ship_loader) => RigidBodyInit {
                 pos: ship_loader.pos,
                 vel: ship_loader.vel,
+                ori: Quaternion::new(0.5, 0.5, 0.5, 1.).normalize(),
                 ..Default::default()
             },
             ObjectLoader::MultiShot(planet_loader) => {

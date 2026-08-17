@@ -107,102 +107,10 @@ impl GraphicalChunk {
                     let block = self.grid[(x,y,z)];
                     if block.is_null() {continue;}
 
-                    let x0 = x;
-                    let x1 = ((x+detail_skip) % 16) | (((x+detail_skip)/16) << 24);
-                    let y0 = y << 4;
-                    let y1 = (((y+detail_skip) % 16) << 4) | (((y+detail_skip)/16) << 25);
-                    let z0 = z << 8;
-                    let z1 = (((z+detail_skip) % 16) << 8) | (((z+detail_skip)/16) << 26);
-
-                    if x == 0 || self.grid[(x-detail_skip,y,z)].is_null() {
-                        let face = x0 | (1 << 12);
-                        let uv = block.get_uv_forward();
-                        vertices.push(BlockVertex {data: uv.0|y0|z0|face});
-                        vertices.push(BlockVertex {data: uv.1|y1|z0|face});
-                        vertices.push(BlockVertex {data: uv.2|y1|z1|face});
-                        vertices.push(BlockVertex {data: uv.3|y0|z1|face});
-                        indices.push(0+index_offset);
-                        indices.push(2+index_offset);
-                        indices.push(1+index_offset);
-                        indices.push(0+index_offset);
-                        indices.push(3+index_offset);
-                        indices.push(2+index_offset);
-                        index_offset += 4;
-                    }
-                    if y == 0 || self.grid[(x,y-detail_skip,z)].is_null() {
-                        let face = y0 | (3 << 12);
-                        let uv = block.get_uv_left();
-                        vertices.push(BlockVertex {data: uv.0|x0|z0|face});
-                        vertices.push(BlockVertex {data: uv.1|x1|z0|face});
-                        vertices.push(BlockVertex {data: uv.2|x1|z1|face});
-                        vertices.push(BlockVertex {data: uv.3|x0|z1|face});
-                        indices.push(0+index_offset);
-                        indices.push(1+index_offset);
-                        indices.push(2+index_offset);
-                        indices.push(0+index_offset);
-                        indices.push(2+index_offset);
-                        indices.push(3+index_offset);
-                        index_offset += 4;
-                    }
-                    if z == 0 || self.grid[(x,y,z-detail_skip)].is_null() {
-                        let face = z0 | (5 << 12);
-                        let uv = block.get_uv_up();
-                        vertices.push(BlockVertex {data: uv.0|x0|y0|face});
-                        vertices.push(BlockVertex {data: uv.1|x1|y0|face});
-                        vertices.push(BlockVertex {data: uv.2|x1|y1|face});
-                        vertices.push(BlockVertex {data: uv.3|x0|y1|face});
-                        indices.push(0+index_offset);
-                        indices.push(2+index_offset);
-                        indices.push(1+index_offset);
-                        indices.push(0+index_offset);
-                        indices.push(3+index_offset);
-                        indices.push(2+index_offset);
-                        index_offset += 4;
-                    }
-                    if x == last || self.grid[(x+detail_skip,y,z)].is_null() {
-                        let face = x1; // Normal or constant face
-                        let uv = block.get_uv_backward();
-                        vertices.push(BlockVertex {data: uv.0|y0|z0|face});
-                        vertices.push(BlockVertex {data: uv.1|y1|z0|face});
-                        vertices.push(BlockVertex {data: uv.2|y1|z1|face});
-                        vertices.push(BlockVertex {data: uv.3|y0|z1|face});
-                        indices.push(0+index_offset);
-                        indices.push(1+index_offset);
-                        indices.push(2+index_offset);
-                        indices.push(0+index_offset);
-                        indices.push(2+index_offset);
-                        indices.push(3+index_offset);
-                        index_offset += 4;
-                    }
-                    if y == last || self.grid[(x,y+detail_skip,z)].is_null() {
-                        let face = y1 | (2 << 12);
-                        let uv = block.get_uv_right();
-                        vertices.push(BlockVertex {data: uv.0|x0|z0|face});
-                        vertices.push(BlockVertex {data: uv.1|x1|z0|face});
-                        vertices.push(BlockVertex {data: uv.2|x1|z1|face});
-                        vertices.push(BlockVertex {data: uv.3|x0|z1|face});
-                        indices.push(0+index_offset);
-                        indices.push(2+index_offset);
-                        indices.push(1+index_offset);
-                        indices.push(0+index_offset);
-                        indices.push(3+index_offset);
-                        indices.push(2+index_offset);
-                        index_offset += 4;
-                    }
-                    if z == last || self.grid[(x,y,z+detail_skip)].is_null() {
-                        let face = z1 | (4 << 12);
-                        let uv = block.get_uv_down();
-                        vertices.push(BlockVertex {data: uv.0|x0|y0|face});
-                        vertices.push(BlockVertex {data: uv.1|x1|y0|face});
-                        vertices.push(BlockVertex {data: uv.2|x1|y1|face});
-                        vertices.push(BlockVertex {data: uv.3|x0|y1|face});
-                        indices.push(0+index_offset);
-                        indices.push(1+index_offset);
-                        indices.push(2+index_offset);
-                        indices.push(0+index_offset);
-                        indices.push(2+index_offset);
-                        indices.push(3+index_offset);
-                        index_offset += 4;
+                    if (block.id & 0x100) == 0 {
+                        add_block(&self.grid, x, y, z, detail_skip, &mut index_offset, &mut vertices, &mut indices);
+                    } else {
+                        add_clutter(&self.grid, x, y, z, detail_skip, &mut index_offset, &mut vertices, &mut indices);
                     }
                 }
             }
@@ -223,11 +131,11 @@ impl GraphicalChunk {
         let mut break_neg = false;
         for z in 0..CHUNK_SIZE {
             for y in 0..CHUNK_SIZE {
-                if self.grid[(0,y,z)].is_null() {
+                if !self.grid[(0,y,z)].is_opaque() {
                     self.flush |= 1 << 0;
                     break_pos = true;
                 }
-                if self.grid[(CHUNK_SIZE-1,y,z)].is_null() {
+                if! self.grid[(CHUNK_SIZE-1,y,z)].is_opaque() {
                     self.flush |= 1 << 1;
                     break_neg = true;
                 }
@@ -240,11 +148,11 @@ impl GraphicalChunk {
         let mut break_neg = false;
         for z in 0..CHUNK_SIZE {
             for x in 0..CHUNK_SIZE {
-                if self.grid[(x,0,z)].is_null() {
+                if !self.grid[(x,0,z)].is_opaque() {
                     self.flush |= 1 << 2;
                     break_pos = true;
                 }
-                if self.grid[(x,CHUNK_SIZE-1,z)].is_null() {
+                if !self.grid[(x,CHUNK_SIZE-1,z)].is_opaque() {
                     self.flush |= 1 << 3;
                     break_neg = true;
                 }
@@ -257,11 +165,11 @@ impl GraphicalChunk {
         let mut break_neg = false;
         for y in 0..CHUNK_SIZE {
             for x in 0..CHUNK_SIZE {
-                if self.grid[(x,y,0)].is_null() {
+                if !self.grid[(x,y,0)].is_opaque() {
                     self.flush |= 1 << 4;
                     break_pos = true;
                 }
-                if self.grid[(x,y,CHUNK_SIZE-1)].is_null() {
+                if !self.grid[(x,y,CHUNK_SIZE-1)].is_opaque() {
                     self.flush |= 1 << 5;
                     break_neg = true;
                 }
@@ -420,4 +328,163 @@ impl GridTexture {
     pub fn bind(&self, renderer: &mut Renderer, detail: usize) {
         self.textures[detail-1].bind(renderer);
     }
+}
+
+fn add_block(grid: &Grid<GraphicalBlock>, x: u32, y: u32, z: u32, detail_skip: u32, index_offset: &mut u16, vertices: &mut Vec<BlockVertex>, indices: &mut Vec<u16>) {
+    let block = grid[(x,y,z)];
+    let last = CHUNK_SIZE - detail_skip;
+    let x0 = x;
+    let x1 = ((x+detail_skip) % 16) | (((x+detail_skip)/16) << 24);
+    let y0 = y << 4;
+    let y1 = (((y+detail_skip) % 16) << 4) | (((y+detail_skip)/16) << 25);
+    let z0 = z << 8;
+    let z1 = (((z+detail_skip) % 16) << 8) | (((z+detail_skip)/16) << 26);
+
+    if x == 0 || !grid[(x-detail_skip,y,z)].is_opaque() {
+        let face = x0 | (1 << 12);
+        let uv = block.get_uv_forward();
+        vertices.push(BlockVertex {data: uv.0|y0|z0|face});
+        vertices.push(BlockVertex {data: uv.1|y1|z0|face});
+        vertices.push(BlockVertex {data: uv.2|y1|z1|face});
+        vertices.push(BlockVertex {data: uv.3|y0|z1|face});
+        indices.push(0+*index_offset);
+        indices.push(2+*index_offset);
+        indices.push(1+*index_offset);
+        indices.push(0+*index_offset);
+        indices.push(3+*index_offset);
+        indices.push(2+*index_offset);
+        *index_offset += 4;
+    }
+    if y == 0 || !grid[(x,y-detail_skip,z)].is_opaque() {
+        let face = y0 | (3 << 12);
+        let uv = block.get_uv_left();
+        vertices.push(BlockVertex {data: uv.0|x0|z0|face});
+        vertices.push(BlockVertex {data: uv.1|x1|z0|face});
+        vertices.push(BlockVertex {data: uv.2|x1|z1|face});
+        vertices.push(BlockVertex {data: uv.3|x0|z1|face});
+        indices.push(0+*index_offset);
+        indices.push(1+*index_offset);
+        indices.push(2+*index_offset);
+        indices.push(0+*index_offset);
+        indices.push(2+*index_offset);
+        indices.push(3+*index_offset);
+        *index_offset += 4;
+    }
+    if z == 0 || !grid[(x,y,z-detail_skip)].is_opaque() {
+        let face = z0 | (5 << 12);
+        let uv = block.get_uv_up();
+        vertices.push(BlockVertex {data: uv.0|x0|y0|face});
+        vertices.push(BlockVertex {data: uv.1|x1|y0|face});
+        vertices.push(BlockVertex {data: uv.2|x1|y1|face});
+        vertices.push(BlockVertex {data: uv.3|x0|y1|face});
+        indices.push(0+*index_offset);
+        indices.push(2+*index_offset);
+        indices.push(1+*index_offset);
+        indices.push(0+*index_offset);
+        indices.push(3+*index_offset);
+        indices.push(2+*index_offset);
+        *index_offset += 4;
+    }
+    if x == last || !grid[(x+detail_skip,y,z)].is_opaque() {
+        let face = x1; // Normal or constant face
+        let uv = block.get_uv_backward();
+        vertices.push(BlockVertex {data: uv.0|y0|z0|face});
+        vertices.push(BlockVertex {data: uv.1|y1|z0|face});
+        vertices.push(BlockVertex {data: uv.2|y1|z1|face});
+        vertices.push(BlockVertex {data: uv.3|y0|z1|face});
+        indices.push(0+*index_offset);
+        indices.push(1+*index_offset);
+        indices.push(2+*index_offset);
+        indices.push(0+*index_offset);
+        indices.push(2+*index_offset);
+        indices.push(3+*index_offset);
+        *index_offset += 4;
+    }
+    if y == last || !grid[(x,y+detail_skip,z)].is_opaque() {
+        let face = y1 | (2 << 12);
+        let uv = block.get_uv_right();
+        vertices.push(BlockVertex {data: uv.0|x0|z0|face});
+        vertices.push(BlockVertex {data: uv.1|x1|z0|face});
+        vertices.push(BlockVertex {data: uv.2|x1|z1|face});
+        vertices.push(BlockVertex {data: uv.3|x0|z1|face});
+        indices.push(0+*index_offset);
+        indices.push(2+*index_offset);
+        indices.push(1+*index_offset);
+        indices.push(0+*index_offset);
+        indices.push(3+*index_offset);
+        indices.push(2+*index_offset);
+        *index_offset += 4;
+    }
+    if z == last || !grid[(x,y,z+detail_skip)].is_opaque() {
+        let face = z1 | (4 << 12);
+        let uv = block.get_uv_down();
+        vertices.push(BlockVertex {data: uv.0|x0|y0|face});
+        vertices.push(BlockVertex {data: uv.1|x1|y0|face});
+        vertices.push(BlockVertex {data: uv.2|x1|y1|face});
+        vertices.push(BlockVertex {data: uv.3|x0|y1|face});
+        indices.push(0+*index_offset);
+        indices.push(1+*index_offset);
+        indices.push(2+*index_offset);
+        indices.push(0+*index_offset);
+        indices.push(2+*index_offset);
+        indices.push(3+*index_offset);
+        *index_offset += 4;
+    }
+}
+
+fn add_clutter(grid: &Grid<GraphicalBlock>, x: u32, y: u32, z: u32, detail_skip: u32, index_offset: &mut u16, vertices: &mut Vec<BlockVertex>, indices: &mut Vec<u16>) {
+    let block = grid[(x,y,z)];
+    let last = CHUNK_SIZE - detail_skip;
+    let x0 = x;
+    let x1 = ((x+detail_skip) % 16) | (((x+detail_skip)/16) << 24);
+    let y0 = y << 4;
+    let y1 = (((y+detail_skip) % 16) << 4) | (((y+detail_skip)/16) << 25);
+    let z0 = z << 8;
+    let z1 = (((z+detail_skip) % 16) << 8) | (((z+detail_skip)/16) << 26);
+
+    let shifted_id = (block.id - 0x100) as u32;
+    let uv = (
+        ((shifted_id + 1) << 16) | (7 << 20),
+        ((shifted_id + 1) << 16) | (6 << 20),
+        ((shifted_id + 0) << 16) | (6 << 20),
+        ((shifted_id + 0) << 16) | (7 << 20),
+    );
+
+    let face = 6 << 12; // Null
+
+    vertices.push(BlockVertex {data: uv.0|x0|y0|z0|face});
+    vertices.push(BlockVertex {data: uv.1|x1|y1|z0|face});
+    vertices.push(BlockVertex {data: uv.2|x1|y1|z1|face});
+    vertices.push(BlockVertex {data: uv.3|x0|y0|z1|face});
+    indices.push(0+*index_offset);
+    indices.push(1+*index_offset);
+    indices.push(2+*index_offset);
+    indices.push(0+*index_offset);
+    indices.push(2+*index_offset);
+    indices.push(3+*index_offset);
+    indices.push(0+*index_offset);
+    indices.push(2+*index_offset);
+    indices.push(1+*index_offset);
+    indices.push(0+*index_offset);
+    indices.push(3+*index_offset);
+    indices.push(2+*index_offset);
+    *index_offset += 4;
+
+    vertices.push(BlockVertex {data: uv.0|x1|y0|z0|face});
+    vertices.push(BlockVertex {data: uv.1|x0|y1|z0|face});
+    vertices.push(BlockVertex {data: uv.2|x0|y1|z1|face});
+    vertices.push(BlockVertex {data: uv.3|x1|y0|z1|face});
+    indices.push(0+*index_offset);
+    indices.push(1+*index_offset);
+    indices.push(2+*index_offset);
+    indices.push(0+*index_offset);
+    indices.push(2+*index_offset);
+    indices.push(3+*index_offset);
+    indices.push(0+*index_offset);
+    indices.push(2+*index_offset);
+    indices.push(1+*index_offset);
+    indices.push(0+*index_offset);
+    indices.push(3+*index_offset);
+    indices.push(2+*index_offset);
+    *index_offset += 4;
 }

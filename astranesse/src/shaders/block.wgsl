@@ -121,7 +121,7 @@ fn vs_main(
     if (((vert.data>>12) & 0xf) == 5) { normal.z = -1.; }
 
     out.texpos = vec2(
-        f32((vert.data>>20) & 0xf) / 6.,
+        f32((vert.data>>20) & 0xf) / 7.,
         f32((vert.data>>16) & 0xf) / TEXTURE_SIZE,
     );
 
@@ -145,6 +145,7 @@ fn vs_main(
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var color = textureSample(t_diffuse, s_diffuse, in.texpos);
+    if color.a == 0 {discard;}
     let to_light = normalize(lights.pos.xyz - in.position.xyz);
 
     var shadow_coords = in.shadow_pos.xyz / in.shadow_pos.w;
