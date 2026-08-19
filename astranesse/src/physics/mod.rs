@@ -2,7 +2,7 @@ mod rigid_body;
 mod collisions;
 
 use faer::{Mat, Side, prelude::Solve};
-use cgmath::{InnerSpace, Matrix3, Vector3};
+use cgmath::{InnerSpace, Matrix3, Rotation, Vector3};
 pub use rigid_body::{RigidBodyData, RigidBody, RigidBodyInit, MoI};
 pub use collisions::{shapes, Collider, CollisionReport};
 use crate::util::Vendor;
@@ -77,20 +77,25 @@ impl Physics {
                 if j >= i {break;}
                 let report = Collider::check_collision(&a, &b);
                 if let CollisionReport::Some { normal, depth, p1, p2 } = report {
-                    // handle collisions
-                    let denom = (1. / a.mass + 1. / b.mass) + 
-                        a.moi.mul_inv(p1.cross(normal)).cross(p1).dot(normal) + 
-                        b.moi.mul_inv(p2.cross(normal)).cross(p2).dot(normal)
+                    let normal1 = a.ori.invert() * normal;
+                    let normal2 = b.ori.invert() * normal;
+                    let denom = 
+                        1. / a.mass +
+                        1. / b.mass + 
+                        a.moi.mul_inv(p1.cross(normal1)).cross(p1).dot(normal1) + 
+                        b.moi.mul_inv(p2.cross(normal2)).cross(p2).dot(normal2)
                     ;
-                    let rel_vel = a.vel - b.vel;
+                    let rel_vel = a.vel - b.vel + a.ori*p1.cross(a.ang_vel) - b.ori*p2.cross(b.ang_vel);
                     let restitution = (a.restitution + b.restitution) / 2.;
-                    let impulse = (1. + restitution) * rel_vel.dot(normal) / denom;
-                    a.add_force(-impulse / delta_t * normal);
-                    b.add_force(impulse / delta_t * normal);
+                    let force = (1. + restitution) * rel_vel.dot(normal) / denom / delta_t;
+                    a.add_force(-force * normal);
+                    b.add_force(force * normal);
+                    a.add_torque(-p1.cross(normal1) * force);
+                    b.add_torque(p2.cross(normal2) * force);
 
                     let a_mass_frac = a.mass / (a.mass + b.mass);
-                    a.pos -= normal*depth * (1. - a_mass_frac);
-                    b.pos += normal*depth * a_mass_frac;
+                    a.pos += normal*depth * (1. - a_mass_frac);
+                    b.pos -= normal*depth * a_mass_frac;
 
                     self.collision_pairs.push((a.clone(), b.clone()));
                     self.collision_reports.push(report);
@@ -100,8 +105,8 @@ impl Physics {
 
         // Compute self angular acceleration
         for mut body in self.rb_vendor.iter() {
-            let accel = body.moi.get_self_accel(body.ang_vel);
-            body.add_torque(accel);
+            let torque = body.moi.get_self_torque(body.ang_vel);
+            body.add_torque(torque);
         }
         // self.resolve_normal_forces(); // TODO
         // self.resolve_normal_torques();

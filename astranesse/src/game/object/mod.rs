@@ -12,7 +12,7 @@ use crate::game::object::chunk::PhysicalBlock;
 pub use crate::game::object::internals::{Internals, Interrupt};
 use crate::graphics::{GraphicalBlock, GraphicalChunk, Graphics, GridTexture, ModelUniform, Renderer, StorageBuffer};
 use crate::physics::{Collider, MoI, Physics, RigidBody, RigidBodyInit, RigidBodyData};
-use crate::util::{CHUNK_SIZE, my_fmod, outer};
+use crate::util::{CHUNK_SIZE, my_fmod, moi_product};
 use chunk::PhysicalChunk;
 pub use internals::BlockGlobalPos;
 pub use blocks::{BlockId, GraphicId, BlockProperties};
@@ -36,6 +36,8 @@ impl ObjectLoader {
                 pos: ship_loader.pos,
                 vel: ship_loader.vel,
                 ori: Quaternion::new(0.5, 0.5, 0.5, 1.).normalize(),
+                ang_vel: Vector3::new(0., 0., 0.5),
+                mass: 0.,
                 ..Default::default()
             },
             ObjectLoader::MultiShot(planet_loader) => {
@@ -70,7 +72,7 @@ impl Object {
         let buffer_size = loader.estimate_max_rendered_chunks()*std::mem::size_of::<ModelUniform>();
         let storage_buffer = StorageBuffer::new(graphics, buffer_size as usize);
         let internals = Internals::new();
-        Self {
+        let mut object = Self {
             physical_chunks: FxHashMap::default(),
             graphical_chunks: FxHashMap::default(),
             loader,
@@ -78,7 +80,9 @@ impl Object {
             body,
             last_load: None,
             storage_buffer,
-        }
+        };
+        object.recalc_rigid_body();
+        object
     }
 
     pub fn update(&mut self, graphics: &Graphics, properties: &BlockProperties, character_pos: Vector3<f64>, delta_t: f64) {
@@ -139,8 +143,6 @@ impl Object {
         let block = GraphicalBlock::new(properties[typ].graphic_id);
         self.graphical_chunks.get_mut(&block_pos.0).unwrap().place_block(block, block_pos, graphics);
         GraphicalChunk::update_exposed(block_pos.0, &mut self.graphical_chunks, graphics);
-
-        self.recalc_rigid_body();
     }
 
 
@@ -153,20 +155,22 @@ impl Object {
             let chunk_pos = Vector3::new(chunk_pos.0 as f64, chunk_pos.1 as f64, chunk_pos.2 as f64) * CHUNK_SIZE as f64;
             mass_m0 += chunk.mass_m0;
             mass_m1 += chunk.mass_m1 + chunk_pos * chunk.mass_m0;
-            mass_m2 += chunk.mass_m2 + outer(chunk_pos, chunk_pos) * chunk.mass_m0;
+            mass_m2 += chunk.mass_m2 + moi_product(chunk_pos) * chunk.mass_m0;
         }
         mass_m1 /= mass_m0;
+        mass_m2 += mass_m0 * Matrix3::new(1., 0., 0., 0., 1., 0., 0., 0., 1.,) / 6.;
         
         // Set the rigid body data
+        let previously_initialized = self.body.mass != 0.;
         self.body.mass = mass_m0;
         let delta_com_global = self.body.ori * (mass_m1 - self.body.com_pos);
-        self.body.com_pos = mass_m1; // Center of mass
-        self.body.pos += delta_com_global;
-        self.body.moi = crate::physics::MoI::new_matrix((mass_m2.clone() - Matrix3::new(
-            mass_m1.x*mass_m1.x - 0.1666666666, mass_m1.x*mass_m1.y, mass_m1.x*mass_m1.z,
-            mass_m1.y*mass_m1.x, mass_m1.y*mass_m1.y - 0.1666666666, mass_m1.y*mass_m1.z,
-            mass_m1.z*mass_m1.x, mass_m1.z*mass_m1.y, mass_m1.z*mass_m1.z - 0.1666666666,
-        )) * mass_m0);
+        if previously_initialized {
+            self.body.pos += delta_com_global;
+        }
+        if self.body.mass > 0. {
+            self.body.moi = MoI::new_matrix(mass_m2);
+            self.body.com_pos = mass_m1; // Center of mass
+        }
     }
 
     fn load_chunks(&mut self, graphics: &Graphics, properties: &BlockProperties, character_pos: Vector3<f64>) {

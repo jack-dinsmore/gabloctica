@@ -20,6 +20,7 @@ use crate::util::CHUNK_SIZE;
 use crate::util::RcCell;
 use crate::util::my_fmod;
 use cgmath::InnerSpace;
+use cgmath::Quaternion;
 use cgmath::Vector3;
 use object::Object;
 use planet::{Planet, PlanetInit};
@@ -112,11 +113,13 @@ impl Game {
         let post_info = PostInfo::new(&graphics, &camera);
 
         let mut planets: Vec<Planet> = vec![
-            Planet::new(PlanetInit::default()),
+            // Planet::new(PlanetInit::default()),
         ];
         let mut objects = vec![
-            Rc::new(RefCell::new(Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos: Vector3::new(12., 7., 42.), vel: Vector3::new(0., 0., 0.) })))),
+            Rc::new(RefCell::new(Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos: Vector3::new(12., -5., 50.), vel: Vector3::new(0., 5., 0.) })))),
+            Rc::new(RefCell::new(Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos: Vector3::new(12., 5., 50.), vel: Vector3::new(0., -5., 0.) })))),
         ];
+        objects[0].borrow_mut().body.ori = Quaternion::new(0., 0., 0., 1.);
         for planet in &mut planets {
             let obj = Rc::new(RefCell::new(Object::new(&graphics, &mut physics, planet.loader())));
             planet.object = Some(obj.clone());

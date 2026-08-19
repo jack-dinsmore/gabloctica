@@ -1,6 +1,6 @@
 use cgmath::{Matrix3, Vector3, Zero};
 
-use crate::{game::object::{BlockGlobalPos, BlockId, BlockProperties}, graphics::Graphics, physics::RigidBody, util::{CHUNK_SIZE, Grid, outer}};
+use crate::{game::object::{BlockGlobalPos, BlockId, BlockProperties}, graphics::Graphics, physics::RigidBody, util::{CHUNK_SIZE, Grid, moi_product}};
 
 #[derive(Copy, Clone, Debug)]
 pub struct PhysicalBlock {
@@ -66,14 +66,14 @@ impl PhysicalChunk {
             for y in 0..CHUNK_SIZE {
                 let mut collider_row: u16 = 0;
                 for x in 0..CHUNK_SIZE {
-                    let pos = Vector3::new(x as f64, y as f64, z as f64);
+                    let pos = Vector3::new(x as f64 + 0.5, y as f64 + 0.5, z as f64 + 0.5);
                     let grid_block = self.grid[(x,y,z)];
                     if !grid_block.is_null() {
                         collider_row |= 1 << x;
 
                         self.mass_m0 += grid_block.mass;
                         self.mass_m1 += pos * grid_block.mass;
-                        self.mass_m2 += outer(pos, pos) * grid_block.mass;
+                        self.mass_m2 += moi_product(pos) * grid_block.mass;
                     }
                 }
                 collider_blocks[(y+CHUNK_SIZE*z) as usize] = collider_row;

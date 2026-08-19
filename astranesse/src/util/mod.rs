@@ -14,16 +14,10 @@ pub fn my_fmod(f: f64, l: f64) -> f64 {
     (phase - phase.floor()) * l
 }
 
-pub fn outer(v1: Vector3<f64>, v2: Vector3<f64>) -> Matrix3<f64> {
+pub fn moi_product(v: Vector3<f64>) -> Matrix3<f64> {
     Matrix3::new(
-        v1.x*v2.x,
-        v1.x*v2.y,
-        v1.x*v2.z,
-        v1.y*v2.x,
-        v1.y*v2.y,
-        v1.y*v2.z,
-        v1.z*v2.x,
-        v1.z*v2.y,
-        v1.z*v2.z,
+        v.y*v.y + v.z*v.z, v.x*v.y, v.x*v.z,
+        v.y*v.x, v.x*v.x + v.z*v.z, v.y*v.z,
+        v.x*v.z, v.z*v.y, v.x*v.x + v.y*v.y,
     )
 }

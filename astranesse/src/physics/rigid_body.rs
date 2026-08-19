@@ -6,31 +6,26 @@ pub type RigidBody = Tagged<RigidBodyData>;
 
 #[derive(Clone, Debug)]
 pub enum MoI {
-    Diagonal{ moi: Vector3<f64>, reciprocals: Vector3<f64> },
+    Diagonal{ moi: Vector3<f64>},
     Matrix{ moi: Matrix3<f64>, inverse: Matrix3<f64>},
 }
 impl MoI {
     pub fn new_diagonal(moi: Vector3<f64>) -> Self {
-        let reciprocals = Vector3::new(
-            (moi.y - moi.z) / moi.x,
-            (moi.z - moi.x) / moi.y,
-            (moi.x - moi.y) / moi.z,
-        );
-        Self::Diagonal { moi, reciprocals }
+        Self::Diagonal { moi }
     }
     pub fn new_matrix(moi: Matrix3<f64>) -> Self {
         Self::Matrix { inverse: moi.invert().unwrap(),  moi }
     }
-    /// Get the angular acceleration for angular velocity `omega`.
-    pub fn get_self_accel(&self, omega: Vector3<f64>) -> Vector3<f64> {
+    /// Get the angular ``torque`` for angular velocity `omega`.
+    pub fn get_self_torque(&self, omega: Vector3<f64>) -> Vector3<f64> {
         match self {
-            MoI::Diagonal { reciprocals, .. } => Vector3::new(
-                omega.y*omega.z * reciprocals.x,
-                omega.z*omega.x * reciprocals.y,
-                omega.x*omega.y * reciprocals.z,
+            MoI::Diagonal { moi } => Vector3::new(
+                omega.y*omega.z * (moi.y - moi.z),
+                omega.z*omega.x * (moi.z - moi.x),
+                omega.x*omega.y * (moi.x - moi.y),
             ),
             MoI::Matrix { moi, inverse } => {
-                inverse * omega.cross(moi * omega)
+                (moi * omega).cross(omega)
             },
         }
     }
@@ -117,6 +112,7 @@ pub struct RigidBodyData {
     pub vel: Vector3<f64>,
     /// Rotates from the body to global
     pub ori: Quaternion<f64>,
+    /// Defined in local coordinates
     pub ang_vel: Vector3<f64>,
     pub mass: f64,
     pub moi: MoI,
@@ -172,13 +168,8 @@ impl RigidBodyData {
     pub fn add_torque(&mut self, torque: Vector3<f64>) {
         self.torques += torque;
     }
-    pub fn add_couple(&mut self, force: Vector3<f64>, offset: Vector3<f64>) {
-        self.add_force(force);
-        self.add_torque(offset.cross(force));
-    }
     pub(super) fn update(&mut self, delta_t: f64) {
-        let rotated_torques = self.ori * self.torques;
-        self.ang_vel += self.moi.mul_inv(rotated_torques) * delta_t;
+        self.ang_vel += self.moi.mul_inv(self.torques) * delta_t;
         let vel_quat = Quaternion::from_sv(0., self.ang_vel);
         self.ori += 0.5 * vel_quat * self.ori * delta_t;
         self.ori.normalize();
