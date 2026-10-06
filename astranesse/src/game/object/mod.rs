@@ -148,6 +148,11 @@ impl Object {
 
     /// Update the model buffers and rigid body. If only some chunks were changed, pass a vector of chunk positions. Otherwise, pass an empty vector. This will update the passed chunks, and neighbors if the neighbors now become visible.
     fn recalc_rigid_body(&mut self) {
+        // Determine if the body can be recalculated
+        if let ObjectLoader::MultiShot(..) = self.loader {
+            return;
+        }
+
         let mut mass_m0 = 0.;
         let mut mass_m1 = Vector3::zero();
         let mut mass_m2 = Matrix3::zero();
@@ -157,20 +162,25 @@ impl Object {
             mass_m1 += chunk.mass_m1 + chunk_pos * chunk.mass_m0;
             mass_m2 += chunk.mass_m2 + moi_product(chunk_pos) * chunk.mass_m0;
         }
-        mass_m1 /= mass_m0;
-        mass_m2 += mass_m0 * Matrix3::new(1., 0., 0., 0., 1., 0., 0., 0., 1.,) / 6.;
-        
-        // Set the rigid body data
-        let previously_initialized = self.body.mass != 0.;
+        let first_initialization = self.body.mass == 0. && mass_m0 != 0.;
         self.body.mass = mass_m0;
+        mass_m1 /= mass_m0;
+
+        // If the body has not been loaded, stop.
+        if mass_m0 == 0. {return;}
+
+        // Shift the position to preserve com
         let delta_com_global = self.body.ori * (mass_m1 - self.body.com_pos);
-        if previously_initialized {
+        if !first_initialization {
             self.body.pos += delta_com_global;
         }
-        if self.body.mass > 0. {
-            self.body.moi = MoI::new_matrix(mass_m2);
-            self.body.com_pos = mass_m1; // Center of mass
-        }
+
+        // Center of mass
+        mass_m2 -= moi_product(mass_m1) * mass_m0;
+        self.body.com_pos = mass_m1;
+
+        // MOI
+        self.body.moi = MoI::new_matrix(mass_m2);
     }
 
     fn load_chunks(&mut self, graphics: &Graphics, properties: &BlockProperties, character_pos: Vector3<f64>) {

@@ -13,7 +13,7 @@ impl PhysicalBlock {
         Self {
             id,
             ori,
-            mass: 0.01,
+            mass: 1.,
         }
     }
     pub fn is_null(&self) -> bool {
@@ -79,5 +79,6 @@ impl PhysicalChunk {
                 collider_blocks[(y+CHUNK_SIZE*z) as usize] = collider_row;
             }
         }
+        self.mass_m2 += self.mass_m0 * Matrix3::new(1., 0., 0., 0., 1., 0., 0., 0., 1.,) / 6.;
     }
 }

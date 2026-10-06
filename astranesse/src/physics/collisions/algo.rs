@@ -119,15 +119,15 @@ impl ColliderType {
                     b_normals[0],
                     b_normals[1],
                     b_normals[2],
-                    a_normals[0].cross(b_normals[0]),
-                    a_normals[0].cross(b_normals[1]),
-                    a_normals[0].cross(b_normals[2]),
-                    a_normals[1].cross(b_normals[0]),
-                    a_normals[1].cross(b_normals[1]),
-                    a_normals[1].cross(b_normals[2]),
-                    a_normals[2].cross(b_normals[0]),
-                    a_normals[2].cross(b_normals[1]),
-                    a_normals[2].cross(b_normals[2]),
+                    a_normals[0].cross(b_normals[0]).normalize(),
+                    a_normals[0].cross(b_normals[1]).normalize(),
+                    a_normals[0].cross(b_normals[2]).normalize(),
+                    a_normals[1].cross(b_normals[0]).normalize(),
+                    a_normals[1].cross(b_normals[1]).normalize(),
+                    a_normals[1].cross(b_normals[2]).normalize(),
+                    a_normals[2].cross(b_normals[0]).normalize(),
+                    a_normals[2].cross(b_normals[1]).normalize(),
+                    a_normals[2].cross(b_normals[2]).normalize(),
                 ];
 
                 let mut best_sepax_index = 0;
@@ -158,15 +158,18 @@ impl ColliderType {
                             pos += v;
                             n += 1;
                         }
-                    }
-                    for i in 0..8 {
                         let v = get_pos_from_i(i, &b_normals, &b_edges) + b_global_center;
                         if check_inside(v, a_global_center, &a_normals, *a_edges) {
                             pos += v;
                             n += 1;
                         }
                     }
-                    pos / n as f64
+
+                    if n == 0 {
+                        (a_global_center + b_global_center) / 2.
+                    } else {
+                        pos / n as f64
+                    }
                 } else {
                     // Vertex collision
                     let (a_mid, a_n) = match best_sepax_index {
@@ -210,19 +213,19 @@ impl ColliderType {
 
                     a_mid + a_n * s
                 };
-                let p1 = a.ori.invert()*(global_pos - a.pos);
-                let p2 = b.ori.invert()*(global_pos - b.pos);
+                let p1_global = global_pos - a.pos;
+                let p2_global = global_pos - b.pos;
 
                 let mut normal = sepaxes[best_sepax_index];
-                if normal.dot(p1) < 0. {
+                if normal.dot(p1_global) < 0. {
                     normal *= -1.;
                 }
 
                 CollisionReport::Some {
                     normal,
                     depth: best_sepn,
-                    p1,
-                    p2,
+                    p1: a.ori.invert()*p1_global,
+                    p2: b.ori.invert()*p2_global,
                 }
             },
             (

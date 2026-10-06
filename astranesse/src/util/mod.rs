@@ -16,8 +16,8 @@ pub fn my_fmod(f: f64, l: f64) -> f64 {
 
 pub fn moi_product(v: Vector3<f64>) -> Matrix3<f64> {
     Matrix3::new(
-        v.y*v.y + v.z*v.z, v.x*v.y, v.x*v.z,
-        v.y*v.x, v.x*v.x + v.z*v.z, v.y*v.z,
-        v.x*v.z, v.z*v.y, v.x*v.x + v.y*v.y,
+        v.y*v.y + v.z*v.z, -v.x*v.y, -v.x*v.z,
+        -v.y*v.x, v.x*v.x + v.z*v.z, -v.y*v.z,
+        -v.x*v.z, -v.z*v.y, v.x*v.x + v.y*v.y,
     )
 }

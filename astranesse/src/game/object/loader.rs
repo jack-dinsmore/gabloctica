@@ -20,7 +20,7 @@ impl ShipLoader {
         chunk.grid[(7,6,7)] = PhysicalBlock::new(4, 1, properties);// Tank
         chunk.grid[(8,6,7)] = PhysicalBlock::new(5, 3, properties);// Engine
         chunk.grid[(7,7,8)] = PhysicalBlock::new(6, 0, properties);// Chair
-        chunk.grid[(8,8,8)] = PhysicalBlock::new(8, 0, properties);// Rock
+        // chunk.grid[(8,8,8)] = PhysicalBlock::new(8, 0, properties);// Rock
 
         let mut out = FxHashMap::default();
         out.insert(chunk_coord, chunk);

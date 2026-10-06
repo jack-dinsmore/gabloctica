@@ -76,8 +76,10 @@ pub struct RigidBodyInit {
     pub vel: Vector3<f64>,
     /// Orientation rotates FROM body TO inertial
     pub ori: Quaternion<f64>,
+    /// Angular velocity in local coordinate
     pub ang_vel: Vector3<f64>,
     pub mass: f64,
+    /// MOI in local coordinates
     pub moi: MoI,
     pub static_coeff: f64,
     pub kinetic_coeff: f64,
@@ -97,7 +99,7 @@ impl Default for RigidBodyInit {
             kinetic_coeff: 0.3,
             moi: MoI::new_diagonal(Vector3::new(1., 1., 1.)),
             collider: None,
-            restitution: 0.7,
+            restitution: 0.5,
         }
     }
 }
@@ -171,8 +173,8 @@ impl RigidBodyData {
     pub(super) fn update(&mut self, delta_t: f64) {
         self.ang_vel += self.moi.mul_inv(self.torques) * delta_t;
         let vel_quat = Quaternion::from_sv(0., self.ang_vel);
-        self.ori += 0.5 * vel_quat * self.ori * delta_t;
-        self.ori.normalize();
+        self.ori += 0.5 * self.ori * vel_quat * delta_t;
+        self.ori = self.ori.normalize();
 
         self.vel += self.forces * delta_t / self.mass;
         self.pos += self.vel * delta_t;

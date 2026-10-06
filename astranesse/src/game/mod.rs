@@ -113,20 +113,19 @@ impl Game {
         let post_info = PostInfo::new(&graphics, &camera);
 
         let mut planets: Vec<Planet> = vec![
-            // Planet::new(PlanetInit::default()),
+            Planet::new(PlanetInit::default()),
         ];
-        let mut objects = vec![
-            Rc::new(RefCell::new(Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos: Vector3::new(12., -5., 50.), vel: Vector3::new(0., 5., 0.) })))),
-            Rc::new(RefCell::new(Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos: Vector3::new(12., 5., 50.), vel: Vector3::new(0., -5., 0.) })))),
+        let mut objects: Vec<Rc<RefCell<Object>>> = vec![
+            // Rc::new(RefCell::new(Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos: Vector3::new(12., -5., 144.), vel: Vector3::new(0., 5., 0.) })))),
+            Rc::new(RefCell::new(Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos: Vector3::new(12., 5., 43.), vel: Vector3::new(0., 0., 0.) })))),
         ];
-        objects[0].borrow_mut().body.ori = Quaternion::new(0., 0., 0., 1.);
         for planet in &mut planets {
             let obj = Rc::new(RefCell::new(Object::new(&graphics, &mut physics, planet.loader())));
             planet.object = Some(obj.clone());
             objects.push(obj);
         }
         let entities = vec![
-            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 50.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
+            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 43.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
         ];
 
         // Set cursor to center of screen
@@ -354,7 +353,7 @@ impl Game {
             // Move camera look
             let player = &self.entities[0];
             const SPEED: f64 = 0.2;
-            self.camera.pos = player.body.pos;
+            self.camera.pos = player.body.pos + player.body.ori * Vector3::unit_z() * 0.5;
             self.camera.theta += (SPEED*delta_t) as f32 *self.mouse_motion.1;
             self.camera.phi -= (SPEED*delta_t) as f32 *self.mouse_motion.0;
             self.mouse_motion = (0., 0.);

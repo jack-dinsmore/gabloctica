@@ -11,7 +11,7 @@ impl Entity {
     pub fn new(physics: &mut Physics, mut init: RigidBodyInit) -> Self {
         init.collider = Some(crate::physics::Collider::Box(BoxData { 
             center: Vector3::zero(),
-            edges: Vector3::new(0.9, 0.4, 0.4),
+            edges: Vector3::new(0.4, 0.4, 0.9), // Remember that these lengths are halfwidths
         }));
         init.moi = crate::physics::MoI::new_diagonal(Vector3::new(1e8, 1e8, 1e8));
         Self {
