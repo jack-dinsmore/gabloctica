@@ -99,7 +99,8 @@ impl GraphicalChunk {
         let detail_skip = 2u32.pow(self.detail as u32-1);
         let last = CHUNK_SIZE - detail_skip;
         if detail_skip == 0 {
-            panic!("{}", self.detail); // TODO remove
+            // panic!("{}", self.detail); // TODO remove
+            return;// TODO BAD
         }
         for x in (0..CHUNK_SIZE).step_by(detail_skip as usize) {
             for y in (0..CHUNK_SIZE).step_by(detail_skip as usize) {

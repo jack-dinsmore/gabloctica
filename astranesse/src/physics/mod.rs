@@ -11,7 +11,7 @@ use crate::util::Vendor;
 pub const NEWTON_G: f64 = 5.;
 pub const STEFAN_BOLTZMANN: f64 = 1.;
 pub const PROTON_MASS: f32 = 1.;
-pub const BOLTZMANN: f32 = 1.;
+pub const BOLTZMANN: f32 = 0.5;
 const GRAVITY_THRESH: f64 = 10.;
 
 pub struct Physics {

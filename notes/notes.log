@@ -1,0 +1,433 @@
+This is LuaHBTeX, Version 1.15.0 (TeX Live 2022)  (format=lualatex 2022.7.10)  14 OCT 2026 19:33
+ restricted system commands enabled.
+ file:line:error style messages enabled.
+**/Users/jtd/Documents/personal/code/rust/astranesse/notes/notes
+(/Users/jtd/Documents/personal/code/rust/astranesse/notes/notes.tex
+LaTeX2e <2021-11-15> patch level 1
+Lua module: luaotfload 2022-03-18 3.21 Lua based OpenType font support
+Lua module: lualibs 2021-05-20 2.74 ConTeXt Lua standard libraries.
+Lua module: lualibs-extended 2021-05-20 2.74 ConTeXt Lua libraries -- extended collection.
+luaotfload | conf : Root cache directory is "/Users/jtd/Library/texlive/2022/texmf-var/luatex-cache/generic/names".
+luaotfload | init : Loading fontloader "fontloader-2022-02-24.lua" from kpse-resolved path "/usr/local/texlive/2022/texmf-dist/tex/luatex/luaotfload/fontloader-2022-02-24.lua".
+Lua-only attribute luaotfload@noligature = 1
+luaotfload | init : Context OpenType loader version 3.119
+Inserting `luaotfload.node_processor' at position 1 in `pre_linebreak_filter'.
+Inserting `luaotfload.node_processor' at position 1 in `hpack_filter'.
+Inserting `luaotfload.glyph_stream' at position 1 in `glyph_stream_provider'.
+Inserting `luaotfload.define_font' at position 1 in `define_font'.
+Lua-only attribute luaotfload_color_attribute = 2
+luaotfload | conf : Root cache directory is "/Users/jtd/Library/texlive/2022/texmf-var/luatex-cache/generic/names".
+Inserting `luaotfload.harf.strip_prefix' at position 1 in `find_opentype_file'.
+Inserting `luaotfload.harf.strip_prefix' at position 1 in `find_truetype_file'.
+Removing  `luaotfload.glyph_stream' from `glyph_stream_provider'.
+Inserting `luaotfload.harf.glyphstream' at position 1 in `glyph_stream_provider'.
+Inserting `luaotfload.harf.finalize_vlist' at position 1 in `post_linebreak_filter'.
+Inserting `luaotfload.harf.finalize_hlist' at position 2 in `hpack_filter'.
+Inserting `luaotfload.cleanup_files' at position 1 in `wrapup_run'.
+Inserting `luaotfload.harf.finalize_unicode' at position 1 in `finish_pdffile'.
+Inserting `luaotfload.glyphinfo' at position 1 in `glyph_info'.
+Lua-only attribute luaotfload.letterspace_done = 3
+Inserting `luaotfload.aux.set_sscale_dimens' at position 1 in `luaotfload.patch_font'.
+Inserting `luaotfload.aux.set_font_index' at position 2 in `luaotfload.patch_font'.
+Inserting `luaotfload.aux.patch_cambria_domh' at position 3 in `luaotfload.patch_font'.
+Inserting `luaotfload.aux.fixup_fontdata' at position 1 in `luaotfload.patch_font_unsafe'.
+Inserting `luaotfload.aux.set_capheight' at position 4 in `luaotfload.patch_font'.
+Inserting `luaotfload.aux.set_xheight' at position 5 in `luaotfload.patch_font'.
+Inserting `luaotfload.rewrite_fontname' at position 6 in `luaotfload.patch_font'. L3 programming layer <2022-02-24>
+Inserting `tracingstacklevels' at position 1 in `input_level_string'. (/usr/local/texlive/2022/texmf-dist/tex/latex/base/article.cls
+Document Class: article 2021/10/04 v1.4n Standard LaTeX document class
+(/usr/local/texlive/2022/texmf-dist/tex/latex/base/size11.clo
+File: size11.clo 2021/10/04 v1.4n Standard LaTeX file (size option)
+luaotfload | db : Font names database loaded from /Users/jtd/Library/texlive/2022/texmf-var/luatex-cache/generic/names/luaotfload-names.luc.gz)
+\c@part=\count183
+\c@section=\count184
+\c@subsection=\count185
+\c@subsubsection=\count186
+\c@paragraph=\count187
+\c@subparagraph=\count188
+\c@figure=\count189
+\c@table=\count190
+\abovecaptionskip=\skip47
+\belowcaptionskip=\skip48
+\bibindent=\dimen137
+) (/usr/local/texlive/2022/texmf-dist/tex/latex/geometry/geometry.sty
+Package: geometry 2020/01/02 v5.9 Page Geometry
+ (/usr/local/texlive/2022/texmf-dist/tex/latex/graphics/keyval.sty
+Package: keyval 2014/10/28 v1.15 key=value parser (DPC)
+\KV@toks@=\toks16
+) (/usr/local/texlive/2022/texmf-dist/tex/generic/iftex/ifvtex.sty
+Package: ifvtex 2019/10/25 v1.7 ifvtex legacy package. Use iftex instead.
+ (/usr/local/texlive/2022/texmf-dist/tex/generic/iftex/iftex.sty
+Package: iftex 2022/02/03 v1.0f TeX engine tests
+))
+\Gm@cnth=\count191
+\Gm@cntv=\count192
+\c@Gm@tempcnt=\count193
+\Gm@bindingoffset=\dimen138
+\Gm@wd@mp=\dimen139
+\Gm@odd@mp=\dimen140
+\Gm@even@mp=\dimen141
+\Gm@layoutwidth=\dimen142
+\Gm@layoutheight=\dimen143
+\Gm@layouthoffset=\dimen144
+\Gm@layoutvoffset=\dimen145
+\Gm@dimlist=\toks17
+) (/usr/local/texlive/2022/texmf-dist/tex/latex/base/inputenc.sty
+Package: inputenc 2021/02/14 v1.3d Input encoding file
+\inpenc@prehook=\toks18
+\inpenc@posthook=\toks19
+
+
+Package inputenc Warning: inputenc package ignored with utf8 based engines.
+
+) (/usr/local/texlive/2022/texmf-dist/tex/latex/base/fontenc.sty
+Package: fontenc 2021/04/29 v2.0v Standard LaTeX package
+LaTeX Font Info:    Trying to load font information for T1+lmr on input line 112.
+ (/usr/local/texlive/2022/texmf-dist/tex/latex/lm/t1lmr.fd
+File: t1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
+)) (/usr/local/texlive/2022/texmf-dist/tex/latex/ebgaramond/ebgaramond.sty
+Package: ebgaramond 2020/04/12 (Bob Tennent and autoinst) Style file for EB Garamond fonts.
+ (/usr/local/texlive/2022/texmf-dist/tex/generic/iftex/ifxetex.sty
+Package: ifxetex 2019/10/25 v0.7 ifxetex legacy package. Use iftex instead.
+) (/usr/local/texlive/2022/texmf-dist/tex/generic/iftex/ifluatex.sty
+Package: ifluatex 2019/10/25 v1.5 ifluatex legacy package. Use iftex instead.
+) (/usr/local/texlive/2022/texmf-dist/tex/latex/xkeyval/xkeyval.sty
+Package: xkeyval 2020/11/20 v2.8 package option processing (HA)
+ (/usr/local/texlive/2022/texmf-dist/tex/generic/xkeyval/xkeyval.tex (/usr/local/texlive/2022/texmf-dist/tex/generic/xkeyval/xkvutils.tex
+\XKV@toks=\toks20
+\XKV@tempa@toks=\toks21
+)
+\XKV@depth=\count194
+File: xkeyval.tex 2014/12/03 v2.7a key=value parser (HA)
+)) (/usr/local/texlive/2022/texmf-dist/tex/latex/base/textcomp.sty
+Package: textcomp 2020/02/02 v2.0n Standard LaTeX package
+) (/usr/local/texlive/2022/texmf-dist/tex/latex/fontspec/fontspec.sty (/usr/local/texlive/2022/texmf-dist/tex/latex/l3packages/xparse/xparse.sty (/usr/local/texlive/2022/texmf-dist/tex/latex/l3kernel/expl3.sty
+Package: expl3 2022-02-24 L3 programming layer (loader) 
+ (/usr/local/texlive/2022/texmf-dist/tex/latex/l3backend/l3backend-luatex.def
+File: l3backend-luatex.def 2022-02-07 L3 backend support: PDF output (LuaTeX)
+\l__color_backend_stack_int=\count195
+\l__pdf_internal_box=\box50
+))
+Package: xparse 2022-01-12 L3 Experimental document command parser
+)
+Package: fontspec 2022/01/15 v2.8a Font selection for XeLaTeX and LuaLaTeX
+Lua module: fontspec 2022/01/15 2.8a Font selection for XeLaTeX and LuaLaTeX (/usr/local/texlive/2022/texmf-dist/tex/latex/fontspec/fontspec-luatex.sty
+Package: fontspec-luatex 2022/01/15 v2.8a Font selection for XeLaTeX and LuaLaTeX
+\l__fontspec_script_int=\count196
+\l__fontspec_language_int=\count197
+\l__fontspec_strnum_int=\count198
+\l__fontspec_tmp_int=\count199
+\l__fontspec_tmpa_int=\count266
+\l__fontspec_tmpb_int=\count267
+\l__fontspec_tmpc_int=\count268
+\l__fontspec_em_int=\count269
+\l__fontspec_emdef_int=\count270
+\l__fontspec_strong_int=\count271
+\l__fontspec_strongdef_int=\count272
+\l__fontspec_tmpa_dim=\dimen146
+\l__fontspec_tmpb_dim=\dimen147
+\l__fontspec_tmpc_dim=\dimen148
+ (/usr/local/texlive/2022/texmf-dist/tex/latex/base/fontenc.sty
+Package: fontenc 2021/04/29 v2.0v Standard LaTeX package
+) (/usr/local/texlive/2022/texmf-dist/tex/latex/fontspec/fontspec.cfg)))
+
+Package fontspec Info: Font family 'EBGaramond(0)' created for font
+(fontspec)             'EBGaramond' with options [Ligatures = TeX,Scale =
+(fontspec)             1,SmallCapsFeatures={Renderer=Basic},Extension =
+(fontspec)             .otf,Ligatures=TeX,Numbers =
+(fontspec)             {Proportional,OldStyle},UprightFont =
+(fontspec)             *-Regular,ItalicFont = *-Italic,BoldFont =
+(fontspec)             *-Bold,BoldItalicFont =
+(fontspec)             *-BoldItalic,FontFace={m}{sw}{Font=*-Italic,Style=Swash},FontFace={b}{sw}{Font=*-BoldItalic,Style=Swash}].
+(fontspec)              
+(fontspec)              This font family consists of the following NFSS
+(fontspec)             series/shapes:
+(fontspec)              
+(fontspec)             - 'swash' (m/sw) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Italic.otf]:mode=node;script=latn;language=dflt;+tlig;+pnum;+onum;+swsh;"
+(fontspec)             -  (m/scsw) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Italic.otf]:mode=base;script=latn;language=dflt;+tlig;+pnum;+onum;+swsh;+smcp;"
+(fontspec)             - 'bold swash' (b/sw) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-BoldItalic.otf]:mode=node;script=latn;language=dflt;+tlig;+pnum;+onum;+swsh;"
+(fontspec)             -  (b/scsw) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-BoldItalic.otf]:mode=base;script=latn;language=dflt;+tlig;+pnum;+onum;+swsh;+smcp;"
+(fontspec)             - 'normal' (m/n) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Regular.otf]:mode=node;script=latn;language=dflt;+tlig;+pnum;+onum;"
+(fontspec)             - 'small caps'  (m/sc) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Regular.otf]:mode=base;script=latn;language=dflt;+tlig;+pnum;+onum;+smcp;"
+(fontspec)             - 'bold' (b/n) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Bold.otf]:mode=node;script=latn;language=dflt;+tlig;+pnum;+onum;"
+(fontspec)             - 'bold small caps'  (b/sc) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Bold.otf]:mode=base;script=latn;language=dflt;+tlig;+pnum;+onum;+smcp;"
+(fontspec)             - 'italic' (m/it) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Italic.otf]:mode=node;script=latn;language=dflt;+tlig;+pnum;+onum;"
+(fontspec)             - 'italic small caps'  (m/scit) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Italic.otf]:mode=base;script=latn;language=dflt;+tlig;+pnum;+onum;+smcp;"
+(fontspec)             - 'bold italic' (b/it) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-BoldItalic.otf]:mode=node;script=latn;language=dflt;+tlig;+pnum;+onum;"
+(fontspec)             - 'bold italic small caps'  (b/scit) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-BoldItalic.otf]:mode=base;script=latn;language=dflt;+tlig;+pnum;+onum;+smcp;"
+
+LaTeX Font Info:    Font shape `TU/EBGaramond(0)/m/n' will be
+(Font)              scaled to size 10.95pt on input line 124.
+
+Package fontspec Info: Font family 'EBGaramond(1)' created for font
+(fontspec)             'EBGaramond' with options [Ligatures = TeX,Scale =
+(fontspec)             1,SmallCapsFeatures={Renderer=Basic},Extension =
+(fontspec)             .otf,Numbers = {Proportional,OldStyle},UprightFont =
+(fontspec)             *-Regular,ItalicFont = *-Italic,BoldFont =
+(fontspec)             *-Bold,BoldItalicFont = *-BoldItalic].
+(fontspec)              
+(fontspec)              This font family consists of the following NFSS
+(fontspec)             series/shapes:
+(fontspec)              
+(fontspec)             - 'normal' (m/n) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Regular.otf]:mode=node;script=latn;language=dflt;+tlig;+pnum;+onum;"
+(fontspec)             - 'small caps'  (m/sc) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Regular.otf]:mode=base;script=latn;language=dflt;+tlig;+pnum;+onum;+smcp;"
+(fontspec)             - 'bold' (b/n) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Bold.otf]:mode=node;script=latn;language=dflt;+tlig;+pnum;+onum;"
+(fontspec)             - 'bold small caps'  (b/sc) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Bold.otf]:mode=base;script=latn;language=dflt;+tlig;+pnum;+onum;+smcp;"
+(fontspec)             - 'italic' (m/it) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Italic.otf]:mode=node;script=latn;language=dflt;+tlig;+pnum;+onum;"
+(fontspec)             - 'italic small caps'  (m/scit) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Italic.otf]:mode=base;script=latn;language=dflt;+tlig;+pnum;+onum;+smcp;"
+(fontspec)             - 'bold italic' (b/it) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-BoldItalic.otf]:mode=node;script=latn;language=dflt;+tlig;+pnum;+onum;"
+(fontspec)             - 'bold italic small caps'  (b/scit) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-BoldItalic.otf]:mode=base;script=latn;language=dflt;+tlig;+pnum;+onum;+smcp;"
+
+
+Package fontspec Info: Font family 'EBGaramond(2)' created for font
+(fontspec)             'EBGaramond' with options [Ligatures = TeX,Scale =
+(fontspec)             1,SmallCapsFeatures={Renderer=Basic},Extension =
+(fontspec)             .otf,Numbers = {Proportional,Lining},UprightFont =
+(fontspec)             *-Regular,ItalicFont = *-Italic,BoldFont =
+(fontspec)             *-Bold,BoldItalicFont = *-BoldItalic].
+(fontspec)              
+(fontspec)              This font family consists of the following NFSS
+(fontspec)             series/shapes:
+(fontspec)              
+(fontspec)             - 'normal' (m/n) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Regular.otf]:mode=node;script=latn;language=dflt;+tlig;+pnum;+lnum;"
+(fontspec)             - 'small caps'  (m/sc) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Regular.otf]:mode=base;script=latn;language=dflt;+tlig;+pnum;+lnum;+smcp;"
+(fontspec)             - 'bold' (b/n) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Bold.otf]:mode=node;script=latn;language=dflt;+tlig;+pnum;+lnum;"
+(fontspec)             - 'bold small caps'  (b/sc) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Bold.otf]:mode=base;script=latn;language=dflt;+tlig;+pnum;+lnum;+smcp;"
+(fontspec)             - 'italic' (m/it) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Italic.otf]:mode=node;script=latn;language=dflt;+tlig;+pnum;+lnum;"
+(fontspec)             - 'italic small caps'  (m/scit) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Italic.otf]:mode=base;script=latn;language=dflt;+tlig;+pnum;+lnum;+smcp;"
+(fontspec)             - 'bold italic' (b/it) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-BoldItalic.otf]:mode=node;script=latn;language=dflt;+tlig;+pnum;+lnum;"
+(fontspec)             - 'bold italic small caps'  (b/scit) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-BoldItalic.otf]:mode=base;script=latn;language=dflt;+tlig;+pnum;+lnum;+smcp;"
+
+luaotfload | aux : font no 26 (nil) defines no feature for script latn
+luaotfload | aux : font no 26 (nil) defines no feature for script dflt
+
+Package fontspec Info: Font family 'EBGaramond-Initials(0)' created for font
+(fontspec)             'EBGaramond-Initials' with options [Ligatures =
+(fontspec)             TeX,Scale =
+(fontspec)             1,SmallCapsFeatures={Renderer=Basic},Extension =
+(fontspec)             .otf,BoldFont={},ItalicFont={},SmallCapsFont={}].
+(fontspec)              
+(fontspec)              This font family consists of the following NFSS
+(fontspec)             series/shapes:
+(fontspec)              
+(fontspec)             - 'normal' (m/n) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Initials.otf]:mode=node;language=dflt;+tlig;"
+(fontspec)             - 'small caps'  (m/sc) with NFSS spec.: 
+
+LaTeX Info: Redefining \oldstylenums on input line 152.
+LaTeX Info: Redefining \liningnums on input line 153.
+LaTeX Info: Redefining \textsw on input line 187.
+
+Package fontspec Info: Font family 'EBGaramond(3)' created for font
+(fontspec)             'EBGaramond' with options [Ligatures = TeX,Scale =
+(fontspec)             1,SmallCapsFeatures={Renderer=Basic},Extension =
+(fontspec)             .otf,Numbers = {Monospaced,OldStyle},UprightFont =
+(fontspec)             *-Regular,ItalicFont = *-Italic,BoldFont =
+(fontspec)             *-Bold,BoldItalicFont = *-BoldItalic].
+(fontspec)              
+(fontspec)              This font family consists of the following NFSS
+(fontspec)             series/shapes:
+(fontspec)              
+(fontspec)             - 'normal' (m/n) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Regular.otf]:mode=node;script=latn;language=dflt;+tlig;+tnum;+onum;"
+(fontspec)             - 'small caps'  (m/sc) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Regular.otf]:mode=base;script=latn;language=dflt;+tlig;+tnum;+onum;+smcp;"
+(fontspec)             - 'bold' (b/n) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Bold.otf]:mode=node;script=latn;language=dflt;+tlig;+tnum;+onum;"
+(fontspec)             - 'bold small caps'  (b/sc) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Bold.otf]:mode=base;script=latn;language=dflt;+tlig;+tnum;+onum;+smcp;"
+(fontspec)             - 'italic' (m/it) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Italic.otf]:mode=node;script=latn;language=dflt;+tlig;+tnum;+onum;"
+(fontspec)             - 'italic small caps'  (m/scit) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-Italic.otf]:mode=base;script=latn;language=dflt;+tlig;+tnum;+onum;+smcp;"
+(fontspec)             - 'bold italic' (b/it) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-BoldItalic.otf]:mode=node;script=latn;language=dflt;+tlig;+tnum;+onum;"
+(fontspec)             - 'bold italic small caps'  (b/scit) with NFSS spec.:
+(fontspec)             <->s*[1]"[EBGaramond-BoldItalic.otf]:mode=base;script=latn;language=dflt;+tlig;+tnum;+onum;+smcp;"
+
+) (./notes.aux)
+\openout1 = notes.aux
+
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 13.
+LaTeX Font Info:    ... okay on input line 13.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 13.
+LaTeX Font Info:    ... okay on input line 13.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 13.
+LaTeX Font Info:    ... okay on input line 13.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 13.
+LaTeX Font Info:    ... okay on input line 13.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 13.
+LaTeX Font Info:    Trying to load font information for TS1+cmr on input line 13.
+ (/usr/local/texlive/2022/texmf-dist/tex/latex/base/ts1cmr.fd
+File: ts1cmr.fd 2019/12/16 v2.5j Standard LaTeX font definitions
+)
+LaTeX Font Info:    ... okay on input line 13.
+LaTeX Font Info:    Checking defaults for TU/lmr/m/n on input line 13.
+LaTeX Font Info:    ... okay on input line 13.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 13.
+LaTeX Font Info:    ... okay on input line 13.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 13.
+LaTeX Font Info:    ... okay on input line 13.
+
+*geometry* driver: auto-detecting
+*geometry* detected driver: luatex
+*geometry* verbose mode - [ preamble ] result:
+* driver: luatex
+* paper: <default>
+* layout: <same size as paper>
+* layoutoffset:(h,v)=(0.0pt,0.0pt)
+* modes: 
+* h-part:(L,W,R)=(43.36243pt, 527.57014pt, 43.36243pt)
+* v-part:(T,H,B)=(43.36243pt, 708.24513pt, 43.36243pt)
+* \paperwidth=614.295pt
+* \paperheight=794.96999pt
+* \textwidth=527.57014pt
+* \textheight=708.24513pt
+* \oddsidemargin=-28.90756pt
+* \evensidemargin=-28.90756pt
+* \topmargin=-65.90756pt
+* \headheight=12.0pt
+* \headsep=25.0pt
+* \topskip=11.0pt
+* \footskip=30.0pt
+* \marginparwidth=4.0pt
+* \marginparsep=10.0pt
+* \columnsep=10.0pt
+* \skip\footins=10.0pt plus 4.0pt minus 2.0pt
+* \hoffset=0.0pt
+* \voffset=0.0pt
+* \mag=1000
+* \@twocolumntrue
+* \@twosidefalse
+* \@mparswitchfalse
+* \@reversemarginfalse
+* (1in=72.27pt=25.4mm, 1cm=28.453pt)
+
+
+Package fontspec Info: Adjusting the maths setup (use [no-math] to avoid
+(fontspec)             this).
+
+\symlegacymaths=\mathgroup4
+LaTeX Font Info:    Overwriting symbol font `legacymaths' in version `bold'
+(Font)                  OT1/cmr/m/n --> OT1/cmr/bx/n on input line 13.
+LaTeX Font Info:    Redeclaring math accent \acute on input line 13.
+LaTeX Font Info:    Redeclaring math accent \grave on input line 13.
+LaTeX Font Info:    Redeclaring math accent \ddot on input line 13.
+LaTeX Font Info:    Redeclaring math accent \tilde on input line 13.
+LaTeX Font Info:    Redeclaring math accent \bar on input line 13.
+LaTeX Font Info:    Redeclaring math accent \breve on input line 13.
+LaTeX Font Info:    Redeclaring math accent \check on input line 13.
+LaTeX Font Info:    Redeclaring math accent \hat on input line 13.
+LaTeX Font Info:    Redeclaring math accent \dot on input line 13.
+LaTeX Font Info:    Redeclaring math accent \mathring on input line 13.
+LaTeX Font Info:    Redeclaring math symbol \colon on input line 13.
+LaTeX Font Info:    Redeclaring math symbol \Gamma on input line 13.
+LaTeX Font Info:    Redeclaring math symbol \Delta on input line 13.
+LaTeX Font Info:    Redeclaring math symbol \Theta on input line 13.
+LaTeX Font Info:    Redeclaring math symbol \Lambda on input line 13.
+LaTeX Font Info:    Redeclaring math symbol \Xi on input line 13.
+LaTeX Font Info:    Redeclaring math symbol \Pi on input line 13.
+LaTeX Font Info:    Redeclaring math symbol \Sigma on input line 13.
+LaTeX Font Info:    Redeclaring math symbol \Upsilon on input line 13.
+LaTeX Font Info:    Redeclaring math symbol \Phi on input line 13.
+LaTeX Font Info:    Redeclaring math symbol \Psi on input line 13.
+LaTeX Font Info:    Redeclaring math symbol \Omega on input line 13.
+LaTeX Font Info:    Redeclaring math symbol \mathdollar on input line 13.
+LaTeX Font Info:    Redeclaring symbol font `operators' on input line 13.
+LaTeX Font Info:    Encoding `OT1' has changed to `TU' for symbol font
+(Font)              `operators' in the math version `normal' on input line 13.
+LaTeX Font Info:    Overwriting symbol font `operators' in version `normal'
+(Font)                  OT1/cmr/m/n --> TU/EBGaramond(0)/m/n on input line 13.
+LaTeX Font Info:    Encoding `OT1' has changed to `TU' for symbol font
+(Font)              `operators' in the math version `bold' on input line 13.
+LaTeX Font Info:    Overwriting symbol font `operators' in version `bold'
+(Font)                  OT1/cmr/bx/n --> TU/EBGaramond(0)/m/n on input line 13.
+LaTeX Font Info:    Overwriting symbol font `operators' in version `normal'
+(Font)                  TU/EBGaramond(0)/m/n --> TU/EBGaramond(0)/m/n on input line 13.
+LaTeX Font Info:    Overwriting math alphabet `\mathit' in version `normal'
+(Font)                  OT1/cmr/m/it --> TU/EBGaramond(0)/m/it on input line 13.
+LaTeX Font Info:    Overwriting math alphabet `\mathbf' in version `normal'
+(Font)                  OT1/cmr/bx/n --> TU/EBGaramond(0)/b/n on input line 13.
+LaTeX Font Info:    Overwriting math alphabet `\mathsf' in version `normal'
+(Font)                  OT1/cmss/m/n --> TU/lmss/m/n on input line 13.
+LaTeX Font Info:    Overwriting math alphabet `\mathtt' in version `normal'
+(Font)                  OT1/cmtt/m/n --> TU/lmtt/m/n on input line 13.
+LaTeX Font Info:    Overwriting symbol font `operators' in version `bold'
+(Font)                  TU/EBGaramond(0)/m/n --> TU/EBGaramond(0)/b/n on input line 13.
+LaTeX Font Info:    Overwriting math alphabet `\mathit' in version `bold'
+(Font)                  OT1/cmr/bx/it --> TU/EBGaramond(0)/b/it on input line 13.
+LaTeX Font Info:    Overwriting math alphabet `\mathsf' in version `bold'
+(Font)                  OT1/cmss/bx/n --> TU/lmss/b/n on input line 13.
+LaTeX Font Info:    Overwriting math alphabet `\mathtt' in version `bold'
+(Font)                  OT1/cmtt/m/n --> TU/lmtt/b/n on input line 13.
+LaTeX Font Info:    Font shape `TU/EBGaramond(0)/m/n' will be
+(Font)              scaled to size 17.28pt on input line 14.
+LaTeX Font Info:    Font shape `TU/EBGaramond(0)/m/n' will be
+(Font)              scaled to size 12.0pt on input line 14.
+LaTeX Font Info:    Font shape `TU/EBGaramond(0)/m/n' will be
+(Font)              scaled to size 8.0pt on input line 14.
+LaTeX Font Info:    Font shape `TU/EBGaramond(0)/m/n' will be
+(Font)              scaled to size 6.0pt on input line 14.
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <12> on input line 14.
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <8> on input line 14.
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <6> on input line 14.
+LaTeX Font Info:    Font shape `TU/EBGaramond(0)/m/n' will be
+(Font)              scaled to size 14.4pt on input line 16.
+LaTeX Font Info:    Font shape `TU/EBGaramond(0)/b/n' will be
+(Font)              scaled to size 14.4pt on input line 16.
+LaTeX Font Info:    Font shape `TU/EBGaramond(0)/b/n' will be
+(Font)              scaled to size 12.0pt on input line 17.
+[1{/usr/local/texlive/2022/texmf-var/fonts/map/pdftex/updmap/pdftex.map}
+
+
+
+] (./notes.aux))
+
+Here is how much of LuaTeX's memory you used:
+ 4080 strings out of 477785
+ 100000,552014 words of node,token memory allocated
+ 406 words of node memory still in use:
+   3 hlist, 1 vlist, 1 rule, 2 glue, 3 kern, 1 glyph, 4 attribute, 48 glue_spec, 4 attribute_list, 1 write nodes
+   avail lists: 2:120,3:45,4:3,5:35,6:14,7:943,8:1,9:79,10:2,11:60
+ 24691 multiletter control sequences out of 65536+600000
+ 43 fonts using 8739839 bytes
+ 83i,8n,112p,328b,257s stack positions out of 10000i,1000n,20000p,200000b,200000s
+</usr/local/texlive/2022/texmf-dist/fonts/opentype/public/ebgaramond/EBGaramond-Bold.otf></usr/local/texlive/2022/texmf-dist/fonts/opentype/public/ebgaramond/EBGaramond-Regular.otf>
+Output written on notes.pdf (1 page, 11889 bytes).
+
+PDF statistics: 22 PDF objects out of 1000 (max. 8388607)
+ 12 compressed objects within 1 object stream
+ 0 named destinations out of 1000 (max. 131072)
+ 1 words of extra memory for PDF output out of 10000 (max. 100000000)
+

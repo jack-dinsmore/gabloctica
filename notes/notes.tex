@@ -1,0 +1,22 @@
+\documentclass[11pt,twocolumn]{article}
+
+\usepackage[margin=0.6in]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{ebgaramond}
+
+\title{Astranesse}
+\author{Jack T. Dinsmore}
+
+\renewcommand{\baselinestretch}{1.15}
+
+\begin{document}
+  \maketitle
+
+  \section{Planet generation}
+  \subsection{Atmosphere}
+    Given the basic properties of a planet and a rough altitude map the task is to compute its atmospheric flows. These will then be used to determine the weathering and humidity maps of the planet, which modify the altitude and set the biome. The atmospheric simulation should include Hadley cells and respond to large scale features such as coastlines and mountains. The humidity can be done post hoc, and should take adiabatic cooling into account.
+
+    My basic picture is that Hadley cells exist because the higher temperature at the equator sets up a pressure gradient towards the poles. But the upper atmosphere has far less pressure gradient because it's less thermally connected to the ground. This sets up curl in the pressure field.
+
+\end{document}

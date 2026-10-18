@@ -268,9 +268,7 @@ impl Object {
                 self.last_load = Some(std::time::Instant::now());
             },
         }
-        dbg!();
     }
-    
 }
 
 // Graphics

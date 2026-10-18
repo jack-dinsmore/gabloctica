@@ -21,7 +21,6 @@ use crate::util::CHUNK_SIZE;
 use crate::util::RcCell;
 use crate::util::my_fmod;
 use cgmath::InnerSpace;
-use cgmath::Quaternion;
 use cgmath::Vector3;
 use object::Object;
 use planet::{Planet, PlanetInit};

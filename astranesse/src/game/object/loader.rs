@@ -45,103 +45,35 @@ impl PlanetLoader {
     }
 
     pub(super) fn load_chunk(&self, graphics: &Graphics, properties: &BlockProperties, chunk_coord: (i32, i32, i32)) -> Option<PhysicalChunk> {
-        let chunk_coord_f = Vector3::new(chunk_coord.0 as f32, chunk_coord.1 as f32, chunk_coord.2 as f32);
-        let mut intersecting_faces = Vec::new();
-        let mut is_outside = false;
-        for face_index in 0..6 {
-            let chunk_alt = match face_index {
-                0 => chunk_coord_f.x - self.halfwidth,
-                1 => -chunk_coord_f.x - self.halfwidth,
-                2 => chunk_coord_f.y - self.halfwidth,
-                3 => -chunk_coord_f.y - self.halfwidth,
-                4 => chunk_coord_f.z - self.halfwidth,
-                5 => -chunk_coord_f.z - self.halfwidth,
-                _ => unreachable!()
-            };
-            let val = self.planet.get_altitude(chunk_coord_f, face_index);
-            if chunk_alt > val {
-                is_outside = true;
-            } else if chunk_alt > val - 1. {
-                intersecting_faces.push((face_index, chunk_alt))
-            }
-        }
-        if is_outside {
+        let chunk_pos = Vector3::new(chunk_coord.0 as f32, chunk_coord.1 as f32, chunk_coord.2 as f32) * CHUNK_SIZE as f32;
+        if self.planet.get_point_altitude(chunk_pos) > self.planet.get_altitude(chunk_pos) + CHUNK_SIZE as f32 {
+            // The chunk is outside the planet. Don't load it.
             return None;
         }
-        let pos = chunk_coord_f * CHUNK_SIZE as f32;
+
         let mut chunk = PhysicalChunk::empty(graphics, chunk_coord);
-        let recip = 1. / CHUNK_SIZE as f32;
-        if intersecting_faces.is_empty() {
-            let biome = self.planet.get_biome(chunk_coord_f, 0);
-            chunk.grid.fill(PhysicalBlock::new(1, 0, properties));
-        }
-        else if intersecting_faces.len() == 1 {
-            let (face_index, chunk_alt) = intersecting_faces[0];
-            let biome = self.planet.get_biome(chunk_coord_f, face_index);
+        let max = chunk_pos.x.abs().max(chunk_pos.y.abs().max(chunk_pos.z.abs()));
+        let face_index = if max == chunk_pos.x.abs() {
+            if chunk_pos.x > 0. { 0 } else { 1 }
+        } else if max == chunk_pos.y.abs() {
+            if chunk_pos.y > 0. { 2 } else { 3 }
+        } else {
+            if chunk_pos.z > 0. { 4 } else { 5 }
+        };
 
-            for u in 0..CHUNK_SIZE {
-                let ux = u as f32 * recip;
-                for v in 0..CHUNK_SIZE {
-                    let vx = v as f32 * recip;
-                    let block_coord = chunk_coord_f + match face_index {
-                        0|1 => Vector3::new(0., ux, vx),
-                        2|3 => Vector3::new(ux, 0., vx),
-                        4|5 => Vector3::new(ux, vx, 0.),
-                        _ => unreachable!()
-                    };
-                    let local_height = ((self.planet.get_altitude(block_coord, face_index) - chunk_alt) * CHUNK_SIZE as f32).max(0.) as u32;
-                    for t in 0..local_height.min(CHUNK_SIZE) {
-                        let depth = local_height - t - 1;
-                        let block = biome.get_block(depth as i32);
-                        match face_index {
-                            0 => chunk.grid[(t,u,v)].id = block,
-                            1 => chunk.grid[(CHUNK_SIZE-1-t,u,v)].id = block,
-                            2 => chunk.grid[(u,t,v)].id = block,
-                            3 => chunk.grid[(u,CHUNK_SIZE-1-t,v)].id = block,
-                            4 => chunk.grid[(u,v,t)].id = block,
-                            5 => chunk.grid[(u,v,CHUNK_SIZE-1-t)].id = block,
-                            _ => unreachable!()
-                        }
-                    }
+        // Build the cube up from the bottom
+        for u in 0..CHUNK_SIZE {
+            for v in 0..CHUNK_SIZE {
+                for w in 0..CHUNK_SIZE {
+                    let pos = chunk_pos + Vector3::new(u as f32, v as f32, w as f32);
+                    let depth = (self.planet.get_altitude(pos) - self.planet.get_point_altitude(pos)) as i32;
+                    if depth < 0 {continue;}
+                    let biome = self.planet.get_biome(pos);
+                    let block = biome.get_block(depth);
+                    chunk.grid[(u,v,w)].id = block;
                 }
             }
         }
-        else if intersecting_faces.len() >= 2 {
-            for x in 0..CHUNK_SIZE {
-                let xx = x as f32 * recip;
-                for y in 0..CHUNK_SIZE {
-                    let yx = y as f32 * recip;
-                    for z in 0..CHUNK_SIZE {
-                        let zx = z as f32 * recip;
-                        let block_coord = chunk_coord_f + Vector3::new(xx, yx, zx);
-                        let mut min_depth = 32;
-                        let mut best_face_index = 0;
-                        for (face_index, alt) in &intersecting_faces {
-                            let block_alt = alt + match face_index {
-                                0 => xx,
-                                1 => 1. - xx,
-                                2 => yx,
-                                3 => 1. - yx,
-                                4 => zx,
-                                5 => 1. - zx,
-                                _ => unreachable!()
-                            };
-                            // let block_alt = block_coord[0].abs().max(block_coord[1].abs().max(block_coord[2].abs())) - self.halfwidth as f64;
-                            let depth = ((self.planet.get_altitude(block_coord, *face_index) - block_alt) * 16.) as i32 - 1;
-                            if depth < min_depth {
-                                best_face_index = *face_index;
-                                min_depth = depth;
-                            }
-                        }
-                        if min_depth >= 0 {
-                            let biome = self.planet.get_biome(pos, best_face_index);
-                            chunk.grid[(x,y,z)].id = biome.get_block(min_depth);
-                        }
-                    }
-                }
-            }
-        }
-
         Some(chunk)
     }
     

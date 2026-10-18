@@ -21,3 +21,13 @@ pub fn moi_product(v: Vector3<f64>) -> Matrix3<f64> {
         -v.x*v.z, -v.z*v.y, v.x*v.x + v.y*v.y,
     )
 }
+
+/// Find the pth percentile of a slice `data` assuming the slice is sorted.
+pub fn percentile_sorted(data: &[f32], p: f32) -> f32 {
+    let rank = p / 100.0 * (data.len() - 1) as f32;
+    let lower = rank.floor() as usize;
+    let upper = rank.ceil() as usize;
+    let fraction = rank - lower as f32;
+
+    data[lower] + fraction * (data[upper] - data[lower])
+}
