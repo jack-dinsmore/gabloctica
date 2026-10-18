@@ -5,7 +5,7 @@ mod grid;
 use std::{cell::RefCell, rc::Rc};
 use cgmath::{Matrix3, Vector3};
 pub use vendor::{Vendor, Tagged};
-pub use interp::SphericalInterpolator;
+pub use interp::{SphericalInterpolator, lerp};
 pub use grid::{Grid, CHUNK_SIZE};
 pub type RcCell<T> = Rc<RefCell<T>>;
 

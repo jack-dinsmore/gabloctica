@@ -3,6 +3,7 @@ pub mod planet;
 pub mod entity;
 pub mod galaxy;
 pub mod shading;
+pub mod chemistry;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -117,7 +118,7 @@ impl Game {
         ];
         let mut objects: Vec<Rc<RefCell<Object>>> = vec![
             // Rc::new(RefCell::new(Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos: Vector3::new(12., -5., 144.), vel: Vector3::new(0., 5., 0.) })))),
-            Rc::new(RefCell::new(Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos: Vector3::new(12., 5., 43.), vel: Vector3::new(0., 0., 0.) })))),
+            Rc::new(RefCell::new(Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos: Vector3::new(12., 5., 83.), vel: Vector3::new(0., 0., 0.) })))),
         ];
         for planet in &mut planets {
             let obj = Rc::new(RefCell::new(Object::new(&graphics, &mut physics, planet.loader())));
@@ -125,7 +126,7 @@ impl Game {
             objects.push(obj);
         }
         let entities = vec![
-            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 43.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
+            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 83.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
         ];
 
         // Set cursor to center of screen
@@ -369,6 +370,7 @@ impl Game {
         for object in &mut self.objects {
             object.borrow_mut().update_buffer(&self.graphics, &self.camera)
         }
+        
         self.font.text(&format!("FPS {}", self.fps_counter.get()), 0., 0.12);
         if !self.planets.is_empty() {
             self.font.text(&self.planets[0].dbg_text(self.camera.pos.cast().unwrap()), 0.0, 0.2);

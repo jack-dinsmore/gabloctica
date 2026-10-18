@@ -1,4 +1,6 @@
 use std::borrow::Cow;
+use wgpu::BlendState;
+
 use crate::graphics::{
     Graphics, Renderer, resource::ResourceType, vertex::Vertex
 };
@@ -35,7 +37,7 @@ impl Shader {
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: graphics.surface_config.format,
-                    blend: None,
+                    blend: Some(BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
                 compilation_options: Default::default(),

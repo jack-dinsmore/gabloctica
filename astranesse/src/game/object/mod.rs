@@ -199,7 +199,7 @@ impl Object {
         );
 
         match &self.loader {
-            ObjectLoader::OneShot(l) => {
+            ObjectLoader::OneShot(l) => { // e.g. ships
                 if self.physical_chunks.is_empty() {
                     let dist = (character_pos - self.body.pos).magnitude();
                     let collider = self.body.get_object_collider_mut();
@@ -230,7 +230,7 @@ impl Object {
                     // TODO delete myself
                 }
             },
-            ObjectLoader::MultiShot(l) => {
+            ObjectLoader::MultiShot(l) => { // e.g. planets
                 let collider = self.body.get_object_collider_mut();
                 // Unload old chunks
                 let keys = self.graphical_chunks.keys().copied().collect::<Vec<_>>();
@@ -268,6 +268,7 @@ impl Object {
                 self.last_load = Some(std::time::Instant::now());
             },
         }
+        dbg!();
     }
     
 }

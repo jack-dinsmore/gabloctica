@@ -9,6 +9,9 @@ use rustc_hash::FxHashSet;
 use crate::util::Vendor;
 
 pub const NEWTON_G: f64 = 5.;
+pub const STEFAN_BOLTZMANN: f64 = 1.;
+pub const PROTON_MASS: f32 = 1.;
+pub const BOLTZMANN: f32 = 1.;
 const GRAVITY_THRESH: f64 = 10.;
 
 pub struct Physics {
@@ -177,7 +180,6 @@ impl Physics {
             } else {
                 (i.kinetic_coeff * j.kinetic_coeff).sqrt()
             };
-            dbg!(normal, friction_dirs[ki]);
 
             let force = a[(ki, 0)] * (normal + friction_dirs[ki] * coeff);
             let inv_ori_i = i.ori.invert();
