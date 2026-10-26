@@ -1,3 +1,5 @@
+use cgmath::Vector3;
+
 use crate::util::lerp;
 
 #[derive(Clone, Debug)]
@@ -6,7 +8,7 @@ pub struct Chemical {
     pub triple: (f32, f32), // Temperature, pressure
     pub molecular_mass: f32,
     pub liquid_density: f32,
-    pub opacity: f32, // Extinction per pascal (1 / m / Pa)
+    pub opacity: Vector3<f32>, // Extinction per pascal (1 / m / Pa) in r, g, b
 }
 
 impl Chemical {
@@ -16,7 +18,7 @@ impl Chemical {
             triple: (100., 10.),
             molecular_mass: 18.,
             liquid_density: 1.,
-            opacity: 1e-5,
+            opacity: Vector3::new(0.3, 0.5, 1.) * 1e-5,
         }
     }
     pub fn air() -> Self {
@@ -25,7 +27,7 @@ impl Chemical {
             triple: (10., 10.),
             molecular_mass: 18.,
             liquid_density: 1.,
-            opacity: 1e-5,
+            opacity: Vector3::new(0.3, 0.5, 1.) * 1e-5,
         }
     }
 

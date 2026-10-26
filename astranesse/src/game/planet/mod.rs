@@ -90,7 +90,7 @@ pub struct Planet {
 
     //Aesthetic properties
     pub scale_height: f32,
-    pub extinction: f32,
+    pub extinction: Vector3<f32>,
 }
 impl Planet {
     pub fn new(data: PlanetInit) -> Self {
@@ -139,7 +139,7 @@ impl Planet {
         let (scale_height, ocean_volume, extinction) = {
             let mut total_pressure = 0.;
             let mut mean_mm = 0.;
-            let mut extinction = 0.;
+            let mut extinction = Vector3::new(0., 0., 0.);
             let mut liquid_fractional_volume = 0.;
             for ((chemical, orig_pressure), state) in concentration.data.iter().zip(&surface_states) {
                 let pressure = match state {
@@ -163,6 +163,7 @@ impl Planet {
             let g_accel = NEWTON_G as f32 * data.mass / radius.powi(2);
             let scale_height = BOLTZMANN * equilib_t / (PROTON_MASS * mean_mm * g_accel);
             let ocean_volume = 24. * radius*radius * scale_height * liquid_fractional_volume;
+            extinction *= scale_height;
 
             (scale_height, ocean_volume, extinction)
         };
@@ -320,10 +321,5 @@ impl Planet {
         let wind = self.wind_interp.get(pos);
         let temp = self.temp_interp.get(pos);
         format!("Altitude: {:.2}\nVolume: {}\nHumidity: {:.2}\nWind: {:?}\nTemp: {:.2}", alt, 1., humidity, wind, temp)
-    }
-
-    pub fn get_local_extinction(&self, pos: Vector3<f32>) -> f32 {
-        // TODO replace with extinction map
-        (-(self.get_point_altitude(pos) - self.ocean_alt).max(0.) / self.scale_height).exp() * self.extinction
     }
 }

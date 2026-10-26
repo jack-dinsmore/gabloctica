@@ -1,7 +1,7 @@
 
-use cgmath::{Matrix4, Rotation, SquareMatrix};
+use cgmath::{Matrix4, Rotation};
 
-use crate::{game::planet::Planet, graphics::{Camera, Graphics, Lighting, OPENGL_TO_WGPU_MATRIX, PostVertex, Renderer, ResourceType, Shader, Uniform, UniformBuffer}, util::CHUNK_SIZE};
+use crate::{game::planet::Planet, graphics::{Camera, Graphics, Lighting, PostVertex, Renderer, ResourceType, Shader, Uniform, UniformBuffer}, util::CHUNK_SIZE};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -9,7 +9,6 @@ struct PostUniform {
     planet_model_inv: [[f32; 4]; 4],
     viewport: [f32; 4],
     fog: [f32; 4],
-    scale_height: [f32; 4],
 }
 
 impl Uniform for PostUniform {
@@ -37,7 +36,6 @@ impl PostInfo {
         let uniform = PostUniform {
             viewport: [width as f32, height as f32, camera.znear, camera.zfar],
             fog: [0.6, 0.09, 0., 1.],
-            scale_height: [0., 0., 0., 0.],
             planet_model_inv: [[0., 0., 0., 0.],[0., 0., 0., 0.],[0., 0., 0., 0.],[0., 0., 0., 0.]],
         };
 
@@ -58,8 +56,10 @@ impl PostInfo {
                 let rb = planet.object.as_ref().unwrap().borrow().body.clone();
                 let planet_model_inv = Matrix4::from_scale(stretch as f64) * Matrix4::from(rb.ori.invert()) * Matrix4::from_translation(camera.pos - rb.pos);
                 self.uniform.planet_model_inv = planet_model_inv.cast().unwrap().into();
-                self.uniform.fog[3] = planet.extinction * planet.scale_height;
-                self.uniform.scale_height[0] = planet.scale_height * stretch;
+                self.uniform.fog[0] = planet.extinction.x;
+                self.uniform.fog[1] = planet.extinction.y;
+                self.uniform.fog[2] = planet.extinction.z;
+                self.uniform.fog[3] = planet.scale_height * stretch;
             },
             None => {
                 self.uniform.fog[3] = 0.;

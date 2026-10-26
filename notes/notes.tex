@@ -4,10 +4,13 @@
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{ebgaramond}
+\usepackage{amsmath}
+\usepackage{amssymb}
 
 \usepackage{bm}
 \newcommand{\unit}[1]{\hat{\bm {#1}}}
 \newcommand{\parens}[1]{\left(#1\right)}
+\newcommand{\brackets}[1]{\left[#1\right]}
 
 \title{Astranesse}
 \author{Jack T. Dinsmore}
@@ -33,7 +36,7 @@
       \end{equation}
       where $E(\ell)$ is the differential extinction and the fog color is blended into the background color by the amount $1 - e^-\tau$. The second equation comes from assuming an exponentially decaying atmosphere with surface extinction $E_0$ (inverse meters), scale height $H$, and height $h(\ell)$ above the surface.
 
-      For a cubic planet, $h(\ell)$ depends on what face the point of integration is hovering over. So I'll split the trajectory into chunks, where each chunk is over a unique edge, face, or vertex. One way of formalizing this is to define the vector $\bm \ell$ pointing from the camera to the end of the sight ray, and dividing the vector into chunks ranging from $\alpha_i \bm \ell$ to $\alpha_{i+1} \bm \ell$, so that
+      For a cubic planet, $h(\ell)$ depends on what face the point of integration is hovering over. So I'll split the trajectory into chunks, where each chunk is over a unique face. One way of formalizing this is to define the vector $\bm \ell$ pointing from the camera to the end of the sight ray, and dividing the vector into chunks ranging from $\alpha_i \bm \ell$ to $\alpha_{i+1} \bm \ell$, so that
       \begin{equation}
         \tau = |\ell| E_0 \sum_i \int_{\alpha_i}^{\alpha_{i+1}}d\alpha\, e^{-h_i(\alpha) / H}.
       \end{equation}
@@ -44,6 +47,17 @@
       \end{equation}
       It seems that one easy way to continue this formula for edges and corners is just to take the normal vector as the average of the abutting faces' normal vectors.
 
-      Note that $E_0H$ is dimensionless. I call that the extinction constant. Then the coordinate system can be remapped in whatever way is desired, e.g.~to a frame in which the planet is the unit cube.
+      Note that $E_0H$ is dimensionless. I call that the extinction constant. Then the coordinate system can be remapped in whatever way is desired, e.g.~to a frame in which the planet is the unit cube. Then $w_i = 1$, $\unit n_i$ are the unit axes, and $H$ is the only important length scale.
+    
+    \subsubsection{Scattering}
+      The amount of light scattered into the line of sight is rather simply computed. If scattering is isotropic and the radiation density going in direction $\unit t$ at point $\bm x$ is $\rho(\bm x,\unit t)$, then the radiation per unit travel length scattered into solid angle $d\Omega$ is $E(\bm x) \rho(\bm x, \unit t) / (4\pi)$, where the $4\pi$ factor satisfies that the integral of all the scattered light gives extinction. So the flux of scattered light is
+      \begin{equation}
+        I = \int_0^\infty d\Omega_{\unit t} d\ell \frac{E(\ell)}{4\pi} \rho(\bm x, \unit t).
+      \end{equation}
+      What is the radiation density though? If optical depth is small, $\rho(\bm x, \unit t)=0$ except along the axis to the sun $\unit s$. Specifically, $\rho(\bm x, \unit t) = I_0 e^{-\tau_0}\delta(\unit t - \unit s)$ where $I_0$ is the illumination of the sun, which sets the color of each block. If we're on a very large face, then $\tau_\odot$ is a constant and
+      \begin{equation}
+        I/I_0 = \frac{1}{4\pi}\tau e^{-\tau_\odot}.
+      \end{equation}
+
 
 \end{document}

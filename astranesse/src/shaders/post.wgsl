@@ -10,13 +10,7 @@ struct PostUniform {
     planet_model_inv: mat4x4<f32>,
     viewport: vec4<f32>,
     fog: vec4<f32>,
-    scale_height: vec4<f32>,
 };
-
-/// Returns depth
-fn linearize_depth(depth: f32, near: f32, far: f32) -> f32 {
-    return (near * far) / (far - depth * (far - near));
-}
 
 // ==========================
 // CUSTOM CODE
@@ -80,28 +74,32 @@ fn get_optical_depth(start_cube: vec3<f32>, stop_cube: vec3<f32>) -> f32 {
         let adot = dot(start_cube, normal) - 1.;
         let secant = look_length / ldot;
 
-        depth += exp(-(ldot * start_alpha + adot) / post.scale_height.x) * secant;
-        depth -= exp(-(ldot * stop_alpha + adot) / post.scale_height.x) * secant;
+        depth += exp(-(ldot * start_alpha + adot) / post.fog.w) * secant;
+        depth -= exp(-(ldot * stop_alpha + adot) / post.fog.w) * secant;
         if stop_alpha >= 1. {break;}
         start_alpha = stop_alpha;
     }
 
-    return depth * post.fog.w;
+    return depth;
 }
 
 @fragment
 fn fs_main(@builtin(position) pos : vec4<f32>) -> @location(0) vec4<f32> {
     let uv = vec2(pos.x / post.viewport.x, pos.y / post.viewport.y); // Division
     let depth = textureSample(depth_tex, samp, uv);
-    let color = textureSample(color_tex, samp, uv);
+    var color = textureSample(color_tex, samp, uv).xyz;
 
     let end_space = camera.view_proj_inv * vec4(2. * uv.x - 1., 1. - 2*uv.y, depth, 1.);
     let end_cube = post.planet_model_inv * (end_space / end_space.w);
     let start_cube = post.planet_model_inv * vec4(0., 0., 0., 1.);
+    let sun_cube = post.planet_model_inv * lights.pos;
 
-    let optical_depth = get_optical_depth(start_cube.xyz, end_cube.xyz);
+    let optical_depth = post.fog.xyz * get_optical_depth(start_cube.xyz, end_cube.xyz);
+    let solar_depth = post.fog.xyz * get_optical_depth(end_cube.xyz, sun_cube.xyz);
 
-    let mixed_color =  mix(post.fog.xyz, color.xyz, exp(-optical_depth));
+    // let mixed_color =  mix(post.fog.xyz, color.xyz, exp(-optical_depth));
+    color *= exp(-optical_depth);
+    color += 0.079577 * optical_depth * exp(-solar_depth);
 
-    return vec4(mixed_color, color.w);
+    return vec4(color, 1.);
 }
