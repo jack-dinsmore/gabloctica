@@ -27,7 +27,7 @@ pub struct Lighting {
 
 impl Lighting {
     pub fn new(graphics: &Graphics) -> Self {
-        let pos = Vector3::new(100., 80., 100.);
+        let pos = Vector3::new(500., 500., 300.);
         let buffer = UniformBuffer::new(graphics);
         Self {
             pos,

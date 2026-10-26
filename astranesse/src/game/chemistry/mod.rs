@@ -6,6 +6,7 @@ pub struct Chemical {
     pub triple: (f32, f32), // Temperature, pressure
     pub molecular_mass: f32,
     pub liquid_density: f32,
+    pub opacity: f32, // Extinction per pascal (1 / m / Pa)
 }
 
 impl Chemical {
@@ -15,6 +16,7 @@ impl Chemical {
             triple: (100., 10.),
             molecular_mass: 18.,
             liquid_density: 1.,
+            opacity: 1e-5,
         }
     }
     pub fn air() -> Self {
@@ -23,6 +25,7 @@ impl Chemical {
             triple: (10., 10.),
             molecular_mass: 18.,
             liquid_density: 1.,
+            opacity: 1e-5,
         }
     }
 

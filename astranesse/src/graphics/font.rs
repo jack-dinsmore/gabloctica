@@ -26,7 +26,7 @@ impl Font {
     pub fn new(graphics: &mut Graphics, camera: &Camera, bytes: &'static [u8]) -> Self {
         let shader = Shader::new::<TextVertex>(graphics, include_str!("../shaders/font.wgsl"), vec![
             ResourceType::Texture,
-        ], false);
+        ], true);
         let font = rusttype::Font::try_from_bytes(bytes).unwrap();
         let scale = Scale { x: 32., y: 42. };
         let string: String = (0..255u8).map(|c| c as char).collect();
@@ -100,6 +100,7 @@ impl Font {
     }
 
     pub fn render(&mut self, renderer: &mut Renderer, camera: &Camera, lighting: &Lighting) {
+        renderer.start_font();
         self.shader.bind(renderer);
         camera.bind(renderer);
         lighting.bind(renderer);

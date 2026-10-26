@@ -87,6 +87,10 @@ pub struct Planet {
     biomes: Vec<Biome>,
     pub halfwidth: f32,
     pub object: Option<RcCell<Object>>,
+
+    //Aesthetic properties
+    pub scale_height: f32,
+    pub extinction: f32,
 }
 impl Planet {
     pub fn new(data: PlanetInit) -> Self {
@@ -132,9 +136,10 @@ impl Planet {
         // Work out atmospheric properties
         let concentration = Concentration::new(&data.composition);
         let surface_states = concentration.get_states(equilib_t);
-        let (scale_height, ocean_volume) = {
+        let (scale_height, ocean_volume, extinction) = {
             let mut total_pressure = 0.;
             let mut mean_mm = 0.;
+            let mut extinction = 0.;
             let mut liquid_fractional_volume = 0.;
             for ((chemical, orig_pressure), state) in concentration.data.iter().zip(&surface_states) {
                 let pressure = match state {
@@ -144,6 +149,7 @@ impl Planet {
                 };
                 total_pressure += pressure;
                 mean_mm += chemical.molecular_mass * pressure;
+                extinction += pressure * chemical.opacity;
 
                 if let State::Liquid(p) = state {
                     let liquid_density = (orig_pressure - p) * (chemical.molecular_mass * PROTON_MASS) / (BOLTZMANN * equilib_t);
@@ -157,9 +163,8 @@ impl Planet {
             let g_accel = NEWTON_G as f32 * data.mass / radius.powi(2);
             let scale_height = BOLTZMANN * equilib_t / (PROTON_MASS * mean_mm * g_accel);
             let ocean_volume = 24. * radius*radius * scale_height * liquid_fractional_volume;
-            dbg!(ocean_volume, scale_height);
 
-            (scale_height, ocean_volume)
+            (scale_height, ocean_volume, extinction)
         };
 
         // Work out ocean via Newton's method
@@ -193,7 +198,6 @@ impl Planet {
                         }
                     }
                 }
-                dbg!(alt, volume);
                 if dvolume == 0. {
                     alt = min_alt;
                 } else {
@@ -279,6 +283,8 @@ impl Planet {
             temp_interp,
             biomes,
             seed,
+            scale_height,
+            extinction,
         }
     }
 
@@ -314,5 +320,10 @@ impl Planet {
         let wind = self.wind_interp.get(pos);
         let temp = self.temp_interp.get(pos);
         format!("Altitude: {:.2}\nVolume: {}\nHumidity: {:.2}\nWind: {:?}\nTemp: {:.2}", alt, 1., humidity, wind, temp)
+    }
+
+    pub fn get_local_extinction(&self, pos: Vector3<f32>) -> f32 {
+        // TODO replace with extinction map
+        (-(self.get_point_altitude(pos) - self.ocean_alt).max(0.) / self.scale_height).exp() * self.extinction
     }
 }

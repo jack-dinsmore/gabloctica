@@ -1,12 +1,15 @@
 
-use crate::{game::planet::Planet, graphics::{Camera, Graphics, Renderer, ResourceType, Uniform, UniformBuffer}};
+use cgmath::{Matrix4, Rotation, SquareMatrix};
+
+use crate::{game::planet::Planet, graphics::{Camera, Graphics, Lighting, OPENGL_TO_WGPU_MATRIX, PostVertex, Renderer, ResourceType, Shader, Uniform, UniformBuffer}, util::CHUNK_SIZE};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct PostUniform {
+    planet_model_inv: [[f32; 4]; 4],
     viewport: [f32; 4],
     fog: [f32; 4],
-    normal: [f32; 4],
+    scale_height: [f32; 4],
 }
 
 impl Uniform for PostUniform {
@@ -14,11 +17,19 @@ impl Uniform for PostUniform {
 }
 
 pub struct PostInfo {
+    shader: Shader,
     uniform: PostUniform,
     buffer: UniformBuffer<PostUniform>,
 }
 impl PostInfo {
-    pub fn new(graphics: &Graphics, camera: &Camera) -> Self {
+    pub fn new(graphics: &mut Graphics, camera: &Camera) -> Self {
+        let shader = Shader::new::<PostVertex>(graphics, include_str!("../../shaders/post.wgsl"), vec![
+            ResourceType::Post,
+            ResourceType::Texture,
+            ResourceType::Camera,
+            ResourceType::Lighting,
+        ], true);
+
         let buffer = UniformBuffer::new(graphics);
         let size = graphics.window.inner_size();
         let width = size.width.max(1);
@@ -26,41 +37,43 @@ impl PostInfo {
         let uniform = PostUniform {
             viewport: [width as f32, height as f32, camera.znear, camera.zfar],
             fog: [0.6, 0.09, 0., 1.],
-            normal: [0., 0., 0., 0.],
+            scale_height: [0., 0., 0., 0.],
+            planet_model_inv: [[0., 0., 0., 0.],[0., 0., 0., 0.],[0., 0., 0., 0.],[0., 0., 0., 0.]],
         };
 
         Self {
             buffer,
             uniform,
+            shader,
         }
     }
     pub fn bind(&mut self, renderer: &mut Renderer) {
         self.buffer.bind(renderer);
     }
     pub fn update_buffer(&mut self, graphics: &Graphics, camera: &Camera, my_planet: Option<&Planet>) {
-        let scale_height = 3.;
-
         match my_planet {
             Some(planet) => {
+                let stretch = 2. / (planet.width as f32 * CHUNK_SIZE as f32);
                 let planet_object = planet.object.as_ref().unwrap().borrow();
-                let displacement = camera.pos - planet_object.body.pos.cast().unwrap();
-        
-                let altitude = displacement.x.abs().max(displacement.y.abs().max(displacement.z.abs()));
-                let normal = if altitude == displacement.x {[1., 0., 0., 0.]}
-                else if altitude == -displacement.x {[-1., 0., 0., 0.]}
-                else if altitude == displacement.y {[0., 1., 0., 0.]}
-                else if altitude == -displacement.y {[0., -1., 0., 0.]}
-                else if altitude == displacement.z {[0., 0., 1., 0.]}
-                else {[0., 0., -1., 0.]};
-                let altitude = altitude as f32 - (planet.width/2) as f32;
-                self.uniform.fog[3] = (-altitude / scale_height).min(0.).exp();
-                self.uniform.normal = normal;
+                let rb = planet.object.as_ref().unwrap().borrow().body.clone();
+                let planet_model_inv = Matrix4::from_scale(stretch as f64) * Matrix4::from(rb.ori.invert()) * Matrix4::from_translation(camera.pos - rb.pos);
+                self.uniform.planet_model_inv = planet_model_inv.cast().unwrap().into();
+                self.uniform.fog[3] = planet.extinction * planet.scale_height;
+                self.uniform.scale_height[0] = planet.scale_height * stretch;
             },
             None => {
                 self.uniform.fog[3] = 0.;
-                self.uniform.normal = [0., 0., 1., 1.];
             },
         }
         self.buffer.write(graphics, self.uniform);
+    }
+
+    pub fn render(&mut self, renderer: &mut Renderer, camera: &Camera, lighting: &Lighting){
+        renderer.start_post();
+        self.shader.bind(renderer);
+        self.bind(renderer);
+        camera.bind(renderer);
+        lighting.bind(renderer);
+        renderer.stop_post();
     }
 }

@@ -9,11 +9,11 @@ pub struct Shader {
     render_pipeline: wgpu::RenderPipeline,
     layout: wgpu::PipelineLayout,
     resources: Vec<ResourceType>,
-    pub(super) is_post: bool,
+    pub(super) has_no_depth: bool,
 }
 
 impl Shader {
-    pub fn new<V: Vertex>(graphics: &mut Graphics, source: &'static str, resources: Vec<ResourceType>, is_post: bool) -> Self {
+    pub fn new<V: Vertex>(graphics: &mut Graphics, source: &'static str, resources: Vec<ResourceType>, has_no_depth: bool) -> Self {
         let shader = graphics.device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
             source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(source)),
@@ -46,7 +46,7 @@ impl Shader {
             None
         };
 
-        let depth_stencil = if is_post {
+        let depth_stencil = if has_no_depth {
             None
         } else {
             Some(wgpu::DepthStencilState {
@@ -92,7 +92,7 @@ impl Shader {
             render_pipeline,
             layout,
             resources,
-            is_post,
+            has_no_depth,
         }
     }
 

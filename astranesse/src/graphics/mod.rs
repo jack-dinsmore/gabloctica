@@ -22,6 +22,21 @@ use wgpu::{
     Adapter, Color, CommandEncoderDescriptor, Device, DeviceDescriptor, Features, Instance, Limits, LoadOp, MemoryHints, Operations, PowerPreference, Queue, RenderPassColorAttachment, RenderPassDescriptor, RequestAdapterOptions, StoreOp, Surface, SurfaceConfiguration, TextureViewDescriptor
 };
 
+#[rustfmt::skip]
+pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::from_cols(
+    cgmath::Vector4::new(1.0, 0.0, 0.0, 0.0),
+    cgmath::Vector4::new(0.0, 1.0, 0.0, 0.0),
+    cgmath::Vector4::new(0.0, 0.0, 0.5, 0.0),
+    cgmath::Vector4::new(0.0, 0.0, 0.5, 1.0),
+);
+pub const OPENGL_TO_WGPU_MATRIX_INVERSE: cgmath::Matrix4<f32> = cgmath::Matrix4::from_cols(
+    cgmath::Vector4::new(1.0, 0.0, 0.0, 0.0),
+    cgmath::Vector4::new(0.0, 1.0, 0.0, 0.0),
+    cgmath::Vector4::new(0.0, 0.0, 2.0, 0.0),
+    cgmath::Vector4::new(0.0, 0.0,-1.0, 1.0),
+);
+
+
 pub struct Graphics {
     pub window: Arc<Window>,
     _instance: Instance,
@@ -153,7 +168,7 @@ impl<'a> Renderer<'a> {
         self.render_pass.take();
         let encoder_ref = self.encoder();
         self.render_pass = Some(encoder_ref.begin_render_pass(&RenderPassDescriptor {
-            label: Some("Render pass"),
+            label: Some("Shadow render pass"),
             color_attachments: &[],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: &camera.shadow_texture.view,
@@ -172,7 +187,7 @@ impl<'a> Renderer<'a> {
         self.render_pass.take();
         let encoder_ref = self.encoder();
         self.render_pass = Some(encoder_ref.begin_render_pass(&RenderPassDescriptor {
-            label: Some("Render pass"),
+            label: Some("First render pass"),
             color_attachments: &[Some(RenderPassColorAttachment {
                 view: &self.render_texture.texture.view,
                 depth_slice: None,
@@ -199,7 +214,7 @@ impl<'a> Renderer<'a> {
         self.render_pass.take();
         let encoder_ref = self.encoder();
         self.render_pass = Some(encoder_ref.begin_render_pass(&RenderPassDescriptor {
-            label: Some("Render pass"),
+            label: Some("Cleared render pass"),
             color_attachments: &[Some(RenderPassColorAttachment {
                 view: &self.render_texture.texture.view,
                 depth_slice: None,
@@ -222,11 +237,12 @@ impl<'a> Renderer<'a> {
         }));
     }
 
+    /// Begin drawing onto the render texture
     pub fn start_post(&mut self) {
         self.render_pass.take();
         let encoder_ref = self.encoder();
         self.render_pass = Some(encoder_ref.begin_render_pass(&RenderPassDescriptor {
-            label: Some("Render pass"),
+            label: Some("Post render pass"),
             color_attachments: &[Some(RenderPassColorAttachment {
                 view: &self.frame_view,
                 depth_slice: None,
@@ -242,11 +258,31 @@ impl<'a> Renderer<'a> {
         }));
     }
 
+    pub fn start_font(&mut self) {
+        self.render_pass.take();
+        let encoder_ref = self.encoder();
+        self.render_pass = Some(encoder_ref.begin_render_pass(&RenderPassDescriptor {
+            label: Some("Font render pass"),
+            color_attachments: &[Some(RenderPassColorAttachment {
+                view: &self.frame_view,
+                depth_slice: None,
+                resolve_target: None,
+                ops: Operations {
+                    load: LoadOp::Load,
+                    store: StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        }));
+    }
+
     pub fn stop_post(&mut self) {
         self.render_texture.bind(self);
         self.render_pass.as_mut().unwrap().draw(0..3, 0..1);
     }
-    
+
     pub fn draw_indices(&mut self, n_indices: u32) {
         self.render_pass.as_mut().unwrap().draw_indexed(0..n_indices, 0, 0..1);
     }

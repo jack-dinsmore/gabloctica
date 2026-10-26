@@ -1,9 +1,7 @@
 # Todo
 
 ## Graphics: 
-* Fog
 * More terrain generation
-    * First, speed up planet generation
     * Make the planet mass accurate even when only part of the planet is loaded
 * Chromatic aberration?
 * OPTIMIZE: Combine texture and shadow bind group into one, and lighting and camera. Then lower the bind group limit back to defaults.

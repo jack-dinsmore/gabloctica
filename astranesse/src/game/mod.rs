@@ -63,7 +63,6 @@ pub struct Game {
     block_shader: Shader,
     flat_shader: Shader,
     shadow_shader: Shader,
-    post_shader: Shader,
     camera: Camera,
     texture: GridTexture,
     lighting: Lighting,
@@ -102,15 +101,9 @@ impl Game {
             ResourceType::Camera,
             ResourceType::Model,
         ], false);
-        let post_shader = Shader::new::<PostVertex>(&mut graphics, include_str!("../shaders/post.wgsl"), vec![
-            ResourceType::Post,
-            ResourceType::Texture,
-            ResourceType::Camera,
-            ResourceType::Lighting,
-        ], true);
         let camera = Camera::new(&graphics);
         let lighting = Lighting::new(&graphics);
-        let post_info = PostInfo::new(&graphics, &camera);
+        let post_info = PostInfo::new(&mut graphics, &camera);
 
         let mut planets: Vec<Planet> = vec![
             Planet::new(PlanetInit::default()),
@@ -125,7 +118,8 @@ impl Game {
             objects.push(obj);
         }
         let entities = vec![
-            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 83.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
+            // Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 83.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
+            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(-200., 0., 80.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
         ];
 
         // Set cursor to center of screen
@@ -162,7 +156,6 @@ impl Game {
             entities,
             galaxy,
             shadow_shader,
-            post_shader,
             post_info,
             planets,
         }
@@ -406,17 +399,12 @@ impl Game {
                 for object in &self.objects {
                     object.borrow().draw(&mut renderer, &self.texture)
                 }
+
+                // Post
+                self.post_info.render(&mut renderer, &self.camera, &self.lighting);
                 
                 // Draw text
                 self.font.render(&mut renderer, &self.camera, &self.lighting);
-
-                // Finish
-                renderer.start_post();
-                self.post_shader.bind(&mut renderer);
-                self.post_info.bind(&mut renderer);
-                self.camera.bind(&mut renderer);
-                self.lighting.bind(&mut renderer);
-                renderer.stop_post();
             },
         );
     }
