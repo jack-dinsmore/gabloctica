@@ -1,30 +1,19 @@
 pub mod object;
-pub mod planet;
 pub mod entity;
 pub mod galaxy;
 pub mod shading;
 pub mod chemistry;
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use crate::game::entity::Entity;
-use crate::game::galaxy::Galaxy;
-use crate::game::object::Interrupt;
-use crate::game::object::ObjectLoader;
-use crate::game::object::BlockProperties;
-use crate::game::object::loader::ShipLoader;
-use crate::game::shading::PostInfo;
+use crate::game::object::ObjectIdentifier;
 use crate::graphics::*;
 use crate::physics::*;
 use crate::util::CHUNK_SIZE;
-use crate::util::RcCell;
 use crate::util::my_fmod;
-use cgmath::InnerSpace;
-use cgmath::Vector3;
-use object::Object;
-use planet::{Planet, PlanetInit};
-use cgmath::Rotation;
+use object::{Interrupt, BlockProperties, Planet, Ship};
+use shading::PostInfo;
+use galaxy::Galaxy;
+use entity::Entity;
+use cgmath::{InnerSpace, Vector3, Rotation};
 use rustc_hash::FxHashSet;
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
@@ -69,9 +58,9 @@ pub struct Game {
     font: Font,
     post_info: PostInfo,
     
-    objects: Vec<RcCell<Object>>,
-    entities: Vec<Entity>,
     planets: Vec<Planet>,
+    ships: Vec<Ship>,
+    entities: Vec<Entity>,
     
     key_state: KeyState,
     fps_counter: FpsCounter,
@@ -105,21 +94,15 @@ impl Game {
         let lighting = Lighting::new(&graphics);
         let post_info = PostInfo::new(&mut graphics, &camera);
 
-        let mut planets: Vec<Planet> = vec![
-            Planet::new(PlanetInit::default()),
+        let planets = vec![
+            Planet::new(&graphics, &mut physics),
         ];
-        let mut objects: Vec<Rc<RefCell<Object>>> = vec![
-            // Rc::new(RefCell::new(Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos: Vector3::new(12., -5., 144.), vel: Vector3::new(0., 5., 0.) })))),
-            Rc::new(RefCell::new(Object::new(&graphics, &mut physics, ObjectLoader::OneShot(ShipLoader{ pos: Vector3::new(12., 5., 83.), vel: Vector3::new(0., 0., 0.) })))),
+        let ships = vec![
+            Ship::new(&graphics, &mut physics, RigidBodyInit { pos: Vector3::new(12., 5., 83.), vel: Vector3::new(0., 0., 0.), ..Default::default() }),
         ];
-        for planet in &mut planets {
-            let obj = Rc::new(RefCell::new(Object::new(&graphics, &mut physics, planet.loader())));
-            planet.object = Some(obj.clone());
-            objects.push(obj);
-        }
         let entities = vec![
-            // Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 83.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
-            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(-200., 0., 80.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
+            // Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(-200., 0., 80.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
+            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 80.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
         ];
 
         // Set cursor to center of screen
@@ -144,7 +127,6 @@ impl Game {
             block_properties,
             key_state,
             camera,
-            objects,
             mouse_motion: (0., 0.),
             lighting,
             texture,
@@ -158,6 +140,7 @@ impl Game {
             shadow_shader,
             post_info,
             planets,
+            ships,
         }
     }
 
@@ -177,25 +160,32 @@ impl Game {
                 let mut report = CollisionReport::None;
                 let mut collided_object = None;
 
-                for object in &mut self.objects {
-                    // The collision function should always pick some over None, but choose the one with the smallest distance to the target otherwise.
-                    let new_report = Collider::check_collision(&player.body, &object. borrow().body);
+                for planet in &mut self.planets {
+                    let new_report = Collider::check_collision(&player.body, &planet.object.body);
 
                     if new_report > report {
                         report = new_report;
-                        collided_object = Some(object);
+                        collided_object = Some(&mut planet.object);
+                    }
+                }
+                for ship in &mut self.ships {
+                    let new_report = Collider::check_collision(&player.body, &ship.object.body);
+
+                    if new_report > report {
+                        report = new_report;
+                        collided_object = Some(&mut ship.object);
                     }
                 }
 
                 if let Some(o) = collided_object {
                     let place_pos = match report {
                         CollisionReport::Some { p2, .. } => {
-                            let offset = o.borrow().body.ori.invert() * forward;
+                            let offset = o.body.ori.invert() * forward;
                             p2 - offset*0.001
                         }
                         CollisionReport::None => unreachable!(),
                     };
-                    o.borrow_mut().insert_block(&self.graphics, &self.block_properties, 1, place_pos);
+                    o.insert_block(&self.graphics, &self.block_properties, 1, place_pos);
                 }
 
                 // Put the collider back
@@ -206,6 +196,58 @@ impl Game {
         }
     }
 
+    fn handle_keydowns(&mut self, delta_t: f64) {
+        let player = &mut self.entities[0];
+        match &player.chair {
+            None => {
+                // Move camera pos
+                const SPEED: f64 = 1000.;
+                let forward: Vector3<f64> = self.camera.get_forward().cast().unwrap();
+                let up: Vector3<f64> = self.camera.get_up().cast().unwrap();
+                let right: Vector3<f64> = self.camera.get_right().cast().unwrap();
+                if self.key_state.get(KeyCode::KeyW) {
+                    player.walk(forward * (SPEED*delta_t));
+                }
+                if self.key_state.get(KeyCode::KeyS) {
+                    player.walk(-forward * (SPEED*delta_t));
+                }
+                if self.key_state.get(KeyCode::KeyD) {
+                    player.walk(right * (SPEED*delta_t));
+                }
+                if self.key_state.get(KeyCode::KeyA){
+                    player.walk(-right * (SPEED*delta_t));
+                }
+                if self.key_state.get(KeyCode::KeyQ) {
+                    player.walk(up * (SPEED*delta_t));
+                }
+                if self.key_state.get(KeyCode::KeyE){
+                    player.walk(-up * (SPEED*delta_t));
+                }
+            },
+            Some((id, block_key, block_pos)) => {
+                let object = id.get_object_mut(&mut self.ships, &mut self.planets);
+                if self.key_state.get(KeyCode::KeyW) {
+                    object.interrupt(*block_key, Interrupt::Forward(1.));
+                }
+                if self.key_state.get(KeyCode::KeyS) {
+                    object.interrupt(*block_key, Interrupt::Backward(1.));
+                }
+                if self.key_state.get(KeyCode::KeyD) {
+                    object.interrupt(*block_key, Interrupt::Right(1.));
+                }
+                if self.key_state.get(KeyCode::KeyA){
+                    object.interrupt(*block_key, Interrupt::Left(1.));
+                }
+                if self.key_state.get(KeyCode::KeyQ) {
+                    object.interrupt(*block_key, Interrupt::Up(1.));
+                }
+                if self.key_state.get(KeyCode::KeyE){
+                    object.interrupt(*block_key, Interrupt::Down(1.));
+                }
+            }
+        }
+    }
+
     fn interact(&mut self) {
         // Replace the player's collider with its look ray temporarily
         let player = &mut self.entities[0];
@@ -213,31 +255,45 @@ impl Game {
         let forward = self.camera.get_forward().cast().unwrap();
         player.body.collider = Some(Collider::new_ray(self.camera.pos.cast().unwrap(), forward*LOOK_DIST));
 
-        let mut report = CollisionReport::None;
-        let mut collided_object = None;
-
-        for object in &mut self.objects {
-            // The collision function should always pick some over None, but choose the one with the smallest distance to the target otherwise.
-            let new_report = Collider::check_collision(&player.body, &object. borrow().body);
-
-            if new_report > report {
-                report = new_report;
-                collided_object = Some(object);
+        let (collided_object, object_id, report) = {
+            let mut report = CollisionReport::None;
+            let mut object_id = ObjectIdentifier::Ship(0);
+            let mut collided_object = None;
+    
+            for (i, ship) in self.ships.iter_mut().enumerate() {
+                // The collision function should always pick some over None, but choose the one with the smallest distance to the target otherwise.
+                let new_report = Collider::check_collision(&player.body, &ship.object.body);
+    
+                if new_report > report {
+                    report = new_report;
+                    collided_object = Some(&mut ship.object);
+                    object_id = ObjectIdentifier::Ship(i);  
+                }
             }
-        }
+            for (i, planet) in self.planets.iter_mut().enumerate() {
+                // The collision function should always pick some over None, but choose the one with the smallest distance to the target otherwise.
+                let new_report = Collider::check_collision(&player.body, &planet.object.body);
+    
+                if new_report > report {
+                    report = new_report;
+                    collided_object = Some(&mut planet.object);
+                    object_id = ObjectIdentifier::Planet(i);
+                }
+            }
+
+            (collided_object, object_id, report)
+        };
 
         if let Some(o) = collided_object {
-            let o_borrow = o.borrow();
             // Interacted with this block
             let place_pos = match report {
                 CollisionReport::Some { p2, .. } => {
-                    let offset = o_borrow.body.ori.invert() * forward;
+                    let offset = o.body.ori.invert() * forward;
                     p2 + offset*0.001
                 }
                 CollisionReport::None => unreachable!(),
             };
-            let interacted_block = o_borrow.get_block(place_pos).clone();
-            std::mem::drop(o_borrow);
+            let interacted_block = o.get_block(place_pos).clone();
             if !interacted_block.is_null() {
                 let updated_chunk = (
                     (place_pos.x/CHUNK_SIZE as f64).floor() as i32,
@@ -250,9 +306,9 @@ impl Game {
                     my_fmod(place_pos.z, CHUNK_SIZE as f64) as u32,
                 );
                 let block_key = (updated_chunk, updated_block);
-                o.borrow_mut().interrupt(block_key, Interrupt::Interact);
+                o.interrupt(block_key, Interrupt::Interact);
                 if self.block_properties[interacted_block.id].is_chair {
-                    player.set_chair(o, block_key);
+                    player.set_chair(object_id, block_key);
                 }
             }
         }
@@ -262,19 +318,18 @@ impl Game {
     }
 
     pub fn update(&mut self, delta_t: f64) {
-        self.fps_counter.update(delta_t);
-
+        self.handle_keydowns(delta_t);
+        
+        let camera_pos = self.camera.pos.cast().unwrap();
         let my_planet = if !self.planets.is_empty() {
             let mut min_dist = f64::INFINITY;
             let mut min_index = 0;
             for (i, planet) in self.planets.iter().enumerate() {
-                if let Some(o) = &planet.object {
-                    let o = o.borrow().body.clone();
-                    let dist = (o.pos - self.camera.pos.cast().unwrap()).magnitude();
-                    if dist < min_dist {
-                        min_index = i;
-                        min_dist = dist;
-                    }
+                let o = planet.object.body.clone();
+                let dist = (o.pos - camera_pos).magnitude();
+                if dist < min_dist {
+                    min_index = i;
+                    min_dist = dist;
                 }
             }
             Some(&self.planets[min_index])
@@ -282,68 +337,21 @@ impl Game {
             None
         };
         self.post_info.update_buffer(&self.graphics, &self.camera, my_planet);
-
-        for object in &mut self.objects {
-            object.borrow_mut().update(&self.graphics, &self.block_properties, self.camera.pos.cast().unwrap(), delta_t);
+        
+        for planet in &mut self.planets {
+            planet.update(&self.graphics, &self.block_properties, camera_pos, delta_t);
         }
-
-        {
-            let player = &mut self.entities[0];
-            match &player.chair {
-                None => {
-                    // Move camera pos
-                    const SPEED: f64 = 1000.;
-                    let forward: Vector3<f64> = self.camera.get_forward().cast().unwrap();
-                    let up: Vector3<f64> = self.camera.get_up().cast().unwrap();
-                    let right: Vector3<f64> = self.camera.get_right().cast().unwrap();
-                    if self.key_state.get(KeyCode::KeyW) {
-                        player.walk(forward * (SPEED*delta_t));
-                    }
-                    if self.key_state.get(KeyCode::KeyS) {
-                        player.walk(-forward * (SPEED*delta_t));
-                    }
-                    if self.key_state.get(KeyCode::KeyD) {
-                        player.walk(right * (SPEED*delta_t));
-                    }
-                    if self.key_state.get(KeyCode::KeyA){
-                        player.walk(-right * (SPEED*delta_t));
-                    }
-                    if self.key_state.get(KeyCode::KeyQ) {
-                        player.walk(up * (SPEED*delta_t));
-                    }
-                    if self.key_state.get(KeyCode::KeyE){
-                        player.walk(-up * (SPEED*delta_t));
-                    }
-                },
-                Some((obj, block_key, block_pos)) => {
-                    if self.key_state.get(KeyCode::KeyW) {
-                        obj.borrow_mut().interrupt(*block_key, Interrupt::Forward(1.));
-                    }
-                    if self.key_state.get(KeyCode::KeyS) {
-                        obj.borrow_mut().interrupt(*block_key, Interrupt::Backward(1.));
-                    }
-                    if self.key_state.get(KeyCode::KeyD) {
-                        obj.borrow_mut().interrupt(*block_key, Interrupt::Right(1.));
-                    }
-                    if self.key_state.get(KeyCode::KeyA){
-                        obj.borrow_mut().interrupt(*block_key, Interrupt::Left(1.));
-                    }
-                    if self.key_state.get(KeyCode::KeyQ) {
-                        obj.borrow_mut().interrupt(*block_key, Interrupt::Up(1.));
-                    }
-                    if self.key_state.get(KeyCode::KeyE){
-                        obj.borrow_mut().interrupt(*block_key, Interrupt::Down(1.));
-                    }
-                }
-            }
+        for ship in &mut self.ships {
+            ship.update(&self.graphics, &self.block_properties, camera_pos, delta_t);
+        }
+        for entity in &mut self.entities { // TODO reorder
+            entity.update(delta_t, &self.ships, &self.planets);
         }
         
         self.physics.update(delta_t);
-        for entity in &mut self.entities {
-            entity.update(delta_t);
-        }
+        
+        // Update camera
         {
-            // Move camera look
             let player = &self.entities[0];
             const SPEED: f64 = 0.2;
             self.camera.pos = player.body.pos + player.body.ori * Vector3::unit_z() * 0.5;
@@ -353,14 +361,18 @@ impl Game {
             self.camera.theta = self.camera.theta.clamp(0.0001, 3.1415);
             self.camera.ori = player.body.ori.cast().unwrap();
         }
+        self.fps_counter.update(delta_t);
     }
 
     pub fn draw(&mut self) {
         // OPTIMIZE avoid all calls of queue.write_buffer.
         self.camera.update_buffer(&self.graphics, &self.lighting, &self.camera);
         self.lighting.update_buffer(&self.graphics, &self.camera);
-        for object in &mut self.objects {
-            object.borrow_mut().update_buffer(&self.graphics, &self.camera)
+        for planet in &mut self.planets {
+            planet.object.update_buffer(&self.graphics, &self.camera)
+        }
+        for ship in &mut self.ships {
+            ship.object.update_buffer(&self.graphics, &self.camera)
         }
         
         self.font.text(&format!("FPS {}", self.fps_counter.get()), 0., 0.12);
@@ -372,8 +384,11 @@ impl Game {
         self.graphics.draw(
             |mut renderer| {
                 // Update buffers
-                for object in &self.objects {
-                    object.borrow().copy_buffers(&mut renderer);
+                for planet in &self.planets {
+                    planet.object.copy_buffers(&mut renderer);
+                }
+                for ship in &self.ships {
+                    ship.object.copy_buffers(&mut renderer);
                 }
                 self.font.copy_buffers(&mut renderer);
 
@@ -381,8 +396,11 @@ impl Game {
                 renderer.start_shadow(&mut self.camera);
                 self.shadow_shader.bind(&mut renderer);
                 self.camera.bind(&mut renderer);
-                for object in &self.objects {
-                    object.borrow().draw_shadow(&mut renderer);
+                for planet in &self.planets {
+                    planet.object.draw_shadow(&mut renderer);
+                }
+                for ship in &self.ships {
+                    ship.object.draw_shadow(&mut renderer);
                 }
 
                 // Sky box
@@ -396,8 +414,11 @@ impl Game {
                 self.block_shader.bind(&mut renderer);
                 self.camera.bind(&mut renderer);
                 self.lighting.bind(&mut renderer);
-                for object in &self.objects {
-                    object.borrow().draw(&mut renderer, &self.texture)
+                for planet in &self.planets {
+                    planet.object.draw(&mut renderer, &self.texture)
+                }
+                for ship in &self.ships {
+                    ship.object.draw(&mut renderer, &self.texture)
                 }
 
                 // Post

@@ -1,93 +1,69 @@
 
+mod ship;
+mod planet;
 pub mod chunk;
-pub mod loader;
 pub mod computer;
 mod internals;
 mod blocks;
 
-use cgmath::{InnerSpace, Matrix3, Quaternion, Rotation, Vector3, Zero};
-use loader::{PlanetLoader, ShipLoader};
+use cgmath::{Matrix3, Vector3, Zero};
 use rustc_hash::FxHashMap;
-use crate::game::object::chunk::PhysicalBlock;
-pub use crate::game::object::internals::{Internals, Interrupt};
 use crate::graphics::{GraphicalBlock, GraphicalChunk, Graphics, GridTexture, ModelUniform, Renderer, StorageBuffer};
 use crate::physics::{Collider, MoI, Physics, RigidBody, RigidBodyInit, RigidBodyData};
 use crate::util::{CHUNK_SIZE, my_fmod, moi_product};
-use chunk::PhysicalChunk;
-pub use internals::BlockGlobalPos;
+use chunk::{PhysicalChunk, PhysicalBlock};
+
+pub use internals::{Internals, Interrupt, BlockGlobalPos};
 pub use blocks::{BlockId, GraphicId, BlockProperties};
+pub use planet::Planet;
+pub use ship::Ship;
 
+pub const RENDER_DISTANCE: i32 = 12; // Units of chunks
 
-const RENDER_DISTANCE: i32 = 12; // Units of chunks
-const LOAD_TIME: u128 = 25000; // Millseconds
-
-pub enum ObjectLoader {
-    OneShot(ShipLoader),
-    MultiShot(PlanetLoader),
+#[derive(Debug, Clone, Copy)]
+pub enum ObjectIdentifier {
+    Ship(usize),
+    Planet(usize),
 }
-impl ObjectLoader {
-    fn estimate_max_rendered_chunks(&self) -> usize {
-        8184//TODO
-    }
-
-    fn get_initial_data(&self) -> RigidBodyInit {
+impl ObjectIdentifier {
+    pub fn get_object<'a>(&self, ships: &'a [Ship], planets: &'a [Planet]) -> &'a Object {
         match self {
-            ObjectLoader::OneShot(ship_loader) => RigidBodyInit {
-                pos: ship_loader.pos,
-                vel: ship_loader.vel,
-                ori: Quaternion::new(0.5, 0.5, 0.5, 1.).normalize(),
-                ang_vel: Vector3::new(0., 0., 0.5),
-                mass: 0.,
-                ..Default::default()
-            },
-            ObjectLoader::MultiShot(planet_loader) => {
-                let mass = 1000.;
-                RigidBodyInit {
-                    mass,
-                    moi: MoI::new_diagonal(Vector3::new(mass, mass, mass)*1000.),
-                    ..Default::default()
-                }
-            },
+            ObjectIdentifier::Ship(i) => &ships[*i].object,
+            ObjectIdentifier::Planet(i) => &planets[*i].object,
+        }
+    }
+    pub fn get_object_mut<'a>(&self, ships: &'a mut [Ship], planets: &'a mut [Planet]) -> &'a mut Object {
+        match self {
+            ObjectIdentifier::Ship(i) => &mut ships[*i].object,
+            ObjectIdentifier::Planet(i) => &mut planets[*i].object,
         }
     }
 }
 
 pub struct Object {
-    physical_chunks: FxHashMap<(i32, i32, i32), PhysicalChunk>,
-    graphical_chunks: FxHashMap<(i32, i32, i32), GraphicalChunk>,
+    pub physical_chunks: FxHashMap<(i32, i32, i32), PhysicalChunk>,
+    pub graphical_chunks: FxHashMap<(i32, i32, i32), GraphicalChunk>,
     internals: Internals,
     pub body: RigidBody,
-    
-    last_load: Option<std::time::Instant>,
-    
-    loader: ObjectLoader,
     storage_buffer: StorageBuffer,
 }
 
 impl Object {
-    pub fn new(graphics: &Graphics, physics: &mut Physics, loader: ObjectLoader) -> Self {
-        let mut initial_data = loader.get_initial_data();
+    pub fn new(graphics: &Graphics, physics: &mut Physics, mut initial_data: RigidBodyInit) -> Self {
         initial_data.collider = Some(Collider::empty_object());
         let body = RigidBodyData::new(&mut physics.rb_vendor, initial_data);
-        let buffer_size = loader.estimate_max_rendered_chunks()*std::mem::size_of::<ModelUniform>();
+        let buffer_size = 8184*std::mem::size_of::<ModelUniform>(); // TODO
         let storage_buffer = StorageBuffer::new(graphics, buffer_size as usize);
         let internals = Internals::new();
         let mut object = Self {
             physical_chunks: FxHashMap::default(),
             graphical_chunks: FxHashMap::default(),
-            loader,
             internals,
             body,
-            last_load: None,
             storage_buffer,
         };
         object.recalc_rigid_body();
         object
-    }
-
-    pub fn update(&mut self, graphics: &Graphics, properties: &BlockProperties, character_pos: Vector3<f64>, delta_t: f64) {
-        self.load_chunks(graphics, properties, character_pos);
-        self.internals.update(delta_t);
     }
 
     /// Interact with a block through right clicking
@@ -110,9 +86,13 @@ impl Object {
         let chunk = self.physical_chunks.get(&updated_chunk).unwrap();
         &chunk.grid[updated_block]
     }
+
+    fn update(&mut self, delta_t: f64) {
+        self.internals.update(delta_t);
+    }
     
     /// Insert a block into the cell containg position pos. Pos is in body coordinates.
-    pub(crate) fn insert_block(&mut self, graphics: &Graphics, properties: &BlockProperties, typ: BlockId, pos: Vector3<f64>) {
+    pub fn insert_block(&mut self, graphics: &Graphics, properties: &BlockProperties, typ: BlockId, pos: Vector3<f64>) {
         let block_pos = ((
             (pos.x/CHUNK_SIZE as f64).floor() as i32,
             (pos.y/CHUNK_SIZE as f64).floor() as i32,
@@ -143,16 +123,13 @@ impl Object {
         let block = GraphicalBlock::new(properties[typ].graphic_id);
         self.graphical_chunks.get_mut(&block_pos.0).unwrap().place_block(block, block_pos, graphics);
         GraphicalChunk::update_exposed(block_pos.0, &mut self.graphical_chunks, graphics);
+
+        // TODO why not recalc_rigid_body?
     }
 
 
     /// Update the model buffers and rigid body. If only some chunks were changed, pass a vector of chunk positions. Otherwise, pass an empty vector. This will update the passed chunks, and neighbors if the neighbors now become visible.
     fn recalc_rigid_body(&mut self) {
-        // Determine if the body can be recalculated
-        if let ObjectLoader::MultiShot(..) = self.loader {
-            return;
-        }
-
         let mut mass_m0 = 0.;
         let mut mass_m1 = Vector3::zero();
         let mut mass_m2 = Matrix3::zero();
@@ -181,93 +158,6 @@ impl Object {
 
         // MOI
         self.body.moi = MoI::new_matrix(mass_m2);
-    }
-
-    fn load_chunks(&mut self, graphics: &Graphics, properties: &BlockProperties, character_pos: Vector3<f64>) {
-        if let Some(l) = self.last_load {
-            if l.elapsed().as_millis() < LOAD_TIME {
-                return;
-            }
-        }
-
-        // Get the current chunk
-        let pos_body = self.body.ori.invert() * (character_pos - self.body.pos);
-        let character_chunk = (
-            pos_body.x as i32 / CHUNK_SIZE as i32,
-            pos_body.y as i32 / CHUNK_SIZE as i32,
-            pos_body.z as i32 / CHUNK_SIZE as i32
-        );
-
-        match &self.loader {
-            ObjectLoader::OneShot(l) => { // e.g. ships
-                if self.physical_chunks.is_empty() {
-                    let dist = (character_pos - self.body.pos).magnitude();
-                    let collider = self.body.get_object_collider_mut();
-                    if dist < (RENDER_DISTANCE * CHUNK_SIZE as i32) as f64 * 1.5 {
-                        // Load
-                        self.physical_chunks = l.load_all(graphics, properties);
-                        for (chunk_pos, physical_chunk) in &mut self.physical_chunks {
-                            physical_chunk.update_collider(*chunk_pos, &mut self.body);
-                            self.graphical_chunks.insert(*chunk_pos, GraphicalChunk::from_physical(graphics, *chunk_pos, physical_chunk, properties));
-                        }
-                        self.recalc_rigid_body();
-                    }
-                } else {
-                    // Check if all chunks are outside render distance
-                    for chunk_coord in self.physical_chunks.keys() {
-                        if (chunk_coord.0 - character_chunk.0).abs() < RENDER_DISTANCE
-                        && (chunk_coord.1 - character_chunk.1).abs() < RENDER_DISTANCE
-                        && (chunk_coord.2 - character_chunk.2).abs() < RENDER_DISTANCE {
-                            // One is inside. Therefore I should not unload the object.
-                            return;
-                        }
-                    }
-        
-                    // Unload
-                    l.unload_all();
-                    self.physical_chunks.clear();
-                    self.graphical_chunks.clear();
-                    // TODO delete myself
-                }
-            },
-            ObjectLoader::MultiShot(l) => { // e.g. planets
-                let collider = self.body.get_object_collider_mut();
-                // Unload old chunks
-                let keys = self.graphical_chunks.keys().copied().collect::<Vec<_>>();
-                for coord in keys {
-                    let detail = get_detail(coord.0 - character_chunk.0, coord.1 - character_chunk.1,coord.2 - character_chunk.2,);
-                    if detail == 0 {
-                        l.unload_chunk(coord, &self.physical_chunks[&coord]);
-                        self.physical_chunks.remove(&coord);
-                        self.graphical_chunks.remove(&coord);
-                        collider.chunks.remove(&coord);
-                    } else {
-                        self.graphical_chunks.get_mut(&coord).unwrap().set_detail(detail, graphics);
-                    }
-                }
-
-                // Load new chunks
-                for dx in (-RENDER_DISTANCE)..RENDER_DISTANCE {
-                    for dy in (-RENDER_DISTANCE)..RENDER_DISTANCE {
-                        for dz in (-RENDER_DISTANCE)..RENDER_DISTANCE {
-                            let coord = (character_chunk.0 + dx, character_chunk.1 + dy, character_chunk.2 + dz);
-                            if let None = self.physical_chunks.get(&coord) {
-                                if let Some(mut chunk) = l.load_chunk(graphics, properties, coord) {
-                                    chunk.update_collider(coord, &mut self.body);
-                                    let mut graphical_chunk = GraphicalChunk::from_physical(graphics, coord, &chunk, properties);
-                                    graphical_chunk.set_detail(get_detail(dx, dy, dz), graphics);
-                                    self.graphical_chunks.insert(coord, graphical_chunk);
-                                    self.physical_chunks.insert(coord, chunk);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                self.recalc_rigid_body();
-                self.last_load = Some(std::time::Instant::now());
-            },
-        }
     }
 }
 
@@ -306,7 +196,7 @@ impl Object {
         }
     }
     
-    pub(crate) fn copy_buffers(&self, renderer: &mut Renderer) {
+    pub fn copy_buffers(&self, renderer: &mut Renderer) {
         let mut i = 0;
         for chunk in self.graphical_chunks.values() {
             if chunk.exposed != 63  {
@@ -314,16 +204,5 @@ impl Object {
                 i += 1;
             }
         }
-    }
-}
-
-/// Return the detail of the cube given how far away it is
-fn get_detail(dx: i32, dy: i32, dz: i32) -> usize {
-    let dist = dx.abs().max(dy.abs().max(dz.abs()));
-    match dist {
-        0..8 => 1,
-        8..12 => 2,
-        // 12..RENDER_DISTANCE => 4,
-        _ => 0, // Unloaded
     }
 }

@@ -1,6 +1,6 @@
 use core::f64;
 
-use cgmath::{InnerSpace, Quaternion, Rotation, Vector3, Zero};
+use cgmath::{Array, InnerSpace, Quaternion, Rotation, Vector3, Zero};
 use crate::physics::RigidBody;
 
 use super::CollisionReport;
@@ -133,7 +133,7 @@ impl ColliderType {
                 let mut best_sepax_index = 0;
                 let mut best_sepn = f64::INFINITY;
                 for (i, sepax) in sepaxes.iter().enumerate() {
-                    if sepax.magnitude2() < 1e-8 {continue;}
+                    if !sepax.is_finite() { continue; }
                     let dots_a = get_dots(&a_normals, *sepax, *a_edges, a_global_center);
                     let dots_b = get_dots(&b_normals, *sepax, *b_edges, b_global_center);
                     match get_sepn(&dots_a, &dots_b) {
@@ -143,7 +143,9 @@ impl ColliderType {
                                 best_sepax_index = i;
                             }
                         },
-                        None => return CollisionReport::None,
+                        None => {
+                            return CollisionReport::None
+                        },
                     }
                 }
                 // A collision occurred with normal "best_sepax"

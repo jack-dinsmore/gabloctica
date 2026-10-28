@@ -149,7 +149,3 @@ impl SphericalInterpolator<Vector3<f32>> {
         ((forward - backward).dot(ax1) + (left - right).dot(ax2))/(2.*step)
     }
 }
-
-impl SphericalInterpolator<f32> {
-    // TODO
-}

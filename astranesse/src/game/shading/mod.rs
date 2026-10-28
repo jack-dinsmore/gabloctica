@@ -1,7 +1,6 @@
 
-use cgmath::{Matrix4, Rotation};
-
-use crate::{game::planet::Planet, graphics::{Camera, Graphics, Lighting, PostVertex, Renderer, ResourceType, Shader, Uniform, UniformBuffer}, util::CHUNK_SIZE};
+use crate::graphics::{Camera, Graphics, Lighting, PostVertex, Renderer, ResourceType, Shader, Uniform, UniformBuffer};
+use crate::game::Planet;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -50,20 +49,14 @@ impl PostInfo {
     }
     pub fn update_buffer(&mut self, graphics: &Graphics, camera: &Camera, my_planet: Option<&Planet>) {
         match my_planet {
-            Some(planet) => {
-                let stretch = 2. / (planet.width as f32 * CHUNK_SIZE as f32);
-                let planet_object = planet.object.as_ref().unwrap().borrow();
-                let rb = planet.object.as_ref().unwrap().borrow().body.clone();
-                let planet_model_inv = Matrix4::from_scale(stretch as f64) * Matrix4::from(rb.ori.invert()) * Matrix4::from_translation(camera.pos - rb.pos);
-                self.uniform.planet_model_inv = planet_model_inv.cast().unwrap().into();
-                self.uniform.fog[0] = planet.extinction.x;
-                self.uniform.fog[1] = planet.extinction.y;
-                self.uniform.fog[2] = planet.extinction.z;
-                self.uniform.fog[3] = planet.scale_height * stretch;
+            Some(p) => match p.get_post_params(camera) {
+                Some((planet_model_inv, fog)) => {
+                    self.uniform.planet_model_inv = planet_model_inv;
+                    self.uniform.fog = fog;
+                }
+                None => self.uniform.fog[3] = 0.
             },
-            None => {
-                self.uniform.fog[3] = 0.;
-            },
+            None => self.uniform.fog[3] = 0.
         }
         self.buffer.write(graphics, self.uniform);
     }

@@ -122,7 +122,7 @@ impl Camera {
             self.get_up()
         );
         let proj = cgmath::ortho(-SHADOW_TEXTURE_WIDTH, SHADOW_TEXTURE_WIDTH, -SHADOW_TEXTURE_WIDTH, SHADOW_TEXTURE_WIDTH, -1000., 1000.);
-        let shadow_proj = proj * view; // TODO
+        let shadow_proj = proj * view;
 
         let uniform = CameraUniform::new(view_proj, shadow_proj);
 

@@ -49,6 +49,7 @@ impl PhysicalChunk {
         self.update_collider(block_pos.0, body);
     }
 
+    /// Update the object's collider to include this chunk
     pub fn update_collider(&mut self, chunk_pos: (i32, i32, i32), body: &mut RigidBody) {
         self.mass_m0 = 0.;
         self.mass_m1 = Vector3::zero();
