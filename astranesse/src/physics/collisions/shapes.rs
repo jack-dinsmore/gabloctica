@@ -22,7 +22,7 @@ pub struct BoxData {
 
 #[derive(Debug, Clone)]
 pub struct ObjectData {
-    pub chunks: FxHashMap<(i32, i32, i32), [u16; (CHUNK_SIZE*CHUNK_SIZE) as usize]>,
+    pub chunks: FxHashMap<(i32, i32, i32), [u32; (CHUNK_SIZE*CHUNK_SIZE) as usize]>,
 }
 
 

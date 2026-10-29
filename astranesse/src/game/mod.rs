@@ -98,11 +98,11 @@ impl Game {
             Planet::new(&graphics, &mut physics),
         ];
         let ships = vec![
-            Ship::new(&graphics, &mut physics, RigidBodyInit { pos: Vector3::new(12., 5., 83.), vel: Vector3::new(0., 0., 0.), ..Default::default() }),
+            Ship::new(&graphics, &mut physics, RigidBodyInit { pos: Vector3::new(12., 5., 183.), vel: Vector3::new(0., 0., 0.), ..Default::default() }),
         ];
         let entities = vec![
             // Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(-200., 0., 80.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
-            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 80.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
+            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 180.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
         ];
 
         // Set cursor to center of screen
@@ -354,7 +354,7 @@ impl Game {
         {
             let player = &self.entities[0];
             const SPEED: f64 = 0.2;
-            self.camera.pos = player.body.pos + player.body.ori * Vector3::unit_z() * 0.5;
+            self.camera.pos = player.body.pos + player.body.ori * Vector3::unit_z() * 1.0;
             self.camera.theta += (SPEED*delta_t) as f32 *self.mouse_motion.1;
             self.camera.phi -= (SPEED*delta_t) as f32 *self.mouse_motion.0;
             self.mouse_motion = (0., 0.);

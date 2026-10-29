@@ -107,28 +107,28 @@ fn vs_main(
     var out: VertexOutput;
 
     out.position = vec4(
-        f32((vert.data   ) & 0xf),
-        f32((vert.data>>4) & 0xf),
-        f32((vert.data>>8) & 0xf),
+        f32((vert.data   ) & 0x1f),
+        f32((vert.data>>5) & 0x1f),
+        f32((vert.data>>10) & 0x1f),
         1.
     );
     
     var normal = vec3(0., 0., 0.);
-    if (((vert.data>>12) & 0xf) == 0) { normal.x = 1.; }
-    if (((vert.data>>12) & 0xf) == 1) { normal.x = -1.; }
-    if (((vert.data>>12) & 0xf) == 2) { normal.y = 1.; }
-    if (((vert.data>>12) & 0xf) == 3) { normal.y = -1.; }
-    if (((vert.data>>12) & 0xf) == 4) { normal.z = 1.; }
-    if (((vert.data>>12) & 0xf) == 5) { normal.z = -1.; }
+    if (((vert.data>>15) & 0x8) == 0) { normal.x = 1.; }
+    if (((vert.data>>15) & 0x8) == 1) { normal.x = -1.; }
+    if (((vert.data>>15) & 0x8) == 2) { normal.y = 1.; }
+    if (((vert.data>>15) & 0x8) == 3) { normal.y = -1.; }
+    if (((vert.data>>15) & 0x8) == 4) { normal.z = 1.; }
+    if (((vert.data>>15) & 0x8) == 5) { normal.z = -1.; }
 
     out.texpos = vec2(
-        f32((vert.data>>20) & 0xf) / 7.,
-        f32((vert.data>>16) & 0xf) / TEXTURE_SIZE,
+        f32((vert.data>>22) & 0xf) / 7.,
+        f32((vert.data>>18) & 0xf) / TEXTURE_SIZE,
     );
 
-    if ((vert.data>>24) & 1) != 0 { out.position.x += 16.; }
-    if ((vert.data>>25) & 1) != 0 { out.position.y += 16.; }
-    if ((vert.data>>26) & 1) != 0 { out.position.z += 16.; }
+    if ((vert.data>>26) & 1) != 0 { out.position.x += 16.; }
+    if ((vert.data>>27) & 1) != 0 { out.position.y += 16.; }
+    if ((vert.data>>28) & 1) != 0 { out.position.z += 16.; }
 
     let rotation = mat3x3(
         model.model[0].xyz,

@@ -30,15 +30,15 @@ fn vs_main(
     var out: VertexOutput;
 
     var position = vec4(
-        f32((vert.data   ) & 0xf),
-        f32((vert.data>>4) & 0xf),
-        f32((vert.data>>8) & 0xf),
+        f32((vert.data   ) & 0x1f),
+        f32((vert.data>>5) & 0x1f),
+        f32((vert.data>>10) & 0x1f),
         1.
     );
-    
-    if ((vert.data>>24) & 1) != 0 { position.x += 16.; }
-    if ((vert.data>>25) & 1) != 0 { position.y += 16.; }
-    if ((vert.data>>26) & 1) != 0 { position.z += 16.; }
+
+    if ((vert.data>>26) & 1) != 0 { position.x += 16.; }
+    if ((vert.data>>27) & 1) != 0 { position.y += 16.; }
+    if ((vert.data>>28) & 1) != 0 { position.z += 16.; }
 
     out.clip_position = camera.shadow_proj * (model.model * position);
     return out;

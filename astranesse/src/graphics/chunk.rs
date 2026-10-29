@@ -335,14 +335,14 @@ fn add_block(grid: &Grid<GraphicalBlock>, x: u32, y: u32, z: u32, detail_skip: u
     let block = grid[(x,y,z)];
     let last = CHUNK_SIZE - detail_skip;
     let x0 = x;
-    let x1 = ((x+detail_skip) % 16) | (((x+detail_skip)/16) << 24);
-    let y0 = y << 4;
-    let y1 = (((y+detail_skip) % 16) << 4) | (((y+detail_skip)/16) << 25);
-    let z0 = z << 8;
-    let z1 = (((z+detail_skip) % 16) << 8) | (((z+detail_skip)/16) << 26);
+    let x1 = ((x+detail_skip) % 32) | (((x+detail_skip)/32) << 26);
+    let y0 = y << 5;
+    let y1 = (((y+detail_skip) % 32) << 5) | (((y+detail_skip)/32) << 27);
+    let z0 = z << 10;
+    let z1 = (((z+detail_skip) % 32) << 10) | (((z+detail_skip)/32) << 28);
 
     if x == 0 || !grid[(x-detail_skip,y,z)].is_opaque() {
-        let face = x0 | (1 << 12);
+        let face = x0 | (1 << 15);
         let uv = block.get_uv_forward();
         vertices.push(BlockVertex {data: uv.0|y0|z0|face});
         vertices.push(BlockVertex {data: uv.1|y1|z0|face});
@@ -357,7 +357,7 @@ fn add_block(grid: &Grid<GraphicalBlock>, x: u32, y: u32, z: u32, detail_skip: u
         *index_offset += 4;
     }
     if y == 0 || !grid[(x,y-detail_skip,z)].is_opaque() {
-        let face = y0 | (3 << 12);
+        let face = y0 | (3 << 15);
         let uv = block.get_uv_left();
         vertices.push(BlockVertex {data: uv.0|x0|z0|face});
         vertices.push(BlockVertex {data: uv.1|x1|z0|face});
@@ -372,7 +372,7 @@ fn add_block(grid: &Grid<GraphicalBlock>, x: u32, y: u32, z: u32, detail_skip: u
         *index_offset += 4;
     }
     if z == 0 || !grid[(x,y,z-detail_skip)].is_opaque() {
-        let face = z0 | (5 << 12);
+        let face = z0 | (5 << 15);
         let uv = block.get_uv_up();
         vertices.push(BlockVertex {data: uv.0|x0|y0|face});
         vertices.push(BlockVertex {data: uv.1|x1|y0|face});
@@ -402,7 +402,7 @@ fn add_block(grid: &Grid<GraphicalBlock>, x: u32, y: u32, z: u32, detail_skip: u
         *index_offset += 4;
     }
     if y == last || !grid[(x,y+detail_skip,z)].is_opaque() {
-        let face = y1 | (2 << 12);
+        let face = y1 | (2 << 15);
         let uv = block.get_uv_right();
         vertices.push(BlockVertex {data: uv.0|x0|z0|face});
         vertices.push(BlockVertex {data: uv.1|x1|z0|face});
@@ -417,7 +417,7 @@ fn add_block(grid: &Grid<GraphicalBlock>, x: u32, y: u32, z: u32, detail_skip: u
         *index_offset += 4;
     }
     if z == last || !grid[(x,y,z+detail_skip)].is_opaque() {
-        let face = z1 | (4 << 12);
+        let face = z1 | (4 << 15);
         let uv = block.get_uv_down();
         vertices.push(BlockVertex {data: uv.0|x0|y0|face});
         vertices.push(BlockVertex {data: uv.1|x1|y0|face});
@@ -437,18 +437,18 @@ fn add_clutter(grid: &Grid<GraphicalBlock>, x: u32, y: u32, z: u32, detail_skip:
     let block = grid[(x,y,z)];
     let last = CHUNK_SIZE - detail_skip;
     let x0 = x;
-    let x1 = ((x+detail_skip) % 16) | (((x+detail_skip)/16) << 24);
-    let y0 = y << 4;
-    let y1 = (((y+detail_skip) % 16) << 4) | (((y+detail_skip)/16) << 25);
-    let z0 = z << 8;
-    let z1 = (((z+detail_skip) % 16) << 8) | (((z+detail_skip)/16) << 26);
+    let x1 = ((x+detail_skip) % 32) | (((x+detail_skip)/32) << 26);
+    let y0 = y << 5;
+    let y1 = (((y+detail_skip) % 32) << 4) | (((y+detail_skip)/32) << 27);
+    let z0 = z << 10;
+    let z1 = (((z+detail_skip) % 32) << 8) | (((z+detail_skip)/32) << 28);
 
     let shifted_id = (block.id - 0x100) as u32;
     let uv = (
-        ((shifted_id + 1) << 16) | (7 << 20),
-        ((shifted_id + 1) << 16) | (6 << 20),
-        ((shifted_id + 0) << 16) | (6 << 20),
-        ((shifted_id + 0) << 16) | (7 << 20),
+        ((shifted_id + 1) << 18) | (7 << 22),
+        ((shifted_id + 1) << 18) | (6 << 22),
+        ((shifted_id + 0) << 18) | (6 << 22),
+        ((shifted_id + 0) << 18) | (7 << 22),
     );
 
     let face = 6 << 12; // Null

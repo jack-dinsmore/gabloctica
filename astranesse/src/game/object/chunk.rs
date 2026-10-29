@@ -65,7 +65,7 @@ impl PhysicalChunk {
         };
         for z in 0..CHUNK_SIZE {
             for y in 0..CHUNK_SIZE {
-                let mut collider_row: u16 = 0;
+                let mut collider_row: u32 = 0;
                 for x in 0..CHUNK_SIZE {
                     let pos = Vector3::new(x as f64 + 0.5, y as f64 + 0.5, z as f64 + 0.5);
                     let grid_block = self.grid[(x,y,z)];

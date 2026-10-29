@@ -1,25 +1,27 @@
 # Todo
 
-## Graphics: 
-* More terrain generation
-    * Make the planet mass accurate even when only part of the planet is loaded
-* Chromatic aberration?
-* OPTIMIZE: Combine texture and shadow bind group into one, and lighting and camera. Then lower the bind group limit back to defaults.
+* Fix graphics so that the chunks are 32 blocks across
+* Make procedurally generated textures
+* Make procedurally generated ground clutter
+* Make multiple instances of extended ground clutter (trees, etc), save them, and spread them over the surface
+* Fill out wind simulation
+* Make the textures move with wind
+* Gravity
+
+## Terrain
+
+* Each planet has its own procedurally generated texture pack
+
+## Graphics
+* Bind shadow buffer to post shader so that sun beams can be drawn
 
 ## Player motion
 * Revisit friction
-* Prevent ship from popping up
-* Make some kind of torque which resists spinning
 
 ## Biscuit
 * Finish machine implementation
 
-## Ships
-* Speed up bucket fill for planets
+# Ideas
 
-## Collisions
-* Fix the collision point. In particular, when multiple points collide, don't choose the middle as the offending point.
-* OPTIMIZE: break planets into multiple convex parts. Then only one collision needs to be saved in each convex part; the full tree doesn't need to be explored.
-
-## TITLE IDEAS
+## Title
 * Tetronomy

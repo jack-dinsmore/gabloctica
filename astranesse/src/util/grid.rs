@@ -1,6 +1,6 @@
 use std::{mem::MaybeUninit, ops::{Index, IndexMut}};
 
-pub const CHUNK_SIZE: u32 = 16;
+pub const CHUNK_SIZE: u32 = 32;
 
 pub struct Grid<T> {
     data: [T; (CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize],
