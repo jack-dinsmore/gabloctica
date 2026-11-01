@@ -4,6 +4,8 @@ use sorted_vec::SortedSet;
 use std::ops::Index;
 use lazy_static::lazy_static;
 
+use crate::graphics::{Camera, GridTexture};
+
 pub type BlockId = u16;
 pub type GraphicId = u16;
 
@@ -56,20 +58,26 @@ impl BlockInfo {
 
 pub struct BlockProperties {
     blocks: FxHashMap<BlockId, BlockInfo>,
+    texture: GridTexture,
     pub command_blocks: SortedSet<BlockId>,
     pub conductor_blocks: SortedSet<BlockId>,
     pub pipe_blocks: SortedSet<BlockId>,
     pub chair_blocks: SortedSet<BlockId>,
+    pub max_block_id: BlockId,
 }
 
 impl BlockProperties {
-    pub fn new() -> Self {
+    pub fn new(graphics: &crate::graphics::Graphics, camera: &Camera) -> Self {
+        let texture = GridTexture::new(&graphics, &camera, include_bytes!("../../../../assets/texture.png"));
+
         let mut output = Self {
             blocks: FxHashMap::default(),
+            texture,
             command_blocks: SortedSet::new(),
             conductor_blocks: SortedSet::new(),
             pipe_blocks: SortedSet::new(),
             chair_blocks: SortedSet::new(),
+            max_block_id: 0,
         };
         output.load_manifest(include_str!("../../../../assets/blocks.txt"));
         output
@@ -94,8 +102,33 @@ impl BlockProperties {
                 self.chair_blocks.push(block.id);
             }
 
+            self.max_block_id = self.max_block_id.max(block.id);
             self.blocks.insert(block.id, block);
         }
+    }
+
+    pub fn get_texture(&self) -> &GridTexture {
+        &self.texture
+    }
+    
+    pub fn update_buffer(&mut self, graphics: &crate::graphics::Graphics) {
+        self.texture.update_buffer(graphics)
+    }
+    
+    pub(crate) fn add_textured_block(&mut self, image: image::ImageBuffer<image::Rgba<u8>, Vec<u8>>) -> BlockId {
+        let new_id = self.max_block_id;
+        self.blocks.insert(new_id, BlockInfo {
+            id: new_id,
+            graphic_id: new_id, // ????
+            script: None,
+            is_pipe: false,
+            is_conductor: false,
+            is_chair: false,
+            is_clutter: false,
+        });
+        self.texture.add_texture(new_id, image);
+        self.max_block_id += 1;
+        new_id
     }
 }
 

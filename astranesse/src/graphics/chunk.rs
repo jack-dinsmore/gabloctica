@@ -2,7 +2,7 @@ use cgmath::{Matrix4, Vector3};
 use image::{GenericImageView, ImageBuffer, Rgba};
 use rustc_hash::FxHashMap;
 
-use crate::game::object::{BlockGlobalPos, BlockProperties};
+use crate::game::object::{BlockGlobalPos, BlockId, BlockProperties};
 use crate::game::object::chunk::PhysicalChunk;
 use crate::graphics::{GraphicalBlock, BlockVertex, Camera, Graphics, Renderer, ResourceType, Texture};
 use crate::graphics::resource::{IndexBuffer, VertexBuffer, UniformBuffer, Uniform};
@@ -329,17 +329,33 @@ impl GridTexture {
     pub fn bind(&self, renderer: &mut Renderer, detail: usize) {
         self.textures[detail-1].bind(renderer);
     }
+    
+    pub fn update_buffer(&mut self, graphics: &Graphics) {
+        for texture in &mut self.textures {
+            texture.update_buffer(graphics);
+        }
+    }
+    
+    pub(crate) fn add_texture(&mut self, id: BlockId, mut image: ImageBuffer<Rgba<u8>, Vec<u8>>) {
+        self.textures[0].queue_new_texture(id, image.clone());
+        Self::subsample(&mut image, (6*16, 16));
+        self.textures[1].queue_new_texture(id, image.clone());
+        Self::subsample(&mut image, (6*16, 16));
+        self.textures[2].queue_new_texture(id, image.clone());
+        Self::subsample(&mut image, (6*16, 16));
+        self.textures[3].queue_new_texture(id, image);
+    }
 }
 
 fn add_block(grid: &Grid<GraphicalBlock>, x: u32, y: u32, z: u32, detail_skip: u32, index_offset: &mut u16, vertices: &mut Vec<BlockVertex>, indices: &mut Vec<u16>) {
     let block = grid[(x,y,z)];
     let last = CHUNK_SIZE - detail_skip;
     let x0 = x;
-    let x1 = ((x+detail_skip) % 32) | (((x+detail_skip)/32) << 26);
+    let x1 = ((x+detail_skip) % CHUNK_SIZE) | (((x+detail_skip)/CHUNK_SIZE) << 29);
     let y0 = y << 5;
-    let y1 = (((y+detail_skip) % 32) << 5) | (((y+detail_skip)/32) << 27);
+    let y1 = (((y+detail_skip) % CHUNK_SIZE) << 5) | (((y+detail_skip)/CHUNK_SIZE) << 30);
     let z0 = z << 10;
-    let z1 = (((z+detail_skip) % 32) << 10) | (((z+detail_skip)/32) << 28);
+    let z1 = (((z+detail_skip) % CHUNK_SIZE) << 10) | (((z+detail_skip)/CHUNK_SIZE) << 31);
 
     if x == 0 || !grid[(x-detail_skip,y,z)].is_opaque() {
         let face = x0 | (1 << 15);
@@ -437,11 +453,11 @@ fn add_clutter(grid: &Grid<GraphicalBlock>, x: u32, y: u32, z: u32, detail_skip:
     let block = grid[(x,y,z)];
     let last = CHUNK_SIZE - detail_skip;
     let x0 = x;
-    let x1 = ((x+detail_skip) % 32) | (((x+detail_skip)/32) << 26);
+    let x1 = ((x+detail_skip) % CHUNK_SIZE) | (((x+detail_skip)/CHUNK_SIZE) << 29);
     let y0 = y << 5;
-    let y1 = (((y+detail_skip) % 32) << 4) | (((y+detail_skip)/32) << 27);
+    let y1 = (((y+detail_skip) % CHUNK_SIZE) << 4) | (((y+detail_skip)/CHUNK_SIZE) << 30);
     let z0 = z << 10;
-    let z1 = (((z+detail_skip) % 32) << 8) | (((z+detail_skip)/32) << 28);
+    let z1 = (((z+detail_skip) % CHUNK_SIZE) << 8) | (((z+detail_skip)/CHUNK_SIZE) << 31);
 
     let shifted_id = (block.id - 0x100) as u32;
     let uv = (
@@ -451,7 +467,7 @@ fn add_clutter(grid: &Grid<GraphicalBlock>, x: u32, y: u32, z: u32, detail_skip:
         ((shifted_id + 0) << 18) | (7 << 22),
     );
 
-    let face = 6 << 12; // Null
+    let face = 6 << 15; // Null
 
     vertices.push(BlockVertex {data: uv.0|x0|y0|z0|face});
     vertices.push(BlockVertex {data: uv.1|x1|y1|z0|face});

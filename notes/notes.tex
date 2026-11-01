@@ -1,6 +1,6 @@
 \documentclass[11pt,twocolumn]{article}
 
-\usepackage[margin=0.6in]{geometry}
+\usepackage[left=0.6in, right=0.6in, top=0.6in, bottom=0.8in]{geometry}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{ebgaramond}
@@ -11,11 +11,13 @@
 \newcommand{\unit}[1]{\hat{\bm {#1}}}
 \newcommand{\parens}[1]{\left(#1\right)}
 \newcommand{\brackets}[1]{\left[#1\right]}
+\newcommand{\chevronsi}[1]{\langle #1 \rangle}
 
 \title{Astranesse}
 \author{Jack T. Dinsmore}
 
 \renewcommand{\baselinestretch}{1.15}
+\setlength{\columnsep}{0.3in} % Default is usually 6pt
 
 \begin{document}
   \maketitle
@@ -24,7 +26,37 @@
   \subsection{Atmosphere}
     Given the basic properties of a planet and a rough altitude map the task is to compute its atmospheric flows. These will then be used to determine the weathering and humidity maps of the planet, which modify the altitude and set the biome. The atmospheric simulation should include Hadley cells and respond to large scale features such as coastlines and mountains. The humidity can be done post hoc, and should take adiabatic cooling into account.
 
-    My basic picture is that Hadley cells exist because the higher temperature at the equator sets up a pressure gradient towards the poles. But the upper atmosphere has far less pressure gradient because it's less thermally connected to the ground. This sets up curl in the pressure field.
+    \subsubsection{Scale height}
+    Force balance requires simply $\nabla P + \rho g = 0$. Note that $g = GM/(w/2)^2 = 4GM/w^2$ where $w$ is the planet width. Writing $P = P_0 e^{-z/H}$, we have $P/H = \rho g$, or $H = P / (\rho g)$. Also note $PV = Nk_B T \implies P = n k_B T \implies P = \rho (k_B / m) T$, where $m$ is the mean molecular mass. Thus, $H = (k_B T) / (mg)$.
+
+    \subsubsection{Temperature}
+      Take a patch of ground has normal vector $\unit n = (\sin \theta, 0, \cos \theta)$ in the local frame. This frame rotates around spin pole $\unit z$, with sun vector $(0, \sin \phi, \cos \phi)$ in the global frame. This is a general setup; the planet rotates, so the azimuthal angle of $\unit n$ can be fixed, and then by global rotational symmetry the spin pole can be set to $\unit z$ and the azimuthal angle of $\unit s$ to the value I chose. Suppose the solar flux is $F$ and absorption (one minus albedo) is $\epsilon$. Then the injected energy is $F \epsilon dA \max[\unit n(t) \cdot \unit s, 0]$, where $\unit n(t)$ is in the global frame. Over one day, it's $\int_0^{2\pi/\Omega} dt\, \max[\unit s^T R_z(\Omega t) \unit n,0]$. This equation is hard to evaluate. But I could evaluate by analogy: $\int_0^{2\pi/\Omega} dt\, \max[\sin (\Omega t),0] = 2/\Omega$, and $\int_0^{2\pi/\Omega} dt\, \sin (\Omega t)^2 = \pi/\Omega$. Thus, perhaps the integral of this max is approximately $2/\pi$ times the integral of the square? In that case,
+      \begin{equation}
+        \Delta E = \frac{2}{\Omega}\epsilon \brackets{\cos^2 \theta (3\cos^2 \phi - 1) + \sin^2 \phi}F dA.
+      \end{equation}
+
+      Meanwhile, the loss due to radiation is $\Delta E = \sigma T^4 dA (2\pi / \Omega)$. Altogether,
+      \begin{equation}
+        T = \frac{3}{2}T_0\parens{\frac{\epsilon}{\epsilon_0}}^{1/4} \brackets{1 - (\unit n \cdot \unit \Omega)^2 (1 - 3(\unit s \cdot \unit \Omega)^2) - (\unit s \cdot \unit \Omega)^2}^{1/4}.
+      \end{equation}
+      where $T_0 = (2/3)[(F\epsilon_0) / (\pi\sigma)]^{1/4}$, and $\epsilon_0$ is the surface-averaged absorption. Note that there's diurnal variation in $\unit s \cdot \unit \Omega$: it varies sinusoidally over the year. The average value of $(\unit s \cdot \unit \Omega)^2$ over a year is thus the max squared over two. It might also be interesting to know that the average value of $T$ over the full surface is $T_0$.
+
+      That's the temperature of a planet with no atmosphere. But as the atmosphere carries heat, a dense atmosphere will restore the temperature to a uniform $T_0$. Thus, the true temperature is something more like $\eta T + T_0 (1 - \eta)$, for $\eta \in [0,1]$.
+      
+      What is $\eta$? It must relate to how much heat can be transferred by the atmosphere. The scale of heat flux due to the sun is $\sigma T^4 dA$ for a region of area $dA$. Meanwhile, the atmosphere has energy density $\rho CT$ for specific heat capacity $C$, and if it moves at speed $v$ then the heat flux is $\rho CTv dA$. Define $\tanh^{-1} \eta$ as the ratio between the convective and radiative heat flux. I will note later that $v \sim \sqrt{k_B T / m} \sim \sqrt{Hg}$. It also might be useful to remember that $\rho = P/(Hg)$. Thus
+      \begin{equation}
+        \eta \sim \tanh \frac{P C}{\sigma T^3 \sqrt{H g}}.
+      \end{equation}
+
+
+    \subsection{Wind}
+      For the momentum equation, I'll measure the effects of pressure, Coriolis effect, and mountains. No viscosity. For pressure, once this heating is applied to air near the ground the rises when $T > T_0$ and sinks otherwise. This causes a pressure low / high. A sensible guess would be $\Delta P / P_0 = -\Delta T / T_0$, where $P_0$ is the average pressure. Thus, the force is $f_p = P_0 \nabla  T / T_0$. By the ideal gas law, $P_0 = \rho_0 Hg.$
+      
+      For the Coriolis effect, the force density is $f_c = 2 \rho \bm \Omega \times \bm v$ is the Coriolis force per unit mass. And for mountains, a chunk of mass moving up requires work density $\rho \Delta hg$. Thus, the force was $f_m = -\rho h g / \Delta x$, meaning $-\rho g \nabla h$. Kinda weirdly, this prefers atmosphere to roll down the mountain, when that's not really what I wanted. But I'll continue. Momentum balance gives $\rho D\bm v / Dt = f$, but in steady state this is
+      \begin{equation}
+        (\bm v \cdot \nabla) \bm v = gH\parens{\nabla \frac{T}{T_0} - \nabla \frac{h}{H}} + 2\bm \Omega \times \bm v
+      \end{equation}
+      I'll have to update this numerically.
 
   \subsection{Fog}
     Fog consists of the combined effects of scattering out of the line of sight and into the line of sight. Starting with the former (extinction),

@@ -1,4 +1,4 @@
-This is LuaHBTeX, Version 1.15.0 (TeX Live 2022)  (format=lualatex 2022.7.10)  25 OCT 2026 18:26
+This is LuaHBTeX, Version 1.15.0 (TeX Live 2022)  (format=lualatex 2022.7.10)  31 OCT 2026 16:37
  restricted system commands enabled.
  file:line:error style messages enabled.
 **/Users/jtd/Documents/personal/code/rust/astranesse/notes/notes
@@ -348,26 +348,26 @@ LaTeX Font Info:    Redeclaring math alphabet \mathbf on input line 149.
 ) (./notes.aux)
 \openout1 = notes.aux
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 20.
-LaTeX Font Info:    ... okay on input line 20.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 20.
-LaTeX Font Info:    ... okay on input line 20.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 20.
-LaTeX Font Info:    ... okay on input line 20.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 20.
-LaTeX Font Info:    ... okay on input line 20.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 20.
-LaTeX Font Info:    Trying to load font information for TS1+cmr on input line 20.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 22.
+LaTeX Font Info:    ... okay on input line 22.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 22.
+LaTeX Font Info:    ... okay on input line 22.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 22.
+LaTeX Font Info:    ... okay on input line 22.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 22.
+LaTeX Font Info:    ... okay on input line 22.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 22.
+LaTeX Font Info:    Trying to load font information for TS1+cmr on input line 22.
  (/usr/local/texlive/2022/texmf-dist/tex/latex/base/ts1cmr.fd
 File: ts1cmr.fd 2019/12/16 v2.5j Standard LaTeX font definitions
 )
-LaTeX Font Info:    ... okay on input line 20.
-LaTeX Font Info:    Checking defaults for TU/lmr/m/n on input line 20.
-LaTeX Font Info:    ... okay on input line 20.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 20.
-LaTeX Font Info:    ... okay on input line 20.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 20.
-LaTeX Font Info:    ... okay on input line 20.
+LaTeX Font Info:    ... okay on input line 22.
+LaTeX Font Info:    Checking defaults for TU/lmr/m/n on input line 22.
+LaTeX Font Info:    ... okay on input line 22.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 22.
+LaTeX Font Info:    ... okay on input line 22.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 22.
+LaTeX Font Info:    ... okay on input line 22.
 
 *geometry* driver: auto-detecting
 *geometry* detected driver: luatex
@@ -378,11 +378,11 @@ LaTeX Font Info:    ... okay on input line 20.
 * layoutoffset:(h,v)=(0.0pt,0.0pt)
 * modes: 
 * h-part:(L,W,R)=(43.36243pt, 527.57014pt, 43.36243pt)
-* v-part:(T,H,B)=(43.36243pt, 708.24513pt, 43.36243pt)
+* v-part:(T,H,B)=(43.36243pt, 693.79135pt, 57.81621pt)
 * \paperwidth=614.295pt
 * \paperheight=794.96999pt
 * \textwidth=527.57014pt
-* \textheight=708.24513pt
+* \textheight=693.79135pt
 * \oddsidemargin=-28.90756pt
 * \evensidemargin=-28.90756pt
 * \topmargin=-65.90756pt
@@ -392,7 +392,7 @@ LaTeX Font Info:    ... okay on input line 20.
 * \footskip=30.0pt
 * \marginparwidth=4.0pt
 * \marginparsep=10.0pt
-* \columnsep=10.0pt
+* \columnsep=21.68121pt
 * \skip\footins=10.0pt plus 4.0pt minus 2.0pt
 * \hoffset=0.0pt
 * \voffset=0.0pt
@@ -409,106 +409,140 @@ Package fontspec Info: Adjusting the maths setup (use [no-math] to avoid
 
 \symlegacymaths=\mathgroup9
 LaTeX Font Info:    Overwriting symbol font `legacymaths' in version `bold'
-(Font)                  OT1/cmr/m/n --> OT1/cmr/bx/n on input line 20.
-LaTeX Font Info:    Redeclaring math accent \acute on input line 20.
-LaTeX Font Info:    Redeclaring math accent \grave on input line 20.
-LaTeX Font Info:    Redeclaring math accent \ddot on input line 20.
-LaTeX Font Info:    Redeclaring math accent \tilde on input line 20.
-LaTeX Font Info:    Redeclaring math accent \bar on input line 20.
-LaTeX Font Info:    Redeclaring math accent \breve on input line 20.
-LaTeX Font Info:    Redeclaring math accent \check on input line 20.
-LaTeX Font Info:    Redeclaring math accent \hat on input line 20.
-LaTeX Font Info:    Redeclaring math accent \dot on input line 20.
-LaTeX Font Info:    Redeclaring math accent \mathring on input line 20.
-LaTeX Font Info:    Redeclaring math symbol \Gamma on input line 20.
-LaTeX Font Info:    Redeclaring math symbol \Delta on input line 20.
-LaTeX Font Info:    Redeclaring math symbol \Theta on input line 20.
-LaTeX Font Info:    Redeclaring math symbol \Lambda on input line 20.
-LaTeX Font Info:    Redeclaring math symbol \Xi on input line 20.
-LaTeX Font Info:    Redeclaring math symbol \Pi on input line 20.
-LaTeX Font Info:    Redeclaring math symbol \Sigma on input line 20.
-LaTeX Font Info:    Redeclaring math symbol \Upsilon on input line 20.
-LaTeX Font Info:    Redeclaring math symbol \Phi on input line 20.
-LaTeX Font Info:    Redeclaring math symbol \Psi on input line 20.
-LaTeX Font Info:    Redeclaring math symbol \Omega on input line 20.
-LaTeX Font Info:    Redeclaring math symbol \mathdollar on input line 20.
-LaTeX Font Info:    Redeclaring symbol font `operators' on input line 20.
+(Font)                  OT1/cmr/m/n --> OT1/cmr/bx/n on input line 22.
+LaTeX Font Info:    Redeclaring math accent \acute on input line 22.
+LaTeX Font Info:    Redeclaring math accent \grave on input line 22.
+LaTeX Font Info:    Redeclaring math accent \ddot on input line 22.
+LaTeX Font Info:    Redeclaring math accent \tilde on input line 22.
+LaTeX Font Info:    Redeclaring math accent \bar on input line 22.
+LaTeX Font Info:    Redeclaring math accent \breve on input line 22.
+LaTeX Font Info:    Redeclaring math accent \check on input line 22.
+LaTeX Font Info:    Redeclaring math accent \hat on input line 22.
+LaTeX Font Info:    Redeclaring math accent \dot on input line 22.
+LaTeX Font Info:    Redeclaring math accent \mathring on input line 22.
+LaTeX Font Info:    Redeclaring math symbol \Gamma on input line 22.
+LaTeX Font Info:    Redeclaring math symbol \Delta on input line 22.
+LaTeX Font Info:    Redeclaring math symbol \Theta on input line 22.
+LaTeX Font Info:    Redeclaring math symbol \Lambda on input line 22.
+LaTeX Font Info:    Redeclaring math symbol \Xi on input line 22.
+LaTeX Font Info:    Redeclaring math symbol \Pi on input line 22.
+LaTeX Font Info:    Redeclaring math symbol \Sigma on input line 22.
+LaTeX Font Info:    Redeclaring math symbol \Upsilon on input line 22.
+LaTeX Font Info:    Redeclaring math symbol \Phi on input line 22.
+LaTeX Font Info:    Redeclaring math symbol \Psi on input line 22.
+LaTeX Font Info:    Redeclaring math symbol \Omega on input line 22.
+LaTeX Font Info:    Redeclaring math symbol \mathdollar on input line 22.
+LaTeX Font Info:    Redeclaring symbol font `operators' on input line 22.
 LaTeX Font Info:    Encoding `OT1' has changed to `TU' for symbol font
-(Font)              `operators' in the math version `normal' on input line 20.
+(Font)              `operators' in the math version `normal' on input line 22.
 LaTeX Font Info:    Overwriting symbol font `operators' in version `normal'
-(Font)                  OT1/cmr/m/n --> TU/EBGaramond(0)/m/n on input line 20.
+(Font)                  OT1/cmr/m/n --> TU/EBGaramond(0)/m/n on input line 22.
 LaTeX Font Info:    Encoding `OT1' has changed to `TU' for symbol font
-(Font)              `operators' in the math version `bold' on input line 20.
+(Font)              `operators' in the math version `bold' on input line 22.
 LaTeX Font Info:    Overwriting symbol font `operators' in version `bold'
-(Font)                  OT1/cmr/bx/n --> TU/EBGaramond(0)/m/n on input line 20.
+(Font)                  OT1/cmr/bx/n --> TU/EBGaramond(0)/m/n on input line 22.
 LaTeX Font Info:    Overwriting symbol font `operators' in version `normal'
-(Font)                  TU/EBGaramond(0)/m/n --> TU/EBGaramond(0)/m/n on input line 20.
+(Font)                  TU/EBGaramond(0)/m/n --> TU/EBGaramond(0)/m/n on input line 22.
 LaTeX Font Info:    Overwriting math alphabet `\mathit' in version `normal'
-(Font)                  OT1/cmr/m/it --> TU/EBGaramond(0)/m/it on input line 20.
+(Font)                  OT1/cmr/m/it --> TU/EBGaramond(0)/m/it on input line 22.
 LaTeX Font Info:    Overwriting math alphabet `\mathbf' in version `normal'
-(Font)                  OT1/cmr/bx/n --> TU/EBGaramond(0)/b/n on input line 20.
+(Font)                  OT1/cmr/bx/n --> TU/EBGaramond(0)/b/n on input line 22.
 LaTeX Font Info:    Overwriting math alphabet `\mathsf' in version `normal'
-(Font)                  OT1/cmss/m/n --> TU/lmss/m/n on input line 20.
+(Font)                  OT1/cmss/m/n --> TU/lmss/m/n on input line 22.
 LaTeX Font Info:    Overwriting math alphabet `\mathtt' in version `normal'
-(Font)                  OT1/cmtt/m/n --> TU/lmtt/m/n on input line 20.
+(Font)                  OT1/cmtt/m/n --> TU/lmtt/m/n on input line 22.
 LaTeX Font Info:    Overwriting symbol font `operators' in version `bold'
-(Font)                  TU/EBGaramond(0)/m/n --> TU/EBGaramond(0)/b/n on input line 20.
+(Font)                  TU/EBGaramond(0)/m/n --> TU/EBGaramond(0)/b/n on input line 22.
 LaTeX Font Info:    Overwriting math alphabet `\mathit' in version `bold'
-(Font)                  OT1/cmr/bx/it --> TU/EBGaramond(0)/b/it on input line 20.
+(Font)                  OT1/cmr/bx/it --> TU/EBGaramond(0)/b/it on input line 22.
 LaTeX Font Info:    Overwriting math alphabet `\mathsf' in version `bold'
-(Font)                  OT1/cmss/bx/n --> TU/lmss/b/n on input line 20.
+(Font)                  OT1/cmss/bx/n --> TU/lmss/b/n on input line 22.
 LaTeX Font Info:    Overwriting math alphabet `\mathtt' in version `bold'
-(Font)                  OT1/cmtt/m/n --> TU/lmtt/b/n on input line 20.
+(Font)                  OT1/cmtt/m/n --> TU/lmtt/b/n on input line 22.
 LaTeX Font Info:    Font shape `TU/EBGaramond(0)/m/n' will be
-(Font)              scaled to size 17.28pt on input line 21.
+(Font)              scaled to size 17.28pt on input line 23.
 LaTeX Font Info:    Font shape `TU/EBGaramond(0)/m/n' will be
-(Font)              scaled to size 12.0pt on input line 21.
+(Font)              scaled to size 12.0pt on input line 23.
 LaTeX Font Info:    Font shape `TU/EBGaramond(0)/m/n' will be
-(Font)              scaled to size 8.0pt on input line 21.
+(Font)              scaled to size 8.0pt on input line 23.
 LaTeX Font Info:    Font shape `TU/EBGaramond(0)/m/n' will be
-(Font)              scaled to size 6.0pt on input line 21.
-LaTeX Font Info:    Trying to load font information for U+msa on input line 21.
+(Font)              scaled to size 6.0pt on input line 23.
+LaTeX Font Info:    Trying to load font information for U+msa on input line 23.
 (/usr/local/texlive/2022/texmf-dist/tex/latex/amsfonts/umsa.fd
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
-LaTeX Font Info:    Trying to load font information for U+msb on input line 21.
+LaTeX Font Info:    Trying to load font information for U+msb on input line 23.
  (/usr/local/texlive/2022/texmf-dist/tex/latex/amsfonts/umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 )
 LaTeX Font Info:    Font shape `TU/EBGaramond(0)/m/n' will be
-(Font)              scaled to size 14.4pt on input line 23.
+(Font)              scaled to size 14.4pt on input line 25.
 LaTeX Font Info:    Font shape `TU/EBGaramond(0)/b/n' will be
-(Font)              scaled to size 14.4pt on input line 23.
+(Font)              scaled to size 14.4pt on input line 25.
 LaTeX Font Info:    Font shape `TU/EBGaramond(0)/b/n' will be
-(Font)              scaled to size 12.0pt on input line 24.
+(Font)              scaled to size 12.0pt on input line 26.
 LaTeX Font Info:    Font shape `TU/EBGaramond(0)/b/n' will be
-(Font)              scaled to size 10.95pt on input line 32.
+(Font)              scaled to size 10.95pt on input line 29.
 
-Overfull \hbox (16.2497pt too wide) detected at line 47
-[]\OML/cmm/m/it/10.95 [] \OT1/cmr/m/n/10.95 = \OML/cmm/m/it/10.95 E[]H[]e[] [] :
+Underfull \hbox (badness 10000) in paragraph at lines 33--34
+\TU/EBGaramond(0)/m/n/10.95 Take a patch of ground has nor-mal vec-tor $[] \OT1/cmr/m/n/10.95 =
+ []
+
+
+Underfull \hbox (badness 3965) in paragraph at lines 33--34
+\OT1/cmr/m/n/10.95 ([] \OML/cmm/m/it/10.95 ; \OT1/cmr/m/n/10.95 0\OML/cmm/m/it/10.95 ; [] \OT1/cmr/m/n/10.95 )$ \TU/EBGaramond(0)/m/n/10.95 in the lo-cal frame. This frame ro-tates
+ []
+
+
+Underfull \hbox (badness 3078) in paragraph at lines 33--34
+\TU/EBGaramond(0)/m/n/10.95 This equa-tion is hard to eval-u-ate. But I could eval-u-
+ []
+
+
+Underfull \hbox (badness 1005) in paragraph at lines 33--34
+\TU/EBGaramond(0)/m/n/10.95 ate by anal-ogy: $[][] \OML/cmm/m/it/10.95 dt  []\OT1/cmr/m/n/10.95 [[](
+\OML/cmm/m/it/10.95 t\OT1/cmr/m/n/10.95 )\OML/cmm/m/it/10.95 ; \OT1/cmr/m/n/10.95 0] = 2/
+$\TU/EBGaramond(0)/m/n/10.95 , and
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 38--39
+[]\TU/EBGaramond(0)/m/n/10.95 Mean-while, the loss due to ra-di-a-tion is $\OT1/cmr/m/n/10.95 \OML/cmm/m/it/10.95 E \OT1/cmr/m/n/10.95 =
+ []
+
+LaTeX Font Info:    Font shape `TU/EBGaramond(0)/b/n' will be
+(Font)              scaled to size 8.0pt on input line 40.
+LaTeX Font Info:    Font shape `TU/EBGaramond(0)/b/n' will be
+(Font)              scaled to size 6.0pt on input line 40.
+
+Overfull \hbox (37.0148pt too wide) detected at line 41
+[]\OML/cmm/m/it/10.95 T \OT1/cmr/m/n/10.95 = []\OML/cmm/m/it/10.95 T[] [][] [][] :
  []
 
 [1{/usr/local/texlive/2022/texmf-var/fonts/map/pdftex/updmap/pdftex.map}
 
 
-] [2
+]
+Overfull \hbox (22.0903pt too wide) detected at line 79
+[]\OML/cmm/m/it/10.95 [] \OT1/cmr/m/n/10.95 = \OML/cmm/m/it/10.95 E[]H[]e[] [] :
+ []
 
-] (./notes.aux))
+[2] (./notes.aux))
 
 Here is how much of LuaTeX's memory you used:
- 5465 strings out of 477785
+ 5468 strings out of 477785
  100000,552014 words of node,token memory allocated
- 519 words of node memory still in use:
-   6 hlist, 2 vlist, 2 rule, 2 glue, 4 kern, 1 glyph, 16 attribute, 51 glue_spec, 16 attribute_list, 1 write nodes
-   avail lists: 2:440,3:166,4:16,5:511,6:38,7:7219,8:47,9:488,10:14,11:389
- 25990 multiletter control sequences out of 65536+600000
- 70 fonts using 10867311 bytes
- 83i,8n,112p,548b,257s stack positions out of 10000i,1000n,20000p,200000b,200000s
-</usr/local/texlive/2022/texmf-dist/fonts/opentype/public/ebgaramond/EBGaramond-Bold.otf></usr/local/texlive/2022/texmf-dist/fonts/opentype/public/ebgaramond/EBGaramond-Regular.otf></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmmib10.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cmextra/cmmib8.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb>
-Output written on notes.pdf (2 pages, 117718 bytes).
+ 556 words of node memory still in use:
+   6 hlist, 2 vlist, 2 rule, 2 glue, 4 kern, 1 glyph, 24 attribute, 52 glue_spec, 24 attribute_list, 1 write nodes
+   avail lists: 2:476,3:182,4:34,5:622,6:32,7:7447,8:61,9:585,10:18,11:345
+ 25993 multiletter control sequences out of 65536+600000
+ 72 fonts using 11897791 bytes
+ 83i,8n,112p,1133b,257s stack positions out of 10000i,1000n,20000p,200000b,200000s
+</usr/local/texlive/2022/texmf-dist/fonts/opentype/public/ebgaramond/EBGaramond-Bold.otf></usr/local/texlive/2022/texmf-dist/fonts/opentype/public/ebgaramond/EBGaramond-Regular.otf></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmmib10.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cmextra/cmmib8.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb>
+Output written on notes.pdf (2 pages, 146096 bytes).
 
-PDF statistics: 73 PDF objects out of 1000 (max. 8388607)
- 50 compressed objects within 1 object stream
+PDF statistics: 77 PDF objects out of 1000 (max. 8388607)
+ 53 compressed objects within 1 object stream
  0 named destinations out of 1000 (max. 131072)
  1 words of extra memory for PDF output out of 10000 (max. 100000000)
 

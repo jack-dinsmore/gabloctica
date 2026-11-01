@@ -36,9 +36,9 @@ fn vs_main(
         1.
     );
 
-    if ((vert.data>>26) & 1) != 0 { position.x += 16.; }
-    if ((vert.data>>27) & 1) != 0 { position.y += 16.; }
-    if ((vert.data>>28) & 1) != 0 { position.z += 16.; }
+    if ((vert.data>>29) & 1) != 0 { position.x += 32.; }
+    if ((vert.data>>30) & 1) != 0 { position.y += 32.; }
+    if ((vert.data>>31) & 1) != 0 { position.z += 32.; }
 
     out.clip_position = camera.shadow_proj * (model.model * position);
     return out;

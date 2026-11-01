@@ -139,7 +139,7 @@ impl<T: Mul<f32, Output=T> + Add<T, Output=T> + Clone> SphericalInterpolator<T> 
 }
 
 impl SphericalInterpolator<Vector3<f32>> {
-    pub fn get_divergence(&self, pos: Vector3<f32>) -> f32 {
+    pub fn divergence(&self, pos: Vector3<f32>) -> f32 {
         let step = self.delta/2.;
         let (pos, ax1, ax2) = Self::get_axes(pos);
         let forward = self.get(pos+ax1*step);
@@ -147,5 +147,28 @@ impl SphericalInterpolator<Vector3<f32>> {
         let left = self.get(pos+ax2*step);
         let right = self.get(pos-ax2*step);
         ((forward - backward).dot(ax1) + (left - right).dot(ax2))/(2.*step)
+    }
+    
+    pub(crate) fn convective_derivative(&self, pos: Vector3<f32>) -> Vector3<f32> {
+        let step = self.delta/2.;
+        let here = self.get(pos);
+        let (pos, ax1, ax2) = Self::get_axes(pos);
+        let forward = self.get(pos+ax1*step);
+        let backward = self.get(pos-ax2*step);
+        let left = self.get(pos+ax2*step);
+        let right = self.get(pos-ax2*step);
+        (here.dot(ax1) * (forward - backward) + here.dot(ax2) * (left - right)) / (2.*step)
+    }
+}
+
+impl SphericalInterpolator<f32> {
+    pub fn gradient(&self, pos: Vector3<f32>) -> Vector3<f32> {
+        let step = self.delta/2.;
+        let (pos, ax1, ax2) = Self::get_axes(pos);
+        let forward = self.get(pos+ax1*step);
+        let backward = self.get(pos-ax2*step);
+        let left = self.get(pos+ax2*step);
+        let right = self.get(pos-ax2*step);
+        ((forward - backward) * ax1 + (left - right) * ax2) / (2.*step)
     }
 }

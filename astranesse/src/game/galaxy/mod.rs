@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use cgmath::{InnerSpace, Matrix4, SquareMatrix, Vector3};
 use image::{ImageBuffer, Rgba};
 use noise::{NoiseFn, Perlin};
-use rand::{Rng, rngs::ThreadRng};
+use rand::{Rng, RngExt, rngs::ThreadRng};
 use rustc_hash::FxHashMap;
 
 use crate::graphics::{Camera, FlatVertex, Graphics, IndexBuffer, ModelUniform, Renderer, Texture, UniformBuffer, VertexBuffer};

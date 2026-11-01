@@ -10,8 +10,6 @@ struct LightUniform {
     pos: vec4<f32>,
 };
 
-const TEXTURE_SIZE: f32 = 256.; // Blocks per texture
-
 fn rgb_to_hsl(c: vec3<f32>) -> vec3<f32> {
     let maxc = max(c.r, max(c.g, c.b));
     let minc = min(c.r, min(c.g, c.b));
@@ -112,23 +110,23 @@ fn vs_main(
         f32((vert.data>>10) & 0x1f),
         1.
     );
-    
+
     var normal = vec3(0., 0., 0.);
-    if (((vert.data>>15) & 0x8) == 0) { normal.x = 1.; }
-    if (((vert.data>>15) & 0x8) == 1) { normal.x = -1.; }
-    if (((vert.data>>15) & 0x8) == 2) { normal.y = 1.; }
-    if (((vert.data>>15) & 0x8) == 3) { normal.y = -1.; }
-    if (((vert.data>>15) & 0x8) == 4) { normal.z = 1.; }
-    if (((vert.data>>15) & 0x8) == 5) { normal.z = -1.; }
+    if (((vert.data>>15) & 0x7) == 0) { normal.x = 1.; }
+    if (((vert.data>>15) & 0x7) == 1) { normal.x = -1.; }
+    if (((vert.data>>15) & 0x7) == 2) { normal.y = 1.; }
+    if (((vert.data>>15) & 0x7) == 3) { normal.y = -1.; }
+    if (((vert.data>>15) & 0x7) == 4) { normal.z = 1.; }
+    if (((vert.data>>15) & 0x7) == 5) { normal.z = -1.; }
 
     out.texpos = vec2(
-        f32((vert.data>>22) & 0xf) / 7.,
-        f32((vert.data>>18) & 0xf) / TEXTURE_SIZE,
+        f32((vert.data>>26) & 0x7) / 7.,
+        f32((vert.data>>18) & 0xff) / 255,
     );
 
-    if ((vert.data>>26) & 1) != 0 { out.position.x += 16.; }
-    if ((vert.data>>27) & 1) != 0 { out.position.y += 16.; }
-    if ((vert.data>>28) & 1) != 0 { out.position.z += 16.; }
+    if ((vert.data>>29) & 1) != 0 { out.position.x += 32.; }
+    if ((vert.data>>30) & 1) != 0 { out.position.y += 32.; }
+    if ((vert.data>>31) & 1) != 0 { out.position.z += 32.; }
 
     let rotation = mat3x3(
         model.model[0].xyz,

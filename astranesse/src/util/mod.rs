@@ -1,11 +1,13 @@
 mod interp;
 mod vendor;
 mod grid;
+mod kmeans;
 
 use std::{cell::RefCell, rc::Rc};
 use cgmath::{Matrix3, Vector3};
 pub use vendor::{Vendor, Tagged};
 pub use interp::{SphericalInterpolator, lerp};
+pub use kmeans::{KMeans};
 pub use grid::{Grid, CHUNK_SIZE};
 pub type RcCell<T> = Rc<RefCell<T>>;
 

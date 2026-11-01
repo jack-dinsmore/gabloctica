@@ -10,18 +10,10 @@ pub trait Vertex: Copy + Clone + bytemuck::Pod + bytemuck::Zeroable {
 /// 5-9:    y pos
 /// 10-14:   z pos
 /// 15-17:  normal (0, 1, 2, 3, 4, or 5. Other bytes are unused)
-/// 18-21:  u pos
-/// 22-25:  v pos
-/// 26-28:  x,y,z overflow bits
+/// 18-25:  u pos
+/// 26-28:  v pos
+/// 29-31:  x,y,z overflow bits
 /// 
-/// /// BITS    PURPOSE
-/// 0-3:    x pos
-/// 4-7:    y pos
-/// 8-11:   z pos
-/// 12-14:  normal (0, 1, 2, 3, 4, or 5. Other bytes are unused)
-/// 16-19:  u pos
-/// 20-23:  v pos
-/// 24-26:  x,y,z overflow bits
 pub struct BlockVertex {
     pub data: u32,
 }

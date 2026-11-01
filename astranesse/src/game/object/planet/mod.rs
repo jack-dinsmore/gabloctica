@@ -1,5 +1,12 @@
+mod textures;
+
+use std::ptr::eq;
+
 use cgmath::{InnerSpace, Matrix4, Quaternion, Rotation, Vector3};
 use noise::{NoiseFn, Perlin};
+use rand::{RngExt, SeedableRng};
+use rand::rngs::StdRng;
+use textures::BlockSelector;
 
 use crate::game::chemistry::{Chemical, Concentration, State};
 use crate::game::object::chunk::PhysicalChunk;
@@ -15,22 +22,22 @@ const LOAD_TIME: u128 = 25000; // Millseconds
 
 struct LoadedPlanet {
     alt_interp: SphericalInterpolator<f32>,
-    wind_interp: SphericalInterpolator<Vector3<f32>>,
     humidity_interp: SphericalInterpolator<f32>,
     temp_interp: SphericalInterpolator<f32>,
     ocean_alt: f32,
-    seed: u32,
+    rng: StdRng,
     last_load: std::time::Instant,
     halfwidth: f32,
-
+    
     //Aesthetic properties
-    pub scale_height: f32,
-    pub extinction: Vector3<f32>,
+    scale_height: f32,
+    extinction: Vector3<f32>,
+    selector: BlockSelector,
 }
 
 pub struct Planet {
     width: u32,
-    seed: u32,
+    seed: u64,
     mass: f32,
     to_sun: Vector3<f32>,
     sun_flux: f32,
@@ -57,12 +64,11 @@ impl LoadedPlanet {
     fn dbg_text(&self, pos: Vector3<f32>) -> String {
         let alt = self.get_altitude(pos);
         let humidity = self.humidity_interp.get(pos);
-        let wind = self.wind_interp.get(pos);
         let temp = self.temp_interp.get(pos);
-        format!("Altitude: {:.2}\nVolume: {}\nHumidity: {:.2}\nWind: {:?}\nTemp: {:.2}", alt, 1., humidity, wind, temp)
+        format!("Altitude: {:.2}\nVolume: {}\nHumidity: {:.2}\nTemp: {:.2}", alt, 1., humidity, temp)
     }
 
-    pub(super) fn load_chunk(&self, graphics: &Graphics, properties: &BlockProperties, chunk_coord: (i32, i32, i32)) -> Option<PhysicalChunk> {
+    pub(super) fn load_chunk(&mut self, graphics: &Graphics, properties: &BlockProperties, chunk_coord: (i32, i32, i32)) -> Option<PhysicalChunk> {
         let chunk_pos = Vector3::new(chunk_coord.0 as f32, chunk_coord.1 as f32, chunk_coord.2 as f32) * CHUNK_SIZE as f32;
         if self.get_point_altitude(chunk_pos) > self.get_altitude(chunk_pos) + CHUNK_SIZE as f32 {
             // The chunk is outside the planet. Don't load it.
@@ -86,8 +92,12 @@ impl LoadedPlanet {
                     let pos = chunk_pos + Vector3::new(u as f32, v as f32, w as f32);
                     let depth = (self.get_altitude(pos) - self.get_point_altitude(pos)) as i32;
                     if depth < 0 {continue;}
-                    let block = 3;//biome.get_block(depth);//TODO
-                    chunk.grid[(u,v,w)] = super::chunk::PhysicalBlock::new(1, 0, properties);
+                    let alt = self.alt_interp.get(pos);
+                    let temp = self.temp_interp.get(pos);
+                    let humidity = self.humidity_interp.get(pos);
+                    let id = self.selector.get_block_id(alt, humidity, temp);
+                    let rot = (self.rng.random::<u64>() % 16) as u8;
+                    chunk.grid[(u,v,w)] = super::chunk::PhysicalBlock::new(id, rot, properties);
                 }
             }
         }
@@ -135,7 +145,7 @@ impl Planet {
         }
     }
 
-    pub fn update(&mut self, graphics: &Graphics, properties: &BlockProperties, character_pos: Vector3<f64>, delta_t: f64) {
+    pub fn update(&mut self, graphics: &Graphics, properties: &mut BlockProperties, character_pos: Vector3<f64>, delta_t: f64) {
         self.object.update(delta_t);
         self.set_rigid_body();
         
@@ -209,22 +219,22 @@ impl Planet {
         self.object.body.moi = MoI::Diagonal { moi: Vector3::new(moi, moi, moi) };
     }
     
-    fn load(&mut self, graphics: &Graphics, properties: &BlockProperties) {
-        let mut seed = self.seed;
+    fn load(&mut self, graphics: &Graphics, properties: &mut BlockProperties) {
+        let mut rng = StdRng::seed_from_u64(self.seed);
 
         // Get continental layout
         let (continent_flow_interp, alt_interp) = {
-            let flow_noise = [Perlin::new(seed+1), Perlin::new(seed+2), Perlin::new(seed+3)];
-            seed += 3;
+            let flow_noise = [Perlin::new(rng.random()), Perlin::new(rng.random()), Perlin::new(rng.random())];
+            const SCALE: f64 = 1.5;
             let flow_interp = SphericalInterpolator::new(|pos| {
-                let pa = [pos[0] as f64, pos[1] as f64, pos[2] as f64];
+                let pa = [pos[0] as f64 / SCALE, pos[1] as f64 / SCALE, pos[2] as f64 / SCALE];
                 let mut arrow = Vector3::new(
                     flow_noise[0].get(pa) as f32,
                     flow_noise[1].get(pa) as f32,
                     flow_noise[2].get(pa) as f32
                 );
                 arrow -= pos*arrow.dot(pos); // Make normal
-                arrow
+                arrow * 1.0
             }, self.width as usize);
 
             let weathering = 2.;
@@ -234,7 +244,7 @@ impl Planet {
                 let mut impact = 1.;
                 let mut integral = 0.;
                 while impact > 0.01 {
-                    let divergence = flow_interp.get_divergence(pos).powi(3);
+                    let divergence = flow_interp.divergence(pos).powi(3);
                     let arrow = flow_interp.get(pos);
                     integral += divergence * impact;
                     pos += arrow * dt;
@@ -247,42 +257,42 @@ impl Planet {
             (flow_interp, alt_interp)
         };
 
-        let equilib_t = self.sun_flux / (16. * std::f32::consts::PI * self.to_sun.magnitude2() * STEFAN_BOLTZMANN as f32);
-
         // Work out atmospheric properties
+        let equilib_t = self.sun_flux / (16. * std::f32::consts::PI * self.to_sun.magnitude2() * STEFAN_BOLTZMANN as f32);
+        let radius = (self.width * CHUNK_SIZE) as f32 / 2.;
+        let g_accel = NEWTON_G as f32 * self.mass / radius.powi(2);
         let concentration = Concentration::new(&self.composition);
         let surface_states = concentration.get_states(equilib_t);
-        let (scale_height, ocean_volume, extinction) = {
-            let mut total_pressure = 0.;
-            let mut mean_mm = 0.;
-            let mut extinction = Vector3::new(0., 0., 0.);
-            let mut liquid_fractional_volume = 0.;
-            for ((chemical, orig_pressure), state) in concentration.data.iter().zip(&surface_states) {
-                let pressure = match state {
-                    State::Solid => 0.,
-                    State::Gas => *orig_pressure,
-                    State::Liquid(p) => *p,
-                };
-                total_pressure += pressure;
-                mean_mm += chemical.molecular_mass * pressure;
-                extinction += pressure * chemical.opacity;
 
-                if let State::Liquid(p) = state {
-                    let liquid_density = (orig_pressure - p) * (chemical.molecular_mass * PROTON_MASS) / (BOLTZMANN * equilib_t);
-                    liquid_fractional_volume += liquid_density / chemical.liquid_density;
-                }
+        let mut total_pressure = 0.;
+        let mut mean_mm = 0.;
+        let mut specific_heat = 0.;
+        let mut extinction = Vector3::new(0., 0., 0.);
+        let mut liquid_fractional_volume = 0.;
+        for ((chemical, orig_pressure), state) in concentration.data.iter().zip(&surface_states) {
+            let pressure = match state {
+                State::Solid => 0.,
+                State::Gas => *orig_pressure,
+                State::Liquid(p) => *p,
+            };
+            total_pressure += pressure;
+            mean_mm += chemical.molecular_mass * pressure;
+            extinction += pressure * chemical.opacity;
+            specific_heat += pressure * chemical.specific_heat;
+
+            if let State::Liquid(p) = state {
+                let liquid_density = (orig_pressure - p) * (chemical.molecular_mass * PROTON_MASS) / (BOLTZMANN * equilib_t);
+                liquid_fractional_volume += liquid_density / chemical.liquid_density;
             }
-            liquid_fractional_volume /= total_pressure;
-            mean_mm /= total_pressure;
+        }
+        liquid_fractional_volume /= total_pressure;
+        mean_mm /= total_pressure;
+        specific_heat /= total_pressure;
 
-            let radius = (self.width * CHUNK_SIZE) as f32 / 2.;
-            let g_accel = NEWTON_G as f32 * self.mass / radius.powi(2);
-            let scale_height = BOLTZMANN * equilib_t / (PROTON_MASS * mean_mm * g_accel);
-            let ocean_volume = 24. * radius*radius * scale_height * liquid_fractional_volume;
-            extinction *= scale_height;
-
-            (scale_height, ocean_volume, extinction)
-        };
+        let scale_height = BOLTZMANN * equilib_t / (PROTON_MASS * mean_mm * g_accel);
+        let ocean_volume = 24. * radius*radius * scale_height * liquid_fractional_volume;
+        extinction *= scale_height;
+        let eta = (total_pressure * specific_heat / (STEFAN_BOLTZMANN as f32 * equilib_t.powi(3) * (g_accel*scale_height).sqrt())).tanh();
 
         // Work out ocean via Newton's method
         let ocean_alt = {
@@ -324,11 +334,48 @@ impl Planet {
             alt
         };
         
+        // Work out the average temperature
+        let temp_interp = SphericalInterpolator::new(|pos| {
+            let max = pos.x.abs().max(pos.y.abs().max(pos.z.abs()));
+            let mut local_normal = if max == pos.x {
+                Vector3::new(1., 0., 0.)
+            } else if max == -pos.x {
+                Vector3::new(-1., 0., 0.)
+            } else if max == pos.y {
+                Vector3::new(0., 1., 0.)
+            } else if max == -pos.y {
+                Vector3::new(0., -1., 0.)
+            } else if max == pos.z {
+                Vector3::new(0., 0., 1.)
+            } else {
+                Vector3::new(0., 0., -1.)
+            };
+            local_normal += alt_interp.gradient(pos);
+            local_normal = local_normal.normalize();
+            let spin_axis = self.spin_local.normalize();
+            let sun_axis = self.to_sun.normalize();
+
+            let ndot2 = local_normal.dot(spin_axis).powi(2);
+            let sdot2 = sun_axis.dot(spin_axis).powi(2) / 2.;
+
+            let temp = equilib_t * 3. / 2. * (1. - ndot2 * (1. - 3.*sdot2) - sdot2).powf(0.25);
+            temp * (1. - eta) + equilib_t * eta
+        }, self.width as usize);
+
+        // Work out the average wind flow
+        let force_interp = SphericalInterpolator::new(|pos| {
+            g_accel * scale_height * (temp_interp.gradient(pos) / equilib_t - alt_interp.gradient(pos) / scale_height)
+        }, self.width as usize);
         let mut wind_interp = SphericalInterpolator::new(|pos| Vector3::new(0., 0., 0.), self.width as usize);
-        let mut temp_interp = SphericalInterpolator::new(|pos| equilib_t, self.width as usize);
         for _ in 0..10 {
             // Update the ODEs
-            // TODO
+            wind_interp = SphericalInterpolator::new(|pos| {
+                let wind = wind_interp.get(pos);
+                let force = force_interp.get(pos) + 2. * self.spin_local.cross(wind);
+                let residuals = wind_interp.convective_derivative(pos) - force;
+                wind - residuals * 0.01
+            }, self.width as usize);
+
         }
 
         // Work out humidity
@@ -367,17 +414,19 @@ impl Planet {
             }, self.width as usize)
         };
 
+        let selector = BlockSelector::new(properties, &alt_interp, &temp_interp, &humidity_interp, &mut rng);
+
         self.loaded = Some(LoadedPlanet {
             alt_interp,
-            wind_interp,
             humidity_interp,
             temp_interp,
             ocean_alt,
-            seed,
+            rng,
             scale_height,
             extinction,
             halfwidth: self.width as f32 * CHUNK_SIZE as f32 / 2.,
             last_load: std::time::Instant::now() - std::time::Duration::from_millis(2*LOAD_TIME as u64),
+            selector,
         });
     }
     

@@ -1,4 +1,4 @@
-use crate::graphics::{Camera, Graphics, Renderer, ResourceType};
+use crate::{game::object::BlockId, graphics::{Camera, Graphics, Renderer, ResourceType}};
 use super::DEPTH_FORMAT;
 use image::{GenericImageView, ImageBuffer, Rgba};
 
@@ -6,6 +6,8 @@ use image::{GenericImageView, ImageBuffer, Rgba};
 pub struct Texture {
     pub(in crate::graphics) texture: FreeTexture,
     pub(in crate::graphics) bind_group: wgpu::BindGroup,
+    dimensions: (u32, u32),
+    write_queue: Vec<(u16, ImageBuffer<Rgba<u8>, Vec<u8>>)>,
 }
 
 /// A texture which cannot be bound
@@ -69,9 +71,12 @@ impl Texture {
     pub fn new(graphics: &Graphics, camera: &Camera, dimensions: (u32, u32), texture_type: TextureType) -> Self {
         let texture = FreeTexture::new(&graphics.device, dimensions, texture_type);
         let bind_group = Self::get_bind_group(graphics, &texture.view, &camera.shadow_texture.view, Some(&camera.shadow_texture_sampler));
+
         Self {
             texture,
             bind_group,
+            dimensions,
+            write_queue: Vec::new(),
         }
     }
 
@@ -82,6 +87,8 @@ impl Texture {
         Self {
             texture,
             bind_group,
+            dimensions,
+            write_queue: Vec::new(),
         }
     }
 
@@ -163,11 +170,49 @@ impl Texture {
                     wgpu::BindGroupEntry {
                         binding: 3,
                         resource: wgpu::BindingResource::Sampler(&sampler2_ref),
-                    }
+                    },
                 ],
-                label: Some("Bind group"),
+                label: Some("Texture bind group"),
             }
         );
         bind_group
+    }
+    
+    pub fn queue_new_texture(&mut self, index: BlockId, image: ImageBuffer<Rgba<u8>, Vec<u8>>) {
+        self.write_queue.push((index, image));
+    }
+
+    pub fn update_buffer(&mut self, graphics: &Graphics) {
+        if !self.write_queue.is_empty() {
+            for (index, data) in self.write_queue.drain(..) {
+                if index as u32 >= self.dimensions.1 / 16 {
+                    panic!();
+                }
+
+                graphics.queue.write_texture(
+                    wgpu::TexelCopyTextureInfo {
+                        texture: &self.texture.texture,
+                        mip_level: 0,
+                        origin: wgpu::Origin3d {
+                            x: 0,
+                            y: index as u32 * 16+1,
+                            z: 0,
+                        },
+                        aspect: wgpu::TextureAspect::All,
+                    },
+                    &data, 
+                    wgpu::TexelCopyBufferLayout {
+                        offset: 0,
+                        bytes_per_row: Some(4 * 16*6), 
+                        rows_per_image: Some(16),
+                    },
+                    wgpu::Extent3d {
+                        width: 16*6,
+                        height: 16,
+                        depth_or_array_layers: 1,
+                    }
+                );
+            }
+        }
     }
 }

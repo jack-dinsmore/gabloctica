@@ -53,7 +53,6 @@ pub struct Game {
     flat_shader: Shader,
     shadow_shader: Shader,
     camera: Camera,
-    texture: GridTexture,
     lighting: Lighting,
     font: Font,
     post_info: PostInfo,
@@ -98,11 +97,11 @@ impl Game {
             Planet::new(&graphics, &mut physics),
         ];
         let ships = vec![
-            Ship::new(&graphics, &mut physics, RigidBodyInit { pos: Vector3::new(12., 5., 183.), vel: Vector3::new(0., 0., 0.), ..Default::default() }),
+            Ship::new(&graphics, &mut physics, RigidBodyInit { pos: Vector3::new(12., 5., 140.), vel: Vector3::new(0., 0., 0.), ..Default::default() }),
         ];
         let entities = vec![
             // Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(-200., 0., 80.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
-            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 180.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
+            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 140.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
         ];
 
         // Set cursor to center of screen
@@ -114,8 +113,7 @@ impl Game {
         graphics.window.set_cursor_position(center).unwrap();
 
         // Load block information
-        let texture = GridTexture::new(&graphics, &camera, include_bytes!("../../../assets/texture.png"));
-        let block_properties = BlockProperties::new();
+        let block_properties = BlockProperties::new(&graphics, &camera);
 
         let font = Font::new(&mut graphics, &camera, include_bytes!("../../../assets/Rockwell.ttc"));
 
@@ -129,7 +127,6 @@ impl Game {
             camera,
             mouse_motion: (0., 0.),
             lighting,
-            texture,
             block_shader,
             flat_shader,
             physics,
@@ -339,7 +336,7 @@ impl Game {
         self.post_info.update_buffer(&self.graphics, &self.camera, my_planet);
         
         for planet in &mut self.planets {
-            planet.update(&self.graphics, &self.block_properties, camera_pos, delta_t);
+            planet.update(&self.graphics, &mut self.block_properties, camera_pos, delta_t);
         }
         for ship in &mut self.ships {
             ship.update(&self.graphics, &self.block_properties, camera_pos, delta_t);
@@ -368,6 +365,7 @@ impl Game {
         // OPTIMIZE avoid all calls of queue.write_buffer.
         self.camera.update_buffer(&self.graphics, &self.lighting, &self.camera);
         self.lighting.update_buffer(&self.graphics, &self.camera);
+        self.block_properties.update_buffer(&self.graphics);
         for planet in &mut self.planets {
             planet.object.update_buffer(&self.graphics, &self.camera)
         }
@@ -415,10 +413,10 @@ impl Game {
                 self.camera.bind(&mut renderer);
                 self.lighting.bind(&mut renderer);
                 for planet in &self.planets {
-                    planet.object.draw(&mut renderer, &self.texture)
+                    planet.object.draw(&mut renderer, &self.block_properties.get_texture())
                 }
                 for ship in &self.ships {
-                    ship.object.draw(&mut renderer, &self.texture)
+                    ship.object.draw(&mut renderer, &self.block_properties.get_texture())
                 }
 
                 // Post
