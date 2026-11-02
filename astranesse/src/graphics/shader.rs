@@ -2,18 +2,25 @@ use std::borrow::Cow;
 use wgpu::BlendState;
 
 use crate::graphics::{
-    Graphics, Renderer, resource::ResourceType, vertex::Vertex
+    Graphics, MULTISAMPLE_COUNT, Renderer, resource::ResourceType, vertex::Vertex
 };
 
 pub struct Shader {
     render_pipeline: wgpu::RenderPipeline,
     layout: wgpu::PipelineLayout,
     resources: Vec<ResourceType>,
-    pub(super) has_no_depth: bool,
+    render_target: RenderTarget,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum RenderTarget {
+    Texture,
+    Shadow,
+    Screen,
 }
 
 impl Shader {
-    pub fn new<V: Vertex>(graphics: &mut Graphics, source: &'static str, resources: Vec<ResourceType>, has_no_depth: bool) -> Self {
+    pub fn new<V: Vertex>(graphics: &mut Graphics, source: &'static str, resources: Vec<ResourceType>, render_target: RenderTarget) -> Self {
         let shader = graphics.device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
             source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(source)),
@@ -46,16 +53,24 @@ impl Shader {
             None
         };
 
-        let depth_stencil = if has_no_depth {
-            None
-        } else {
-            Some(wgpu::DepthStencilState {
+        let depth_stencil = match render_target {
+            RenderTarget::Shadow | RenderTarget::Texture => Some(wgpu::DepthStencilState {
                 format: super::resource::DEPTH_FORMAT,
                 depth_write_enabled: true,
                 depth_compare: wgpu::CompareFunction::Less,
                 stencil: wgpu::StencilState::default(),
                 bias: wgpu::DepthBiasState::default(),
-            })
+            }),
+            RenderTarget::Screen => None,
+        };
+
+        let multisample = match render_target {
+            RenderTarget::Shadow | RenderTarget::Screen => Default::default(),
+            RenderTarget::Texture => wgpu::MultisampleState {
+                count: MULTISAMPLE_COUNT,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
         };
 
         // Create shader    
@@ -64,7 +79,7 @@ impl Shader {
             None => &[],
         };
         let render_pipeline = graphics.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render pipeline"),
+            label: Some(&format!("Render pipeline {:?}", render_target)),
             layout: Some(&layout),
             vertex: wgpu::VertexState {
                 module: &shader,
@@ -83,7 +98,7 @@ impl Shader {
                 conservative: false,
             },
             depth_stencil,
-            multisample: Default::default(),
+            multisample,
             multiview: None,
             cache: None,
         });
@@ -92,7 +107,7 @@ impl Shader {
             render_pipeline,
             layout,
             resources,
-            has_no_depth,
+            render_target,
         }
     }
 

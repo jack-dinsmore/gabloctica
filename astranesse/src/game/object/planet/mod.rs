@@ -1,7 +1,5 @@
 mod textures;
 
-use std::ptr::eq;
-
 use cgmath::{InnerSpace, Matrix4, Quaternion, Rotation, Vector3};
 use noise::{NoiseFn, Perlin};
 use rand::{RngExt, SeedableRng};

@@ -7,7 +7,7 @@ use wgpu::util::DeviceExt;
 // TODO implement destroying unused resources if it's not already done
 pub struct UniformBuffer<T: Uniform> {
     pub(in crate::graphics) buffer: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
+    bind_group: Option<wgpu::BindGroup>,
     phantom_data: PhantomData<T>
 }
 
@@ -35,14 +35,22 @@ impl<T: Uniform> UniformBuffer<T> {
         let buffer = graphics.device.create_buffer_init(&descriptor);
 
         let layout = &graphics.get_layout(T::TYPE);
-        let bind_group = graphics.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout, 
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: buffer.as_entire_binding(),
-            }],
-            label: None,
-        });
+
+        // Create the bind group if the uniform type is buffer only.
+        let bind_group = match T::TYPE {
+            ResourceType::Camera | ResourceType::Lighting | ResourceType::Model => Some(
+                graphics.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    layout, 
+                    entries: &[wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: buffer.as_entire_binding(),
+                    }],
+                    label: None,
+                })
+            ),
+            ResourceType::Post => None,
+            _ => unreachable!()
+        };
 
         Self {
             buffer,
@@ -60,8 +68,10 @@ impl<T: Uniform> UniformBuffer<T> {
     }
 
     pub fn bind(&self, renderer: &mut Renderer) {
-        let group = renderer.get_group(T::TYPE);
-        renderer.render_pass.as_mut().unwrap().set_bind_group(group, &self.bind_group, &[]);
+        if let Some(bind_group) = &self.bind_group {
+            let group = renderer.get_group(T::TYPE);
+            renderer.render_pass.as_mut().unwrap().set_bind_group(group, bind_group, &[]);
+        }
     }
 }
 

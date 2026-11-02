@@ -1,6 +1,6 @@
-
-use crate::graphics::{Camera, Graphics, Lighting, PostVertex, Renderer, ResourceType, Shader, Uniform, UniformBuffer};
-use crate::game::Planet;
+use crate::game::object::Planet;
+use crate::graphics::{Camera, Graphics, Lighting, PostRenderer, PostVertex, RenderTarget, Renderer, ResourceType, Shader};
+use crate::graphics::{UniformBuffer, Uniform};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -9,26 +9,26 @@ struct PostUniform {
     viewport: [f32; 4],
     fog: [f32; 4],
 }
-
 impl Uniform for PostUniform {
     const TYPE: ResourceType = ResourceType::Post;
 }
 
-pub struct PostInfo {
+
+pub struct PostProcessor {
     shader: Shader,
-    uniform: PostUniform,
+    post: PostRenderer,
     buffer: UniformBuffer<PostUniform>,
+    uniform: PostUniform,
 }
-impl PostInfo {
+
+impl PostProcessor {
     pub fn new(graphics: &mut Graphics, camera: &Camera) -> Self {
         let shader = Shader::new::<PostVertex>(graphics, include_str!("../../shaders/post.wgsl"), vec![
             ResourceType::Post,
-            ResourceType::Texture,
             ResourceType::Camera,
             ResourceType::Lighting,
-        ], true);
+        ], RenderTarget::Screen);
 
-        let buffer = UniformBuffer::new(graphics);
         let size = graphics.window.inner_size();
         let width = size.width.max(1);
         let height = size.height.max(1);
@@ -37,16 +37,18 @@ impl PostInfo {
             fog: [0.6, 0.09, 0., 1.],
             planet_model_inv: [[0., 0., 0., 0.],[0., 0., 0., 0.],[0., 0., 0., 0.],[0., 0., 0., 0.]],
         };
+        let buffer = UniformBuffer::new(graphics);
+
+        let post = PostRenderer::new(graphics, &buffer);
 
         Self {
-            buffer,
-            uniform,
             shader,
+            uniform,
+            buffer,
+            post
         }
     }
-    pub fn bind(&mut self, renderer: &mut Renderer) {
-        self.buffer.bind(renderer);
-    }
+
     pub fn update_buffer(&mut self, graphics: &Graphics, camera: &Camera, my_planet: Option<&Planet>) {
         match my_planet {
             Some(p) => match p.get_post_params(camera) {
@@ -61,12 +63,12 @@ impl PostInfo {
         self.buffer.write(graphics, self.uniform);
     }
 
-    pub fn render(&mut self, renderer: &mut Renderer, camera: &Camera, lighting: &Lighting){
+    pub fn render(&self, renderer: &mut Renderer, camera: &Camera, lighting: &Lighting) {
         renderer.start_post();
         self.shader.bind(renderer);
-        self.bind(renderer);
         camera.bind(renderer);
         lighting.bind(renderer);
+        self.post.bind(renderer);
         renderer.stop_post();
     }
 }

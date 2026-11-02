@@ -19,21 +19,19 @@ pub (in crate::graphics) struct FreeTexture {
 #[derive(Clone, Copy, Debug)]
 pub enum TextureType {
     Normal,
-    Surface,
-    Depth
+    Shadow,
 }
 impl TextureType {
     fn get_format(&self) -> wgpu::TextureFormat {
         match self {
             TextureType::Normal => wgpu::TextureFormat::Rgba8UnormSrgb,
-            TextureType::Surface => wgpu::TextureFormat::Bgra8UnormSrgb,
-            TextureType::Depth => DEPTH_FORMAT,
+            TextureType::Shadow => DEPTH_FORMAT,
         }
     }
     fn get_usage(&self) -> wgpu::TextureUsages {
         match self {
             TextureType::Normal => wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            TextureType::Surface | TextureType::Depth => wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
+            TextureType::Shadow => wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
         }
     }
 }
@@ -43,8 +41,6 @@ impl FreeTexture {
         let texture_size = wgpu::Extent3d {
             width: dimensions.0,
             height: dimensions.1,
-            // All textures are stored as 3D, we represent our 2D texture
-            // by setting depth to 1.
             depth_or_array_layers: 1,
         };
         let desc = wgpu::TextureDescriptor {
@@ -72,18 +68,6 @@ impl Texture {
         let texture = FreeTexture::new(&graphics.device, dimensions, texture_type);
         let bind_group = Self::get_bind_group(graphics, &texture.view, &camera.shadow_texture.view, Some(&camera.shadow_texture_sampler));
 
-        Self {
-            texture,
-            bind_group,
-            dimensions,
-            write_queue: Vec::new(),
-        }
-    }
-
-    /// Create a texture with a bind group
-    pub(in crate::graphics) fn new_surface_texture(graphics: &Graphics, dimensions: (u32, u32), depth_texture_view: &wgpu::TextureView) -> Self {
-        let texture = FreeTexture::new(&graphics.device, dimensions, TextureType::Surface);
-        let bind_group = Self::get_bind_group(graphics, &texture.view, depth_texture_view, None);
         Self {
             texture,
             bind_group,
@@ -175,6 +159,7 @@ impl Texture {
                 label: Some("Texture bind group"),
             }
         );
+        
         bind_group
     }
     

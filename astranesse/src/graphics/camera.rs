@@ -47,7 +47,7 @@ impl Camera {
         let aspect = graphics.surface_config.width as f32 / graphics.surface_config.height as f32;
         let up = Vector3::new(0., 0., 1.);
         let buffer = UniformBuffer::new(graphics);
-        let shadow_texture = FreeTexture::new(&graphics.device, (5000, 5000), TextureType::Depth);
+        let shadow_texture = FreeTexture::new(&graphics.device, (5000, 5000), TextureType::Shadow);
 
         let shadow_texture_sampler = graphics.device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,

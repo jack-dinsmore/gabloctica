@@ -2,6 +2,7 @@ use cgmath::Vector3;
 use crate::graphics::{Camera, Graphics, Renderer, ResourceType};
 use crate::graphics::resource::{UniformBuffer, Uniform};
 
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub(super) struct LightUniform {

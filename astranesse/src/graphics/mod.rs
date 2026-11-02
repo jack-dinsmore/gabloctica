@@ -6,11 +6,13 @@ mod resource;
 mod lighting;
 mod font;
 mod block;
+mod post;
 
 pub use chunk::{GraphicalChunk, GridTexture, ModelUniform};
 pub use camera::Camera;
 pub use lighting::Lighting;
-pub use shader::Shader;
+pub use shader::{Shader, RenderTarget};
+pub use post::PostRenderer;
 pub use vertex::*;
 pub use font::Font;
 pub use resource::*;
@@ -21,6 +23,8 @@ use winit::{dpi::PhysicalSize, event_loop::EventLoopProxy, window::Window};
 use wgpu::{
     Adapter, Color, CommandEncoderDescriptor, Device, DeviceDescriptor, Features, Instance, Limits, LoadOp, MemoryHints, Operations, PowerPreference, Queue, RenderPassColorAttachment, RenderPassDescriptor, RequestAdapterOptions, StoreOp, Surface, SurfaceConfiguration, TextureViewDescriptor
 };
+
+pub const MULTISAMPLE_COUNT: u32 = 4;
 
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::from_cols(
@@ -45,9 +49,49 @@ pub struct Graphics {
     _adapter: Adapter,
     device: Device,
     queue: Queue,
-    depth_texture_view: wgpu::TextureView,
-    render_texture: Option<Texture>,
     layouts: Vec<Option<wgpu::BindGroupLayout>>,
+    
+    surface_texture: wgpu::Texture,
+    surface_texture_view: wgpu::TextureView,
+    depth_texture: wgpu::Texture,
+    depth_texture_view: wgpu::TextureView,
+}
+
+fn make_post_textures(device: &Device, dimensions: (u32, u32)) -> (wgpu::Texture, wgpu::TextureView, wgpu::Texture, wgpu::TextureView) {
+    // Surface texture
+    let texture_size = wgpu::Extent3d {
+        width: dimensions.0,
+        height: dimensions.1,
+        depth_or_array_layers: 1,
+    };
+    let desc = wgpu::TextureDescriptor {
+        label: Some("Surface texture"),
+        size: texture_size,
+        mip_level_count: 1,
+        sample_count: MULTISAMPLE_COUNT,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Bgra8UnormSrgb,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
+        view_formats: &[],
+    };
+    let surface_texture = device.create_texture(&desc);
+    let surface_view = surface_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+    // Depth texture
+    let desc = wgpu::TextureDescriptor {
+        label: Some("Depth texture"),
+        size: texture_size,
+        mip_level_count: 1,
+        sample_count: MULTISAMPLE_COUNT,
+        dimension: wgpu::TextureDimension::D2,
+        format: DEPTH_FORMAT,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
+        view_formats: &[],
+    };
+    let depth_texture = device.create_texture(&desc);
+    let depth_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+    (surface_texture, surface_view, depth_texture, depth_view)
 }
 
 impl Graphics {
@@ -81,7 +125,7 @@ impl Graphics {
         let surface_config = surface.get_default_config(&adapter, width, height).unwrap();
         surface.configure(&device, &surface_config);
 
-        let depth_texture_view = FreeTexture::new(&device, (width, height), TextureType::Depth).view;
+        let (surface_texture, surface_texture_view, depth_texture, depth_texture_view) = make_post_textures(&device, (width, height));
     
         let mut output = Graphics {
             window: window.clone(),
@@ -91,13 +135,14 @@ impl Graphics {
             _adapter: adapter,
             device,
             queue,
-            depth_texture_view: depth_texture_view.clone(),
             layouts: Vec::new(),
-            render_texture: None,
+            depth_texture_view,
+            surface_texture,
+            surface_texture_view,
+            depth_texture,
         };
 
         output.make_layout(ResourceType::Texture);
-        output.render_texture = Some(Texture::new_surface_texture(&output, (width, height), &depth_texture_view));
         
         let _ = proxy.send_event(output);
     }
@@ -145,7 +190,7 @@ impl Graphics {
 pub struct Renderer<'a> {
     encoder_ptr: *mut wgpu::CommandEncoder,
     frame_view: wgpu::TextureView,
-    render_texture: &'a Texture,
+    surface_texture_view: &'a wgpu::TextureView,
     render_pass: Option<wgpu::RenderPass<'a>>,
     depth_texture_view: &'a wgpu::TextureView,
     group_map: [u32; 5],
@@ -160,7 +205,7 @@ impl<'a> Renderer<'a> {
             encoder_ptr,
             depth_texture_view: &graphics.depth_texture_view,
             group_map: [0; 5],
-            render_texture: graphics.render_texture.as_ref().unwrap(),
+            surface_texture_view: &graphics.surface_texture_view,
         }
     }
 
@@ -189,7 +234,7 @@ impl<'a> Renderer<'a> {
         self.render_pass = Some(encoder_ref.begin_render_pass(&RenderPassDescriptor {
             label: Some("First render pass"),
             color_attachments: &[Some(RenderPassColorAttachment {
-                view: &self.render_texture.texture.view,
+                view: &self.surface_texture_view,
                 depth_slice: None,
                 resolve_target: None,
                 ops: Operations {
@@ -216,7 +261,7 @@ impl<'a> Renderer<'a> {
         self.render_pass = Some(encoder_ref.begin_render_pass(&RenderPassDescriptor {
             label: Some("Cleared render pass"),
             color_attachments: &[Some(RenderPassColorAttachment {
-                view: &self.render_texture.texture.view,
+                view: &self.surface_texture_view,
                 depth_slice: None,
                 resolve_target: None,
                 ops: Operations {
@@ -279,7 +324,6 @@ impl<'a> Renderer<'a> {
     }
 
     pub fn stop_post(&mut self) {
-        self.render_texture.bind(self);
         self.render_pass.as_mut().unwrap().draw(0..3, 0..1);
     }
 

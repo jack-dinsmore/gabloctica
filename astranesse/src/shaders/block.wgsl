@@ -86,7 +86,7 @@ struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) position: vec4<f32>,
     @location(1) normal: vec3<f32>,
-    @location(2) texpos: vec2<f32>,
+    @location(2) @interpolate(perspective, sample) texpos: vec2<f32>,
     @location(3) shadow_pos: vec4<f32>,
 }
 
@@ -142,6 +142,7 @@ fn vs_main(
 }
 
 @fragment
+
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var color = textureSample(t_diffuse, s_diffuse, in.texpos);
     if color.a == 0 {discard;}

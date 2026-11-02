@@ -28,11 +28,10 @@ fn vs_main(@builtin(vertex_index) i: u32) -> @builtin(position) vec4<f32> {
 }
 
 @group(0) @binding(0) var<uniform> post : PostUniform;
-@group(1) @binding(0) var color_tex : texture_2d<f32>;
-@group(1) @binding(1) var samp : sampler;
-@group(1) @binding(2) var depth_tex : texture_depth_2d;
-@group(2) @binding(0) var<uniform> camera: CameraUniform;
-@group(3) @binding(0) var<uniform> lights: LightUniform;
+@group(0) @binding(1) var color_tex : texture_multisampled_2d<f32>;
+@group(0) @binding(2) var depth_tex : texture_depth_multisampled_2d;
+@group(1) @binding(0) var<uniform> camera: CameraUniform;
+@group(2) @binding(0) var<uniform> lights: LightUniform;
 
 fn get_containing_normal(pos: vec3<f32>) -> vec3<f32> {
     var normal = vec3<f32>(0., 0., 0.);
@@ -86,11 +85,20 @@ fn get_optical_depth(start_cube: vec3<f32>, stop_cube: vec3<f32>) -> f32 {
 @fragment
 fn fs_main(@builtin(position) pos : vec4<f32>) -> @location(0) vec4<f32> {
     let uv = vec2(pos.x / post.viewport.x, pos.y / post.viewport.y); // Division
-    var color = textureSample(color_tex, samp, uv).xyz;
-    
-    if post.fog.w > 0. {
-        let depth = textureSample(depth_tex, samp, uv);
 
+    // Get color
+    var color = vec3<f32>(0., 0., 0.);
+    var depth = 0.;
+    let pixel = vec2<i32>(pos.xy);
+    let count = i32(textureNumSamples(color_tex));
+    for (var i = 0; i < count; i++) {
+        color += textureLoad(color_tex, pixel, i).xyz;
+        depth += textureLoad(depth_tex, pixel, i);
+    }
+    color /= f32(count);
+    depth /= f32(count);
+
+    if post.fog.w > 0. {
         let end_space = camera.view_proj_inv * vec4(2. * uv.x - 1., 1. - 2*uv.y, depth, 1.);
         let end_cube = post.planet_model_inv * (end_space / end_space.w);
         let start_cube = post.planet_model_inv * vec4(0., 0., 0., 1.);

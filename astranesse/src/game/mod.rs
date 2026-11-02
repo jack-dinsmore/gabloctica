@@ -1,8 +1,8 @@
 pub mod object;
 pub mod entity;
 pub mod galaxy;
-pub mod shading;
 pub mod chemistry;
+pub mod rendering;
 
 use crate::game::object::ObjectIdentifier;
 use crate::graphics::*;
@@ -10,9 +10,9 @@ use crate::physics::*;
 use crate::util::CHUNK_SIZE;
 use crate::util::my_fmod;
 use object::{Interrupt, BlockProperties, Planet, Ship};
-use shading::PostInfo;
 use galaxy::Galaxy;
 use entity::Entity;
+use rendering::PostProcessor;
 use cgmath::{InnerSpace, Vector3, Rotation};
 use rustc_hash::FxHashSet;
 use winit::{
@@ -55,7 +55,7 @@ pub struct Game {
     camera: Camera,
     lighting: Lighting,
     font: Font,
-    post_info: PostInfo,
+    post_processor: PostProcessor,
     
     planets: Vec<Planet>,
     ships: Vec<Ship>,
@@ -79,19 +79,19 @@ impl Game {
             ResourceType::Model,
             ResourceType::Lighting,
             ResourceType::Texture,
-        ], false);
+        ], RenderTarget::Texture);
         let flat_shader = Shader::new::<FlatVertex>(&mut graphics, include_str!("../shaders/flat.wgsl"), vec![
             ResourceType::Camera,
             ResourceType::Model,
             ResourceType::Texture,
-        ], false);
+        ], RenderTarget::Texture);
         let shadow_shader = Shader::new::<BlockVertex>(&mut graphics, include_str!("../shaders/shadow.wgsl"), vec![
             ResourceType::Camera,
             ResourceType::Model,
-        ], false);
+        ], RenderTarget::Shadow);
         let camera = Camera::new(&graphics);
         let lighting = Lighting::new(&graphics);
-        let post_info = PostInfo::new(&mut graphics, &camera);
+        let post_processor = PostProcessor::new(&mut graphics, &camera);
 
         let planets = vec![
             Planet::new(&graphics, &mut physics),
@@ -135,7 +135,7 @@ impl Game {
             entities,
             galaxy,
             shadow_shader,
-            post_info,
+            post_processor,
             planets,
             ships,
         }
@@ -333,7 +333,7 @@ impl Game {
         } else {
             None
         };
-        self.post_info.update_buffer(&self.graphics, &self.camera, my_planet);
+        self.post_processor.update_buffer(&self.graphics, &self.camera, my_planet);
         
         for planet in &mut self.planets {
             planet.update(&self.graphics, &mut self.block_properties, camera_pos, delta_t);
@@ -420,7 +420,7 @@ impl Game {
                 }
 
                 // Post
-                self.post_info.render(&mut renderer, &self.camera, &self.lighting);
+                self.post_processor.render(&mut renderer, &self.camera, &self.lighting);
                 
                 // Draw text
                 self.font.render(&mut renderer, &self.camera, &self.lighting);

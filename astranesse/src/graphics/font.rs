@@ -1,7 +1,7 @@
 use image::{ImageBuffer, Rgba};
 use rusttype::{Scale, point};
 
-use crate::graphics::{Camera, Graphics, Lighting, Renderer, ResourceType, Shader, StorageBuffer, TextVertex, Texture, resource::{IndexBuffer, VertexBuffer}};
+use crate::graphics::{Camera, Graphics, Lighting, RenderTarget, Renderer, ResourceType, Shader, StorageBuffer, TextVertex, Texture, resource::{IndexBuffer, VertexBuffer}};
 
 pub struct Font {
     shader: Shader,
@@ -19,6 +19,9 @@ pub struct Font {
     index_buffer: IndexBuffer,
     vertices: Vec<TextVertex>,
     indices: Vec<u16>,
+    len_indices: u32,
+    vertex_buffer_size: u64,
+    index_buffer_size: u64,
 }
 const MAX_SIZE: usize = 1024;
 
@@ -26,7 +29,7 @@ impl Font {
     pub fn new(graphics: &mut Graphics, camera: &Camera, bytes: &'static [u8]) -> Self {
         let shader = Shader::new::<TextVertex>(graphics, include_str!("../shaders/font.wgsl"), vec![
             ResourceType::Texture,
-        ], true);
+        ], RenderTarget::Screen);
         let font = rusttype::Font::try_from_bytes(bytes).unwrap();
         let scale = Scale { x: 32., y: 42. };
         let string: String = (0..255u8).map(|c| c as char).collect();
@@ -87,16 +90,20 @@ impl Font {
             width,
             height,
             y_info: (min_height as f32 / height as f32, max_height as f32 / height as f32),
+            len_indices: 0,
+            vertex_buffer_size: 0,
+            index_buffer_size: 0,
         }
     }
 
     pub fn copy_buffers(&self, renderer: &mut Renderer) {
         renderer.encoder().copy_buffer_to_buffer(
             &self.storage_buffer_vertex.buffer, 0, &self.vertex_buffer.buffer, 0,
-            (self.vertices.len()*std::mem::size_of::<TextVertex>()) as u64);
+             self.vertex_buffer_size);
         renderer.encoder().copy_buffer_to_buffer(
             &self.storage_buffer_index.buffer, 0, &self.index_buffer.buffer, 0,
-            (self.indices.len()*std::mem::size_of::<u16>()) as u64);
+            self.index_buffer_size);
+       
     }
 
     pub fn render(&mut self, renderer: &mut Renderer, camera: &Camera, lighting: &Lighting) {
@@ -107,9 +114,7 @@ impl Font {
         self.texture.bind(renderer);
         self.vertex_buffer.bind(renderer);
         self.index_buffer.bind(renderer);
-        renderer.draw_indices(self.indices.len() as u32);
-        self.indices.clear();
-        self.vertices.clear();
+        renderer.draw_indices(self.len_indices);
     }
 
     fn text_single_line(&mut self, text: &str, px: f32, py: f32) {
@@ -169,8 +174,14 @@ impl Font {
         self.scale.y
     }
 
-    pub fn update(&self, graphics: &Graphics) {
+    pub fn update(&mut self, graphics: &Graphics) {
         self.storage_buffer_vertex.write(graphics, &self.vertices);
         self.storage_buffer_index.write(graphics, &self.indices);
+        
+        self.len_indices = self.indices.len() as u32;
+        self.vertex_buffer_size = (self.vertices.len()*std::mem::size_of::<TextVertex>()) as u64;
+        self.index_buffer_size = (self.vertices.len()*std::mem::size_of::<TextVertex>()) as u64;
+        self.indices.clear();
+        self.vertices.clear();
     }
 }
