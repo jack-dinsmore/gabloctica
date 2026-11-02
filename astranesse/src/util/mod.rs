@@ -2,6 +2,7 @@ mod interp;
 mod vendor;
 mod grid;
 mod kmeans;
+mod orientations;
 
 use std::{cell::RefCell, rc::Rc};
 use cgmath::{Matrix3, Vector3};
@@ -9,6 +10,7 @@ pub use vendor::{Vendor, Tagged};
 pub use interp::{SphericalInterpolator, lerp};
 pub use kmeans::{KMeans};
 pub use grid::{Grid, CHUNK_SIZE};
+pub use orientations::Ori;
 pub type RcCell<T> = Rc<RefCell<T>>;
 
 pub fn my_fmod(f: f64, l: f64) -> f64 {

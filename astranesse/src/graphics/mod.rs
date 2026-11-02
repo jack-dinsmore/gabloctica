@@ -25,6 +25,10 @@ use wgpu::{
 };
 
 pub const MULTISAMPLE_COUNT: u32 = 4;
+pub const RENDER_DISTANCE: f32 = 10000.;
+pub const NEAR_DISTANCE: f32 = 0.1;
+pub const SHADOW_TEXTURE_WIDTH: f32 = 100.; // How many blocks the shadow texture should span
+pub const SHADOW_TEXTURE_PIXELS: u32 = 4096; // How many blocks the shadow texture should span
 
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::from_cols(

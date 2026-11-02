@@ -1,9 +1,9 @@
-#ID     GID     Name,   Cond.   pipe    command chair   clutter
-0001    0001    dirt1   F       F       F       F       F
-0002    0002    dirt2   F       F       F       F       F
-0003    0003    dirt3   F       F       F       F       F
-0004    0004    tank    T       T       F       F       F
-0005    0005    engine  T       F       T       F       F
-0006    0006    chair   T       F       T       T       F
-0007    0007    metal   T       F       F       F       F
-0008    0101    rock    F       F       F       F       T
+#ID     GID     Name,   Mass     Cond.   pipe    command chair   clutter
+0001    0001    dirt1   1000     F       F       F       F       F
+0002    0002    dirt2   1000     F       F       F       F       F
+0003    0003    dirt3   1000     F       F       F       F       F
+0004    0004    tank    1000     T       T       F       F       F
+0005    0005    engine  1000     T       F       T       F       F
+0006    0006    chair   1000     T       F       T       T       F
+0007    0007    metal   1000     T       F       F       F       F
+0008    0101    rock    1000     F       F       F       F       T

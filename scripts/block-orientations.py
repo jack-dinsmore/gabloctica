@@ -29,6 +29,7 @@ for angle in range(4):
 all_rotations = np.array(all_rotations)
 
 def get_index(mvec, vec):
+    # Helper function for  uv shifts
     deltas = [
         ([4, 1, 1, 1], [0,0]),
         ([4, -1, 1, 1], [1,0]),
@@ -87,6 +88,7 @@ def get_index(mvec, vec):
     return np.array(outputs)
 
 def print_code(vecs):
+    # Display code to give uv shifts
     outputs = []
     mvec = np.mean(vecs, axis=0)
     for vec in vecs:
@@ -102,11 +104,21 @@ def print_code(vecs):
     print("}")
 
 def print_oris():
+    # Display code to convert orientations to quaternions
     for i, rotation in enumerate(all_rotations):
         quat = rotation.as_quat();
         print(f"\t{i} => Quaternion::new({quat[0]:.6f}, {quat[1]:.6f}, {quat[2]:.6f}, {quat[3]:.6f}),")
 
-print_oris()
+def mul_table():
+    for i, a in enumerate(all_rotations):
+        for j, b in enumerate(all_rotations):
+            value = a*b
+            for k, c in enumerate(all_rotations):
+                if np.sum(np.abs(value.as_quat() - c.as_quat())) < 1e-8 or np.sum(np.abs(value.as_quat() + c.as_quat())) < 1e-8:
+                    print(f"({i}, {j}) => {k}, ", end='')
+
+mul_table()
+# print_oris()
 
 # forward
 # print_code([[1,-1,-1], [1,1,-1], [1,1,1], [1,-1,1]])

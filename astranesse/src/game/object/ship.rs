@@ -1,6 +1,6 @@
 use cgmath::{InnerSpace, Vector3};
 use rustc_hash::FxHashMap;
-use crate::{game::object::{BlockProperties, Object, RENDER_DISTANCE, chunk::{PhysicalBlock, PhysicalChunk}}, graphics::{GraphicalChunk, Graphics}, physics::{Physics, RigidBodyInit}};
+use crate::{game::object::{BlockProperties, Object, RENDER_DISTANCE, chunk::{PhysicalBlock, PhysicalChunk}}, graphics::{GraphicalChunk, Graphics}, physics::{Physics, RigidBodyInit}, util::Ori};
 
 pub struct Ship {
     pub object: Object,
@@ -34,14 +34,14 @@ impl Ship {
             let chunk_coord = (0, 0, 0);
             let mut chunk = PhysicalChunk::empty(graphics, chunk_coord);
 
-            chunk.grid[(7,7,7)] = PhysicalBlock::new(7, 0, properties);// Metal
-            chunk.grid[(6,8,7)] = PhysicalBlock::new(4, 1, properties);// Tank
-            chunk.grid[(7,8,7)] = PhysicalBlock::new(4, 1, properties);// Tank
-            chunk.grid[(8,8,7)] = PhysicalBlock::new(5, 3, properties);// Engine
-            chunk.grid[(6,6,7)] = PhysicalBlock::new(4, 1, properties);// Tank
-            chunk.grid[(7,6,7)] = PhysicalBlock::new(4, 1, properties);// Tank
-            chunk.grid[(8,6,7)] = PhysicalBlock::new(5, 3, properties);// Engine
-            chunk.grid[(7,7,8)] = PhysicalBlock::new(6, 0, properties);// Chair
+            chunk.grid[(7,7,7)] = PhysicalBlock::new(7, Ori { data : 0 }, properties);// Metal
+            chunk.grid[(6,8,7)] = PhysicalBlock::new(4, Ori { data : 1 }, properties);// Tank
+            chunk.grid[(7,8,7)] = PhysicalBlock::new(4, Ori { data : 1 }, properties);// Tank
+            chunk.grid[(8,8,7)] = PhysicalBlock::new(5, Ori { data : 3 }, properties);// Engine
+            chunk.grid[(6,6,7)] = PhysicalBlock::new(4, Ori { data : 1 }, properties);// Tank
+            chunk.grid[(7,6,7)] = PhysicalBlock::new(4, Ori { data : 1 }, properties);// Tank
+            chunk.grid[(8,6,7)] = PhysicalBlock::new(5, Ori { data : 3 }, properties);// Engine
+            chunk.grid[(7,7,8)] = PhysicalBlock::new(6, Ori { data : 0 }, properties);// Chair
             // chunk.grid[(8,8,8)] = PhysicalBlock::new(8, 0, properties);// Rock
 
             let mut out = FxHashMap::default();
@@ -52,7 +52,7 @@ impl Ship {
         };
 
         for (chunk_pos, physical_chunk) in &mut self.object.physical_chunks {
-            physical_chunk.update_collider(*chunk_pos, &mut self.object.body);
+            physical_chunk.update_collider(*chunk_pos, &mut self.object.body, properties);
             self.object.graphical_chunks.insert(*chunk_pos, GraphicalChunk::from_physical(graphics, *chunk_pos, physical_chunk, properties));
         }
         self.object.recalc_rigid_body();

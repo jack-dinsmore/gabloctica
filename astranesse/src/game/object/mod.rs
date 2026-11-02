@@ -10,7 +10,7 @@ use cgmath::{Matrix3, Vector3, Zero};
 use rustc_hash::FxHashMap;
 use crate::graphics::{GraphicalBlock, GraphicalChunk, Graphics, GridTexture, ModelUniform, Renderer, StorageBuffer};
 use crate::physics::{Collider, MoI, Physics, RigidBody, RigidBodyInit, RigidBodyData};
-use crate::util::{CHUNK_SIZE, my_fmod, moi_product};
+use crate::util::{CHUNK_SIZE, Ori, moi_product, my_fmod};
 use chunk::{PhysicalChunk, PhysicalBlock};
 
 pub use internals::{Internals, Interrupt, BlockGlobalPos};
@@ -116,9 +116,9 @@ impl Object {
             self.body.get_object_collider_mut().chunks.insert(block_pos.0, [0; (CHUNK_SIZE*CHUNK_SIZE) as usize]);
         }
         // Set the block
-        let block = PhysicalBlock::new(typ, 0, properties);
+        let block = PhysicalBlock::new(typ, Ori { data : 0 }, properties);
         self.internals.place_block(&block, properties, &self.physical_chunks);
-        self.physical_chunks.get_mut(&block_pos.0).unwrap().place_block(block, block_pos, &mut self.body);
+        self.physical_chunks.get_mut(&block_pos.0).unwrap().place_block(block, block_pos, &mut self.body, &properties);
 
         let block = GraphicalBlock::new(properties[typ].graphic_id);
         self.graphical_chunks.get_mut(&block_pos.0).unwrap().place_block(block, block_pos, graphics);

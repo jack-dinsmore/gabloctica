@@ -1,21 +1,21 @@
-use cgmath::{Quaternion, Vector3};
-use crate::game::object::{BlockProperties, GraphicId, chunk::PhysicalBlock};
+use cgmath::Vector3;
+use crate::{game::object::{BlockProperties, GraphicId, chunk::PhysicalBlock}, util::Ori};
 
 #[derive(Clone, Copy, Debug)]
 pub struct GraphicalBlock {
     pub id: GraphicId,
-    ori: u8,
+    ori: Ori,
 }
 impl Default for GraphicalBlock {
     fn default() -> Self {
-        Self { id: 0, ori: 0 }
+        Self { id: 0, ori: Ori { data: 0 } }
     }
 }
 impl GraphicalBlock {
     pub fn new(id: GraphicId) -> Self {
         Self {
             id,
-            ori: 0,
+            ori: Ori { data: 0 },
         }
     }
     
@@ -55,43 +55,13 @@ impl GraphicalBlock {
         axis << 2
     }
 
-    pub fn quat(&self) -> Quaternion<f64> {
-        match self.ori {
-            0 => Quaternion::new(0.500000, 0.500000, 0.500000, 0.500000),
-            1 => Quaternion::new(0.000000, 0.707107, 0.707107, 0.000000),
-            2 => Quaternion::new(-0.500000, 0.500000, 0.500000, -0.500000),
-            3 => Quaternion::new(-0.707107, 0.000000, 0.000000, -0.707107),
-            4 => Quaternion::new(-0.500000, 0.500000, -0.500000, 0.500000),
-            5 => Quaternion::new(-0.707107, 0.000000, 0.000000, 0.707107),
-            6 => Quaternion::new(-0.500000, -0.500000, 0.500000, 0.500000),
-            7 => Quaternion::new(-0.000000, -0.707107, 0.707107, 0.000000),
-            8 => Quaternion::new(0.000000, 0.707107, 0.000000, 0.707107),
-            9 => Quaternion::new(-0.500000, 0.500000, 0.500000, 0.500000),
-            10 => Quaternion::new(-0.707107, 0.000000, 0.707107, 0.000000),
-            11 => Quaternion::new(-0.500000, -0.500000, 0.500000, -0.500000),
-            12 => Quaternion::new(0.707107, 0.000000, 0.707107, 0.000000),
-            13 => Quaternion::new(0.500000, 0.500000, 0.500000, -0.500000),
-            14 => Quaternion::new(0.000000, 0.707107, 0.000000, -0.707107),
-            15 => Quaternion::new(-0.500000, 0.500000, -0.500000, -0.500000),
-            16 => Quaternion::new(0.000000, 0.000000, 0.000000, 1.000000),
-            17 => Quaternion::new(0.000000, 0.000000, 0.707107, 0.707107),
-            18 => Quaternion::new(0.000000, 0.000000, 1.000000, 0.000000),
-            19 => Quaternion::new(0.000000, 0.000000, 0.707107, -0.707107),
-            20 => Quaternion::new(0.000000, 1.000000, 0.000000, 0.000000),
-            21 => Quaternion::new(-0.707107, 0.707107, 0.000000, 0.000000),
-            22 => Quaternion::new(-1.000000, 0.000000, 0.000000, 0.000000),
-            23 => Quaternion::new(-0.707107, -0.707107, 0.000000, -0.000000),
-            _ => unreachable!()
-        }
-    }
-
     pub fn is_null(&self) -> bool {
         self.id == 0
     }
 
     /// Get the data points representing the four corners of the the upward facing face
     pub fn get_uv_forward(&self) -> (u32, u32, u32, u32) {
-        match self.ori {
+        match self.ori.data {
         0 => ( ((self.id as u32 + 1)<<18) | (1<<26), ((self.id as u32 + 0)<<18) | (1<<26), ((self.id as u32 + 0)<<18) | (0<<26), ((self.id as u32 + 1)<<18) | (0<<26) ),
         1 => ( ((self.id as u32 + 1)<<18) | (6<<26), ((self.id as u32 + 1)<<18) | (5<<26), ((self.id as u32 + 0)<<18) | (5<<26), ((self.id as u32 + 0)<<18) | (6<<26) ),
         2 => ( ((self.id as u32 + 0)<<18) | (2<<26), ((self.id as u32 + 1)<<18) | (2<<26), ((self.id as u32 + 1)<<18) | (1<<26), ((self.id as u32 + 0)<<18) | (1<<26) ),
@@ -122,7 +92,7 @@ impl GraphicalBlock {
 
     /// Get the data points representing the four corners of the the upward facing face
     pub fn get_uv_backward(&self) -> (u32, u32, u32, u32) {
-        match self.ori {
+        match self.ori.data {
         0 => ( ((self.id as u32 + 1)<<18) | (1<<26), ((self.id as u32 + 0)<<18) | (1<<26), ((self.id as u32 + 0)<<18) | (2<<26), ((self.id as u32 + 1)<<18) | (2<<26) ),
         1 => ( ((self.id as u32 + 0)<<18) | (5<<26), ((self.id as u32 + 0)<<18) | (4<<26), ((self.id as u32 + 1)<<18) | (4<<26), ((self.id as u32 + 1)<<18) | (5<<26) ),
         2 => ( ((self.id as u32 + 0)<<18) | (0<<26), ((self.id as u32 + 1)<<18) | (0<<26), ((self.id as u32 + 1)<<18) | (1<<26), ((self.id as u32 + 0)<<18) | (1<<26) ),
@@ -153,7 +123,7 @@ impl GraphicalBlock {
 
     /// Get the data points representing the four corners of the the upward facing face
     pub fn get_uv_left(&self) -> (u32, u32, u32, u32) {
-        match self.ori {
+        match self.ori.data {
         0 => ( ((self.id as u32 + 1)<<18) | (5<<26), ((self.id as u32 + 1)<<18) | (4<<26), ((self.id as u32 + 0)<<18) | (4<<26), ((self.id as u32 + 0)<<18) | (5<<26) ),
         1 => ( ((self.id as u32 + 0)<<18) | (1<<26), ((self.id as u32 + 1)<<18) | (1<<26), ((self.id as u32 + 1)<<18) | (0<<26), ((self.id as u32 + 0)<<18) | (0<<26) ),
         2 => ( ((self.id as u32 + 1)<<18) | (5<<26), ((self.id as u32 + 1)<<18) | (6<<26), ((self.id as u32 + 0)<<18) | (6<<26), ((self.id as u32 + 0)<<18) | (5<<26) ),
@@ -184,7 +154,7 @@ impl GraphicalBlock {
 
     /// Get the data points representing the four corners of the the upward facing face
     pub fn get_uv_right(&self) -> (u32, u32, u32, u32) {
-        match self.ori {
+        match self.ori.data {
         0 => ( ((self.id as u32 + 1)<<18) | (6<<26), ((self.id as u32 + 1)<<18) | (5<<26), ((self.id as u32 + 0)<<18) | (5<<26), ((self.id as u32 + 0)<<18) | (6<<26) ),
         1 => ( ((self.id as u32 + 0)<<18) | (2<<26), ((self.id as u32 + 1)<<18) | (2<<26), ((self.id as u32 + 1)<<18) | (1<<26), ((self.id as u32 + 0)<<18) | (1<<26) ),
         2 => ( ((self.id as u32 + 1)<<18) | (4<<26), ((self.id as u32 + 1)<<18) | (5<<26), ((self.id as u32 + 0)<<18) | (5<<26), ((self.id as u32 + 0)<<18) | (4<<26) ),
@@ -215,7 +185,7 @@ impl GraphicalBlock {
 
     /// Get the data points representing the four corners of the the upward facing face
     pub fn get_uv_up(&self) -> (u32, u32, u32, u32) {
-        match self.ori {
+        match self.ori.data {
         0 => ( ((self.id as u32 + 0)<<18) | (3<<26), ((self.id as u32 + 0)<<18) | (2<<26), ((self.id as u32 + 1)<<18) | (2<<26), ((self.id as u32 + 1)<<18) | (3<<26) ),
         1 => ( ((self.id as u32 + 0)<<18) | (2<<26), ((self.id as u32 + 1)<<18) | (2<<26), ((self.id as u32 + 1)<<18) | (3<<26), ((self.id as u32 + 0)<<18) | (3<<26) ),
         2 => ( ((self.id as u32 + 1)<<18) | (2<<26), ((self.id as u32 + 1)<<18) | (3<<26), ((self.id as u32 + 0)<<18) | (3<<26), ((self.id as u32 + 0)<<18) | (2<<26) ),
@@ -246,7 +216,7 @@ impl GraphicalBlock {
 
     /// Get the data points representing the four corners of the the upward facing face
     pub fn get_uv_down(&self) -> (u32, u32, u32, u32) {
-        match self.ori {
+        match self.ori.data {
         0 => ( ((self.id as u32 + 1)<<18) | (4<<26), ((self.id as u32 + 1)<<18) | (3<<26), ((self.id as u32 + 0)<<18) | (3<<26), ((self.id as u32 + 0)<<18) | (4<<26) ),
         1 => ( ((self.id as u32 + 0)<<18) | (4<<26), ((self.id as u32 + 1)<<18) | (4<<26), ((self.id as u32 + 1)<<18) | (3<<26), ((self.id as u32 + 0)<<18) | (3<<26) ),
         2 => ( ((self.id as u32 + 0)<<18) | (3<<26), ((self.id as u32 + 0)<<18) | (4<<26), ((self.id as u32 + 1)<<18) | (4<<26), ((self.id as u32 + 1)<<18) | (3<<26) ),

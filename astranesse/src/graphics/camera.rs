@@ -1,9 +1,7 @@
-use crate::graphics::{FreeTexture, Lighting, OPENGL_TO_WGPU_MATRIX, Renderer, ResourceType, TextureType};
+use crate::graphics::{FreeTexture, Lighting, NEAR_DISTANCE, OPENGL_TO_WGPU_MATRIX, RENDER_DISTANCE, Renderer, ResourceType, SHADOW_TEXTURE_PIXELS, SHADOW_TEXTURE_WIDTH, TextureType};
 use crate::graphics::{Graphics, resource::UniformBuffer};
 use crate::graphics::resource::Uniform;
 use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, Quaternion, SquareMatrix, Vector3};
-
-pub const SHADOW_TEXTURE_WIDTH: f32 = 100.; // How many blocks the shadow texture should span
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -33,8 +31,6 @@ pub struct Camera {
     pub up: Vector3<f32>,
     pub ori: Quaternion<f32>,
 
-    pub znear: f32,
-    pub zfar: f32,
     aspect: f32,
 
     buffer: UniformBuffer<CameraUniform>,
@@ -47,7 +43,7 @@ impl Camera {
         let aspect = graphics.surface_config.width as f32 / graphics.surface_config.height as f32;
         let up = Vector3::new(0., 0., 1.);
         let buffer = UniformBuffer::new(graphics);
-        let shadow_texture = FreeTexture::new(&graphics.device, (5000, 5000), TextureType::Shadow);
+        let shadow_texture = FreeTexture::new(&graphics.device, (SHADOW_TEXTURE_PIXELS, SHADOW_TEXTURE_PIXELS), TextureType::Shadow);
 
         let shadow_texture_sampler = graphics.device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -66,8 +62,6 @@ impl Camera {
             up,
             fovy: 45., // Degrees
             
-            znear: 0.1,
-            zfar: 300.,
             aspect,
 
             buffer,
@@ -111,7 +105,7 @@ impl Camera {
             Point3::from_vec(self.get_forward()),
             self.get_up()
         );
-        let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
+        let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, NEAR_DISTANCE, RENDER_DISTANCE);
         let view_proj = proj * view;
 
         // let rel_pos = (lighting.pos - camera.pos).cast().unwrap();

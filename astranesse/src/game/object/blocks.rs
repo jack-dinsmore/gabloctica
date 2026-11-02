@@ -13,6 +13,7 @@ include!(concat!(env!("OUT_DIR"), "/scripts.rs"));
 
 pub struct BlockInfo {
     pub id: BlockId,
+    pub mass: f64,
     pub graphic_id: GraphicId,
     pub script: Option<Instructions>,
     pub is_pipe: bool,
@@ -27,6 +28,7 @@ impl BlockInfo {
         let id = BlockId::from_str_radix(arguments.next().unwrap(), 16).unwrap();
         let graphic_id = GraphicId::from_str_radix(arguments.next().unwrap(), 16).unwrap();
         let name = arguments.next().unwrap().to_owned();
+        let mass = arguments.next().unwrap().parse().unwrap();
         let is_conductor = arguments.next().unwrap() == "T";
         let is_pipe = arguments.next().unwrap() == "T";
         let is_command = arguments.next().unwrap() == "T";
@@ -46,6 +48,7 @@ impl BlockInfo {
 
         Self {
             id,
+            mass,
             graphic_id,
             script,
             is_pipe,
@@ -115,10 +118,11 @@ impl BlockProperties {
         self.texture.update_buffer(graphics)
     }
     
-    pub(crate) fn add_textured_block(&mut self, image: image::ImageBuffer<image::Rgba<u8>, Vec<u8>>) -> BlockId {
+    pub(crate) fn add_textured_block(&mut self, image: image::ImageBuffer<image::Rgba<u8>, Vec<u8>>, mass: f64) -> BlockId {
         let new_id = self.max_block_id;
         self.blocks.insert(new_id, BlockInfo {
             id: new_id,
+            mass,
             graphic_id: new_id, // ????
             script: None,
             is_pipe: false,

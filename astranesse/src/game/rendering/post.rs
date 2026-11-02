@@ -1,5 +1,5 @@
 use crate::game::object::Planet;
-use crate::graphics::{Camera, Graphics, Lighting, PostRenderer, PostVertex, RenderTarget, Renderer, ResourceType, Shader};
+use crate::graphics::{Camera, Graphics, Lighting, NEAR_DISTANCE, PostRenderer, PostVertex, RENDER_DISTANCE, RenderTarget, Renderer, ResourceType, Shader};
 use crate::graphics::{UniformBuffer, Uniform};
 
 #[repr(C)]
@@ -33,7 +33,7 @@ impl PostProcessor {
         let width = size.width.max(1);
         let height = size.height.max(1);
         let uniform = PostUniform {
-            viewport: [width as f32, height as f32, camera.znear, camera.zfar],
+            viewport: [width as f32, height as f32, NEAR_DISTANCE, RENDER_DISTANCE],
             fog: [0.6, 0.09, 0., 1.],
             planet_model_inv: [[0., 0., 0., 0.],[0., 0., 0., 0.],[0., 0., 0., 0.],[0., 0., 0., 0.]],
         };

@@ -12,7 +12,7 @@ use crate::game::object::{BlockProperties, RENDER_DISTANCE};
 use crate::game::object::Object;
 use crate::graphics::{Camera, GraphicalChunk, Graphics};
 use crate::physics::{BOLTZMANN, MoI, NEWTON_G, PROTON_MASS, Physics, RigidBody, RigidBodyInit, STEFAN_BOLTZMANN};
-use crate::util::{CHUNK_SIZE, SphericalInterpolator};
+use crate::util::{CHUNK_SIZE, Ori, SphericalInterpolator};
 
 const OCEAN_RESOLUTION: isize = 16;
 const HUMIDITY_RESOLUTION: isize = 16;
@@ -29,6 +29,7 @@ struct LoadedPlanet {
     
     //Aesthetic properties
     scale_height: f32,
+    seed: u64,
     extinction: Vector3<f32>,
     selector: BlockSelector,
 }
@@ -67,6 +68,12 @@ impl LoadedPlanet {
     }
 
     pub(super) fn load_chunk(&mut self, graphics: &Graphics, properties: &BlockProperties, chunk_coord: (i32, i32, i32)) -> Option<PhysicalChunk> {
+        let mut seed = self.seed;
+        seed += i64::cast_unsigned(chunk_coord.0 as i64);
+        seed += i64::cast_unsigned(chunk_coord.1 as i64) << 21;
+        seed += i64::cast_unsigned(chunk_coord.2 as i64) << 42;
+        let mut rng = StdRng::seed_from_u64(seed);
+
         let chunk_pos = Vector3::new(chunk_coord.0 as f32, chunk_coord.1 as f32, chunk_coord.2 as f32) * CHUNK_SIZE as f32;
         if self.get_point_altitude(chunk_pos) > self.get_altitude(chunk_pos) + CHUNK_SIZE as f32 {
             // The chunk is outside the planet. Don't load it.
@@ -89,16 +96,33 @@ impl LoadedPlanet {
                 for w in 0..CHUNK_SIZE {
                     let pos = chunk_pos + Vector3::new(u as f32, v as f32, w as f32);
                     let depth = (self.get_altitude(pos) - self.get_point_altitude(pos)) as i32;
-                    if depth < 0 {continue;}
+                    if depth < 0 { continue; } 
+
                     let alt = self.alt_interp.get(pos);
                     let temp = self.temp_interp.get(pos);
                     let humidity = self.humidity_interp.get(pos);
                     let id = self.selector.get_block_id(alt, humidity, temp);
-                    let rot = (self.rng.random::<u64>() % 16) as u8;
+                    let rot = Ori::random(&mut self.rng);
                     chunk.grid[(u,v,w)] = super::chunk::PhysicalBlock::new(id, rot, properties);
                 }
             }
         }
+
+        for u in -(CHUNK_SIZE as i32)..2*(CHUNK_SIZE as i32) {
+            for v in -(CHUNK_SIZE as i32)..2*(CHUNK_SIZE as i32) {
+                let pos = chunk_pos + Vector3::new(u as f32, v as f32, 0 as f32);
+                let w = (self.get_altitude(pos) - self.get_point_altitude(pos)) as i32 + 2;
+                let pos = chunk_pos + Vector3::new(u as f32, v as f32, w as f32);
+                let alt = self.alt_interp.get(pos);
+                let temp = self.temp_interp.get(pos);
+                let humidity = self.humidity_interp.get(pos);
+                if w < 0 || w >= CHUNK_SIZE as i32 { continue; }
+                if let Some(structure) = self.selector.get_structure(alt, temp, humidity, &mut rng) {
+                    structure.place(&mut chunk, (u, v, w));
+                }
+            }
+        }
+
         Some(chunk)
     }
     
@@ -156,7 +180,7 @@ impl Planet {
             self.loaded = None;
         };
 
-        // Load/unload chunks
+        // Load chunks
         if let Some(loaded) = &mut self.loaded {
             if loaded.last_load.elapsed().as_millis() < LOAD_TIME { return; }
     
@@ -174,7 +198,6 @@ impl Planet {
             for coord in keys {
                 let detail = get_detail(coord.0 - character_chunk.0, coord.1 - character_chunk.1,coord.2 - character_chunk.2,);
                 if detail == 0 {
-                    dbg!();
                     loaded.unload_chunk(coord, &self.object.physical_chunks[&coord]);
                     self.object.physical_chunks.remove(&coord);
                     self.object.graphical_chunks.remove(&coord);
@@ -191,7 +214,7 @@ impl Planet {
                         let coord = (character_chunk.0 + dx, character_chunk.1 + dy, character_chunk.2 + dz);
                         if let None = self.object.physical_chunks.get(&coord) {
                             if let Some(mut chunk) = loaded.load_chunk(graphics, properties, coord) {
-                                chunk.update_collider(coord, &mut self.object.body);
+                                chunk.update_collider(coord, &mut self.object.body, properties);
                                 let mut graphical_chunk = GraphicalChunk::from_physical(graphics, coord, &chunk, properties);
                                 graphical_chunk.set_detail(get_detail(dx, dy, dz), graphics);
                                 self.object.graphical_chunks.insert(coord, graphical_chunk);
@@ -425,6 +448,7 @@ impl Planet {
             halfwidth: self.width as f32 * CHUNK_SIZE as f32 / 2.,
             last_load: std::time::Instant::now() - std::time::Duration::from_millis(2*LOAD_TIME as u64),
             selector,
+            seed: self.seed,
         });
     }
     

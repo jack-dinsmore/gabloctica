@@ -1,19 +1,17 @@
 use cgmath::{Matrix3, Vector3, Zero};
 
-use crate::{game::object::{BlockGlobalPos, BlockId, BlockProperties}, graphics::Graphics, physics::RigidBody, util::{CHUNK_SIZE, Grid, moi_product}};
+use crate::{game::object::{BlockGlobalPos, BlockId, BlockProperties}, graphics::Graphics, physics::RigidBody, util::{CHUNK_SIZE, Grid, Ori, moi_product}};
 
 #[derive(Copy, Clone, Debug)]
 pub struct PhysicalBlock {
     pub id: BlockId,
-    pub ori: u8,
-    pub mass: f64,
+    pub ori: Ori,
 }
 impl PhysicalBlock {
-    pub fn new(id: BlockId, ori: u8, properties: &BlockProperties) -> Self {
+    pub fn new(id: BlockId, ori: Ori, properties: &BlockProperties) -> Self {
         Self {
             id,
             ori,
-            mass: 1.,
         }
     }
     pub fn is_null(&self) -> bool {
@@ -22,7 +20,7 @@ impl PhysicalBlock {
 }
 impl Default for PhysicalBlock {
     fn default() -> Self {
-        Self { id: 0, ori: 0, mass: 0. }
+        Self { id: 0, ori: Ori {data: 0} }
     }
 }
 
@@ -44,13 +42,13 @@ impl PhysicalChunk {
     }
 
     // Update the rigid body collider to have the current block layout.
-    pub fn place_block(&mut self, block: PhysicalBlock, block_pos: BlockGlobalPos, body: &mut RigidBody) {
+    pub fn place_block(&mut self, block: PhysicalBlock, block_pos: BlockGlobalPos, body: &mut RigidBody, properties: &BlockProperties) {
         self.grid[block_pos.1] = block;
-        self.update_collider(block_pos.0, body);
+        self.update_collider(block_pos.0, body, properties);
     }
 
     /// Update the object's collider to include this chunk
-    pub fn update_collider(&mut self, chunk_pos: (i32, i32, i32), body: &mut RigidBody) {
+    pub fn update_collider(&mut self, chunk_pos: (i32, i32, i32), body: &mut RigidBody, properties: &BlockProperties) {
         self.mass_m0 = 0.;
         self.mass_m1 = Vector3::zero();
         self.mass_m2 = Matrix3::zero();
@@ -71,10 +69,10 @@ impl PhysicalChunk {
                     let grid_block = self.grid[(x,y,z)];
                     if !grid_block.is_null() {
                         collider_row |= 1 << x;
-
-                        self.mass_m0 += grid_block.mass;
-                        self.mass_m1 += pos * grid_block.mass;
-                        self.mass_m2 += moi_product(pos) * grid_block.mass;
+                        let mass = properties[grid_block.id].mass;
+                        self.mass_m0 += mass;
+                        self.mass_m1 += pos * mass;
+                        self.mass_m2 += moi_product(pos) * mass;
                     }
                 }
                 collider_blocks[(y+CHUNK_SIZE*z) as usize] = collider_row;
