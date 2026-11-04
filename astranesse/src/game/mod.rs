@@ -101,7 +101,7 @@ impl Game {
         ];
         let entities = vec![
             // Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(-200., 0., 80.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
-            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 140.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
+            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0.,0., 140.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
         ];
 
         // Set cursor to center of screen
@@ -334,7 +334,14 @@ impl Game {
             None
         };
         self.post_processor.update_buffer(&self.graphics, &self.camera, my_planet);
+
+        // Update camera
+        const SPEED: f64 = 0.2;
+        let camera_motion = ((SPEED*delta_t) as f32 *self.mouse_motion.0, (SPEED*delta_t) as f32 *self.mouse_motion.1);
+        self.mouse_motion = (0., 0.);
+        self.camera.update(&self.entities[0], my_planet, &self.lighting, camera_motion);
         
+        // Update scene
         for planet in &mut self.planets {
             planet.update(&self.graphics, &mut self.block_properties, camera_pos, delta_t);
         }
@@ -346,24 +353,13 @@ impl Game {
         }
         
         self.physics.update(delta_t);
-        
-        // Update camera
-        {
-            let player = &self.entities[0];
-            const SPEED: f64 = 0.2;
-            self.camera.pos = player.body.pos + player.body.ori * Vector3::unit_z() * 1.0;
-            self.camera.theta += (SPEED*delta_t) as f32 *self.mouse_motion.1;
-            self.camera.phi -= (SPEED*delta_t) as f32 *self.mouse_motion.0;
-            self.mouse_motion = (0., 0.);
-            self.camera.theta = self.camera.theta.clamp(0.0001, 3.1415);
-            self.camera.ori = player.body.ori.cast().unwrap();
-        }
+
         self.fps_counter.update(delta_t);
     }
 
     pub fn draw(&mut self) {
         // OPTIMIZE avoid all calls of queue.write_buffer.
-        self.camera.update_buffer(&self.graphics, &self.lighting, &self.camera);
+        self.camera.update_buffer(&self.graphics, &self.lighting);
         self.lighting.update_buffer(&self.graphics, &self.camera);
         self.block_properties.update_buffer(&self.graphics);
         for planet in &mut self.planets {

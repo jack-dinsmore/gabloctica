@@ -20,7 +20,7 @@ impl PhysicalBlock {
 }
 impl Default for PhysicalBlock {
     fn default() -> Self {
-        Self { id: 0, ori: Ori {data: 0} }
+        Self { id: 0, ori: Ori::identity() }
     }
 }
 

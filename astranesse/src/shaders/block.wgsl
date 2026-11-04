@@ -1,7 +1,7 @@
 struct CameraUniform {
     view_proj: mat4x4<f32>,
-    shadow_proj: mat4x4<f32>,
     view_proj_inv: mat4x4<f32>,
+    shadow_proj: mat4x4<f32>,
 };
 struct ModelUniform {
     model: mat4x4<f32>,
@@ -96,7 +96,12 @@ struct VertexOutput {
 @group(3) @binding(0) var t_diffuse: texture_2d<f32>;
 @group(3) @binding(1) var s_diffuse: sampler;
 @group(3) @binding(2) var t_shadow: texture_depth_2d;
-@group(3) @binding(3) var s_shadow: sampler;
+@group(3) @binding(3) var s_shadow: sampler_comparison;
+
+
+fn shadow_map(x: f32) -> f32 {
+    return (sqrt(1 + x*x) - 1.) / x;
+}
 
 @vertex
 fn vs_main(
@@ -138,6 +143,11 @@ fn vs_main(
     out.normal = rotation * normal;
     out.clip_position = camera.view_proj * out.position;
     out.shadow_pos = camera.shadow_proj * out.position;
+
+    out.shadow_pos /= out.shadow_pos.w;
+    out.shadow_pos.x = shadow_map(out.shadow_pos.x);
+    out.shadow_pos.y = shadow_map(out.shadow_pos.y);
+
     return out;
 }
 
@@ -150,10 +160,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     var shadow_coords = in.shadow_pos.xyz / in.shadow_pos.w;
     shadow_coords.y *= -1.;
-    var closest_depth = textureSample(t_shadow, s_shadow, shadow_coords.xy * 0.5 + 0.5);
-    let shadow = step(closest_depth + 0.0005, shadow_coords.z);
 
-    var illum = (1. - shadow) * dot(in.normal.xyz, to_light);
+    let shadow = textureSampleCompare(t_shadow, s_shadow, shadow_coords.xy * 0.5 + 0.5, shadow_coords.z - 0.0005);
+
+    var illum = shadow * dot(in.normal.xyz, to_light);
 
     illum = max(illum, 0.1);
 

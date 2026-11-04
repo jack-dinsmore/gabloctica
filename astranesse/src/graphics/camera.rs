@@ -1,4 +1,6 @@
-use crate::graphics::{FreeTexture, Lighting, NEAR_DISTANCE, OPENGL_TO_WGPU_MATRIX, RENDER_DISTANCE, Renderer, ResourceType, SHADOW_TEXTURE_PIXELS, SHADOW_TEXTURE_WIDTH, TextureType};
+use crate::game::entity::Entity;
+use crate::game::object::Planet;
+use crate::graphics::{FreeTexture, Lighting, NEAR_DISTANCE, OPENGL_TO_WGPU_MATRIX, RENDER_DISTANCE, Renderer, ResourceType, SHADOW_TEXTURE_PIXELS, TextureType};
 use crate::graphics::{Graphics, resource::UniformBuffer};
 use crate::graphics::resource::Uniform;
 use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, Quaternion, SquareMatrix, Vector3};
@@ -7,8 +9,8 @@ use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, Quaternion, SquareMatr
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub(super) struct CameraUniform {
     view_proj: [[f32; 4]; 4],
-    shadow_proj: [[f32; 4]; 4],
     view_proj_inv: [[f32; 4]; 4],
+    shadow_proj: [[f32; 4]; 4],
 }
 impl Uniform for CameraUniform {
     const TYPE: ResourceType = ResourceType::Camera;
@@ -17,8 +19,8 @@ impl CameraUniform {
     fn new(view_proj: Matrix4<f32>, shadow_proj: Matrix4<f32>) -> Self {
         Self {
             view_proj: (OPENGL_TO_WGPU_MATRIX * view_proj).into(),
-            shadow_proj: (OPENGL_TO_WGPU_MATRIX * shadow_proj).into(),
             view_proj_inv: (OPENGL_TO_WGPU_MATRIX * view_proj).invert().unwrap().into(),
+            shadow_proj: (OPENGL_TO_WGPU_MATRIX * shadow_proj).into(),
         }
     }
 }
@@ -51,7 +53,7 @@ impl Camera {
             address_mode_w: wgpu::AddressMode::ClampToEdge,
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Linear,
+            compare: Some(wgpu::CompareFunction::LessEqual),
             ..Default::default()
         });
 
@@ -99,7 +101,7 @@ impl Camera {
         )
     }
 
-    pub fn update_buffer(&self, graphics: &Graphics, lighting: &Lighting, camera: &Camera) {
+    pub fn update_buffer(&self, graphics: &Graphics, lighting: &Lighting) {
         let view = cgmath::Matrix4::look_at_rh(
             Point3::new(0., 0., 0.),
             Point3::from_vec(self.get_forward()),
@@ -108,22 +110,28 @@ impl Camera {
         let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, NEAR_DISTANCE, RENDER_DISTANCE);
         let view_proj = proj * view;
 
-        // let rel_pos = (lighting.pos - camera.pos).cast().unwrap();
-        let rel_pos = (lighting.pos).cast().unwrap();
+        let rel_pos = lighting.pos.cast().unwrap();
         let view = cgmath::Matrix4::look_at_rh(
             Point3::from_vec(rel_pos.normalize()),
             Point3::new(0., 0., 0.),
             self.get_up()
         );
-        let proj = cgmath::ortho(-SHADOW_TEXTURE_WIDTH, SHADOW_TEXTURE_WIDTH, -SHADOW_TEXTURE_WIDTH, SHADOW_TEXTURE_WIDTH, -1000., 1000.);
-        let shadow_proj = proj * view;
+        let proj = cgmath::ortho(-10., 10., -10., 10., -1000., 1000.);
+        let shadow_view_proj = proj * view;
 
-        let uniform = CameraUniform::new(view_proj, shadow_proj);
-
+        let uniform = CameraUniform::new(view_proj, shadow_view_proj);
         self.buffer.write(graphics, uniform);
     }
 
     pub fn bind(&self, renderer: &mut Renderer) {
         self.buffer.bind(renderer);
+    }
+    
+    pub(crate) fn update(&mut self, player: &Entity, my_planet: Option<&Planet>, lighting: &Lighting, motion: (f32, f32)) {
+        self.pos = player.body.pos + player.body.ori * Vector3::unit_z() * 1.0;
+        self.phi -= motion.0;
+        self.theta += motion.1;
+        self.theta = self.theta.clamp(0.0001, 3.1415);
+        self.ori = player.body.ori.cast().unwrap();
     }
 }

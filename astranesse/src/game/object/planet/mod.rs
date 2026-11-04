@@ -12,7 +12,7 @@ use crate::game::object::{BlockProperties, RENDER_DISTANCE};
 use crate::game::object::Object;
 use crate::graphics::{Camera, GraphicalChunk, Graphics};
 use crate::physics::{BOLTZMANN, MoI, NEWTON_G, PROTON_MASS, Physics, RigidBody, RigidBodyInit, STEFAN_BOLTZMANN};
-use crate::util::{CHUNK_SIZE, Ori, SphericalInterpolator};
+use crate::util::{CHUNK_SIZE, Ori, SphericalInterpolator, get_face_index};
 
 const OCEAN_RESOLUTION: isize = 16;
 const HUMIDITY_RESOLUTION: isize = 16;
@@ -68,11 +68,6 @@ impl LoadedPlanet {
     }
 
     pub(super) fn load_chunk(&mut self, graphics: &Graphics, properties: &BlockProperties, chunk_coord: (i32, i32, i32)) -> Option<PhysicalChunk> {
-        let mut seed = self.seed;
-        seed += i64::cast_unsigned(chunk_coord.0 as i64);
-        seed += i64::cast_unsigned(chunk_coord.1 as i64) << 21;
-        seed += i64::cast_unsigned(chunk_coord.2 as i64) << 42;
-        let mut rng = StdRng::seed_from_u64(seed);
 
         let chunk_pos = Vector3::new(chunk_coord.0 as f32, chunk_coord.1 as f32, chunk_coord.2 as f32) * CHUNK_SIZE as f32;
         if self.get_point_altitude(chunk_pos) > self.get_altitude(chunk_pos) + CHUNK_SIZE as f32 {
@@ -81,14 +76,7 @@ impl LoadedPlanet {
         }
 
         let mut chunk = PhysicalChunk::empty(graphics, chunk_coord);
-        let max = chunk_pos.x.abs().max(chunk_pos.y.abs().max(chunk_pos.z.abs()));
-        let face_index = if max == chunk_pos.x.abs() {
-            if chunk_pos.x > 0. { 0 } else { 1 }
-        } else if max == chunk_pos.y.abs() {
-            if chunk_pos.y > 0. { 2 } else { 3 }
-        } else {
-            if chunk_pos.z > 0. { 4 } else { 5 }
-        };
+        let face_index = get_face_index(chunk_pos);
 
         // Build the cube up from the bottom
         for u in 0..CHUNK_SIZE {
@@ -110,15 +98,58 @@ impl LoadedPlanet {
 
         for u in -(CHUNK_SIZE as i32)..2*(CHUNK_SIZE as i32) {
             for v in -(CHUNK_SIZE as i32)..2*(CHUNK_SIZE as i32) {
-                let pos = chunk_pos + Vector3::new(u as f32, v as f32, 0 as f32);
-                let w = (self.get_altitude(pos) - self.get_point_altitude(pos)) as i32 + 2;
+                let mut seed = self.seed;
+                let w = match face_index {
+                    0|1 => {
+                        let pos = chunk_pos + Vector3::new(0., u as f32, v as f32);
+                        seed += (chunk_coord.1 * CHUNK_SIZE as i32 + u).cast_unsigned() as u64;
+                        seed += ((chunk_coord.2 * CHUNK_SIZE as i32 + v).cast_unsigned() as u64) << 32;
+                        (self.get_altitude(pos) - self.get_point_altitude(pos)) as i32 + 2
+                    }
+                    2|3 => {
+                        let pos = chunk_pos + Vector3::new(u as f32, 0., v as f32);
+                        seed += (chunk_coord.0 * CHUNK_SIZE as i32 + u).cast_unsigned() as u64;
+                        seed += ((chunk_coord.2 * CHUNK_SIZE as i32 + v).cast_unsigned() as u64) << 32;
+                        (self.get_altitude(pos) - self.get_point_altitude(pos)) as i32 + 2
+                    }
+                    4|5 => {
+                        let pos = chunk_pos + Vector3::new(u as f32, v as f32, 0.);
+                        seed += (chunk_coord.0 * CHUNK_SIZE as i32 + u).cast_unsigned() as u64;
+                        seed += ((chunk_coord.1 * CHUNK_SIZE as i32 + v).cast_unsigned() as u64) << 32;
+                        (self.get_altitude(pos) - self.get_point_altitude(pos)) as i32 + 2
+                    },
+                    _ => unreachable!()
+                };
+                if w < -(CHUNK_SIZE as i32) || w >= 2*CHUNK_SIZE as i32 { continue; }
+                let (u, v, w) = match face_index {
+                    0 => (w, u, v),
+                    1 => (-w, u, v),
+                    2 => (u, w, v),
+                    3 => (u, -w, v),
+                    4 => (u, v, w),
+                    5 => (u, v, -w),
+                    _ => unreachable!()
+                };
+
+                let mut rng = StdRng::seed_from_u64(seed);
                 let pos = chunk_pos + Vector3::new(u as f32, v as f32, w as f32);
+                if get_face_index(pos) != face_index {continue;};
+                let global_ori = match face_index {
+                    0 => Ori { data: 0 },
+                    1 => Ori { data: 14 },
+                    2 => Ori { data: 1 },
+                    3 => Ori { data: 15 },
+                    4 => Ori { data: 16 },
+                    5 => Ori { data: 20 },
+                    _ => unreachable!()
+                } * Ori::z(rng.random::<u8>() % 4);
+
+                
                 let alt = self.alt_interp.get(pos);
                 let temp = self.temp_interp.get(pos);
                 let humidity = self.humidity_interp.get(pos);
-                if w < 0 || w >= CHUNK_SIZE as i32 { continue; }
                 if let Some(structure) = self.selector.get_structure(alt, temp, humidity, &mut rng) {
-                    structure.place(&mut chunk, (u, v, w));
+                    structure.place(&mut chunk, (u, v, w), global_ori);
                 }
             }
         }

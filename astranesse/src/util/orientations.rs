@@ -9,8 +9,22 @@ pub struct Ori {
 }
 
 impl Ori {
-    pub(crate) fn random(rng: &mut impl Rng) -> Ori {
+    pub fn random(rng: &mut impl Rng) -> Ori {
         Self { data: (rng.random::<u64>() % 24) as u8 }
+    }
+
+    pub fn identity() -> Ori {
+        Self { data: 16 }
+    }
+
+    pub fn z(quarter_turns: u8) -> Ori {
+        match quarter_turns % 4 {
+            0 => Self { data: 16 },
+            1 => Self { data: 17 },
+            2 => Self { data: 18 },
+            3 => Self { data: 19 },
+            _ => unreachable!()
+        }
     }
 
     pub fn quat(&self) -> Quaternion<f64> {
@@ -39,6 +53,36 @@ impl Ori {
             21 => Quaternion::new(-0.707107, 0.707107, 0.000000, 0.000000),
             22 => Quaternion::new(-1.000000, 0.000000, 0.000000, 0.000000),
             23 => Quaternion::new(-0.707107, -0.707107, 0.000000, -0.000000),
+            _ => unreachable!()
+        }
+    }
+
+    pub fn rotate_integer(&self, u: i32, v: i32, w: i32) -> (i32, i32, i32) {
+        match self.data {
+            0 => (w, u, v),
+            1 => (-u, w, v),
+            2 => (-w, -u, v),
+            3 => (u, -w, v),
+            4 => (w, -u, -v),
+            5 => (u, w, -v),
+            6 => (-w, u, -v),
+            7 => (-u, -w, -v),
+            8 => (w, v, -u),
+            9 => (-v, w, -u),
+            10 => (-w, -v, -u),
+            11 => (v, -w, -u),
+            12 => (w, -v, u),
+            13 => (v, w, u),
+            14 => (-w, v, u),
+            15 => (-v, -w, u),
+            16 => (u, v, w),
+            17 => (-v, u, w),
+            18 => (-u, -v, w),
+            19 => (v, -u, w),
+            20 => (-u, v, -w),
+            21 => (-v, -u, -w),
+            22 => (u, -v, -w),
+            23 => (v, u, -w),
             _ => unreachable!()
         }
     }

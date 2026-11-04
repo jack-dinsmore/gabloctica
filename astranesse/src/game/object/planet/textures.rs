@@ -32,7 +32,7 @@ impl Structure {
 
         let mut blocks = HashSet::new();
         let mut queue = vec![(0, 0, 0)];
-        let ori = Ori { data: 0 };
+        let ori = Ori::identity();
         while let Some(pos) = queue.pop() {
             blocks.insert((pos, ori, id));
 
@@ -94,12 +94,13 @@ impl Structure {
         }
     }
 
-    pub fn place(&self, chunk: &mut PhysicalChunk, (u, v, w): (i32, i32, i32)) {
+    pub fn place(&self, chunk: &mut PhysicalChunk, (u, v, w): (i32, i32, i32), global_ori: Ori) {
         for ((du, dv, dw), ori, id) in &self.blocks {
+            let (du, dv, dw) = global_ori.rotate_integer(*du, *dv, *dw);
             if u + du < 0 || u + du >= CHUNK_SIZE as i32 { continue; }
             if v + dv < 0 || v + dv >= CHUNK_SIZE as i32 { continue; }
             if w + dw < 0 || w + dw >= CHUNK_SIZE as i32 { continue; }
-            chunk.grid[((u+du) as u32, (v+dv) as u32, (w+dw) as u32)] = PhysicalBlock { ori: *ori, id: *id };
+            chunk.grid[((u+du) as u32, (v+dv) as u32, (w+dw) as u32)] = PhysicalBlock { ori: global_ori * *ori, id: *id };
         }
     }
 }
@@ -125,13 +126,13 @@ impl BlockSelector {
 
         for cube_index in 0..N_BLOCKS {
             let mut image: ImageBuffer<Rgba<u8>, _> = ImageBuffer::new(16 * 6, 16);
+            let color_1 = [rng.random::<u8>(), rng.random::<u8>(), rng.random::<u8>()];
+            let color_2 = [rng.random::<u8>(), rng.random::<u8>(), rng.random::<u8>()];
             for face in 0..6 {
                 let noise_1 = Perlin::new(rng.random());
                 let noise_2 = Perlin::new(rng.random());
                 const SCALE_1: f64 = 0.25;
                 const SCALE_2: f64 = 0.5;
-                let color_1 = [rng.random::<u8>(), rng.random::<u8>(), rng.random::<u8>()];
-                let color_2 = [rng.random::<u8>(), rng.random::<u8>(), rng.random::<u8>()];
 
                 for dx in 0..16 {
                     for dy in 0..16 {
@@ -151,6 +152,7 @@ impl BlockSelector {
         let mut structures = Vec::new();
         for _ in 0..4 {
             structures.push(Structure::new_tree(block_ids[0], rng));
+            break; // TODO
         }
 
         Self {

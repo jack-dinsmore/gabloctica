@@ -66,7 +66,7 @@ impl Texture {
     /// Create a texture with a bind group
     pub fn new(graphics: &Graphics, camera: &Camera, dimensions: (u32, u32), texture_type: TextureType) -> Self {
         let texture = FreeTexture::new(&graphics.device, dimensions, texture_type);
-        let bind_group = Self::get_bind_group(graphics, &texture.view, &camera.shadow_texture.view, Some(&camera.shadow_texture_sampler));
+        let bind_group = Self::get_bind_group(graphics, &texture.view, &camera.shadow_texture.view, &camera.shadow_texture_sampler);
 
         Self {
             texture,
@@ -118,7 +118,7 @@ impl Texture {
     }
 
     /// Create a texture with a bind group. You should pass the two views. If you do not pass a second sampler, the first sampler will be re-used.
-    fn get_bind_group(graphics: &Graphics, view1: &wgpu::TextureView, view2: &wgpu::TextureView, sampler2: Option<&wgpu::Sampler>) -> wgpu::BindGroup {
+    fn get_bind_group(graphics: &Graphics, view1: &wgpu::TextureView, view2: &wgpu::TextureView, sampler2: &wgpu::Sampler) -> wgpu::BindGroup {
         let layout = &graphics.get_layout(ResourceType::Texture);
         let sampler = graphics.device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -129,11 +129,6 @@ impl Texture {
             mipmap_filter: wgpu::FilterMode::Nearest,
             ..Default::default()
         });
-
-        let sampler2_ref = match sampler2 {
-            Some(s) => s,
-            None => &sampler,
-        };
 
         let bind_group = graphics.device.create_bind_group(
             &wgpu::BindGroupDescriptor {
@@ -153,7 +148,7 @@ impl Texture {
                     },
                     wgpu::BindGroupEntry {
                         binding: 3,
-                        resource: wgpu::BindingResource::Sampler(&sampler2_ref),
+                        resource: wgpu::BindingResource::Sampler(&sampler2),
                     },
                 ],
                 label: Some("Texture bind group"),

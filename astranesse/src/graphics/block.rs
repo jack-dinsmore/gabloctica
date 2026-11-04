@@ -8,14 +8,14 @@ pub struct GraphicalBlock {
 }
 impl Default for GraphicalBlock {
     fn default() -> Self {
-        Self { id: 0, ori: Ori { data: 0 } }
+        Self { id: 0, ori: Ori::identity() }
     }
 }
 impl GraphicalBlock {
     pub fn new(id: GraphicId) -> Self {
         Self {
             id,
-            ori: Ori { data: 0 },
+            ori: Ori::identity(),
         }
     }
     

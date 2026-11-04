@@ -117,7 +117,23 @@ def mul_table():
                 if np.sum(np.abs(value.as_quat() - c.as_quat())) < 1e-8 or np.sum(np.abs(value.as_quat() + c.as_quat())) < 1e-8:
                     print(f"({i}, {j}) => {k}, ", end='')
 
-mul_table()
+def integer_rotate():
+    for i, q in enumerate(all_rotations):
+        xaxis = np.argmax(np.abs(q.apply([1,0,0])))
+        xsign = np.sign(q.apply([1,0,0])[xaxis])
+        yaxis = np.argmax(np.abs(q.apply([0,1,0])))
+        ysign = np.sign(q.apply([0,1,0])[yaxis])
+        zaxis = np.argmax(np.abs(q.apply([0,0,1])))
+        zsign = np.sign(q.apply([0,0,1])[zaxis])
+        symbols = ["", "", ""]
+        symbols[xaxis] = "u" if xsign > 0 else "-u"
+        symbols[yaxis] = "v" if ysign > 0 else "-v"
+        symbols[zaxis] = "w" if zsign > 0 else "-w"
+        print(f"\t{i} => ({', '.join(symbols)}),")
+
+
+# mul_table()
+integer_rotate()
 # print_oris()
 
 # forward
