@@ -41,7 +41,7 @@ pub struct Planet {
     to_sun: Vector3<f32>,
     sun_flux: f32,
     spin_local: Vector3<f32>,
-    composition: Vec<(Chemical, f32)>, // Chemical, Abundance in Pa
+    concentration: Concentration,
     pub object: Object,
 
     loaded: Option<LoadedPlanet>,
@@ -175,14 +175,21 @@ impl Planet {
     pub fn new(graphics: &Graphics, physics: &mut Physics) -> Self {
         let mass = 1000.;
         let width = 8;
+        let real_width = width as f64 * CHUNK_SIZE as f64;
 
-        let moi = mass as f64 * (width as f64 * CHUNK_SIZE as f64).powi(2) / 6.;
+        let moi = mass as f64 * real_width.powi(2) / 6.;
         let rb_init = RigidBodyInit {
             mass: mass as f64,
             moi: MoI::new_diagonal(Vector3::new(1., 1., 1.)*moi),
             ..Default::default()
         };
         let object = Object::new(graphics, physics, rb_init);
+        let concentration = Concentration::new(
+            vec![Chemical::air(), Chemical::water()],
+            vec![1.5e11, 0.5e10],
+            real_width as f32,
+            (NEWTON_G * mass as f64 / (real_width/2.).powi(2)) as f32
+        );
 
         Self {
             seed: 79842121,
@@ -191,7 +198,7 @@ impl Planet {
             to_sun: Vector3::new(1., 0., 0.) * 10000.,
             spin_local: Vector3::new(0., 0., 0.1),
             sun_flux: 1e12,
-            composition: vec![(Chemical::air(), 100_000.), (Chemical::water(), 1.)],
+            concentration,
             object,
 
             loaded: None,
@@ -313,36 +320,29 @@ impl Planet {
         let equilib_t = self.sun_flux / (16. * std::f32::consts::PI * self.to_sun.magnitude2() * STEFAN_BOLTZMANN as f32);
         let radius = (self.width * CHUNK_SIZE) as f32 / 2.;
         let g_accel = NEWTON_G as f32 * self.mass / radius.powi(2);
-        let concentration = Concentration::new(&self.composition);
-        let surface_states = concentration.get_states(equilib_t);
 
         let mut total_pressure = 0.;
         let mut mean_mm = 0.;
         let mut specific_heat = 0.;
         let mut extinction = Vector3::new(0., 0., 0.);
-        let mut liquid_fractional_volume = 0.;
-        for ((chemical, orig_pressure), state) in concentration.data.iter().zip(&surface_states) {
-            let pressure = match state {
-                State::Solid => 0.,
-                State::Gas => *orig_pressure,
-                State::Liquid(p) => *p,
-            };
+        let mut ocean_volume = 0.;
+        let states = self.concentration.get_states(equilib_t);
+        let mut liquid_chemical = None;
+        for (state, chemical) in states.iter().zip(&self.concentration.chemicals) {
+            let pressure = state.pressure();
             total_pressure += pressure;
-            mean_mm += chemical.molecular_mass * pressure;
+            ocean_volume += state.volume();
+            mean_mm += pressure * chemical.molecular_mass;
             extinction += pressure * chemical.opacity;
             specific_heat += pressure * chemical.specific_heat;
-
-            if let State::Liquid(p) = state {
-                let liquid_density = (orig_pressure - p) * (chemical.molecular_mass * PROTON_MASS) / (BOLTZMANN * equilib_t);
-                liquid_fractional_volume += liquid_density / chemical.liquid_density;
+            if let State::Liquid(_, _) = state {
+                liquid_chemical = Some(chemical.clone());
             }
         }
-        liquid_fractional_volume /= total_pressure;
         mean_mm /= total_pressure;
         specific_heat /= total_pressure;
 
         let scale_height = BOLTZMANN * equilib_t / (PROTON_MASS * mean_mm * g_accel);
-        let ocean_volume = 24. * radius*radius * scale_height * liquid_fractional_volume;
         extinction *= scale_height;
         let eta = (total_pressure * specific_heat / (STEFAN_BOLTZMANN as f32 * equilib_t.powi(3) * (g_accel*scale_height).sqrt())).tanh();
 
@@ -431,39 +431,34 @@ impl Planet {
         }
 
         // Work out humidity
-        let chemical = {
-            let mut first_liquid = None;
-            for ((chemical, _), state) in self.composition.iter().zip(surface_states) {
-                if let State::Liquid(_) = state {
-                    first_liquid = Some(chemical);
-                    break; 
-                }
-            }
-            first_liquid.unwrap()
-        };
-        let humidity_interp = {
-            let surface_vapor_pressure = chemical.get_pressure(equilib_t);
-            SphericalInterpolator::new(|mut pos| {
-                let mut humidity = surface_vapor_pressure;
-                let rain_rate = 1.;
-                let dt = 0.1;
-                while humidity > surface_vapor_pressure / 100. {
-                    pos /= pos.magnitude();
-                    let alt = alt_interp.get(pos);
-                    let surface_temp = temp_interp.get(pos);
-                    let condensation_pressure = chemical.get_pressure(surface_temp * (-alt/scale_height).exp());
-                    if condensation_pressure < humidity {
-                        // Condensed 
-                        humidity = condensation_pressure;
-                    };
-                    pos -= wind_interp.get(pos) * dt;
-                    humidity *= 1. - rain_rate * dt;
-                    if alt_interp.get(pos) < ocean_alt {
-                        break;
+        let humidity_interp = match liquid_chemical {
+            Some(c) => {
+                let surface_vapor_pressure = c.get_vapor_pressure(equilib_t);
+                SphericalInterpolator::new(|mut pos| {
+                    let mut humidity = surface_vapor_pressure;
+                    let rain_rate = 1.;
+                    let dt = 0.1;
+                    while humidity > surface_vapor_pressure / 100. {
+                        pos /= pos.magnitude();
+                        let alt = alt_interp.get(pos);
+                        let surface_temp = temp_interp.get(pos);
+                        let condensation_pressure = c.get_vapor_pressure(surface_temp * (-alt/scale_height).exp());
+                        if condensation_pressure < humidity {
+                            // Condensed 
+                            humidity = condensation_pressure;
+                        };
+                        pos -= wind_interp.get(pos) * dt;
+                        humidity *= 1. - rain_rate * dt;
+                        if alt_interp.get(pos) < ocean_alt {
+                            break;
+                        }
                     }
-                }
-                humidity
-            }, self.width as usize)
+                    humidity
+                }, self.width as usize)
+            },
+            None => {
+                SphericalInterpolator::new(|pos| 0., self.width as usize)
+            },
         };
 
         let selector = BlockSelector::new(properties, &alt_interp, &temp_interp, &humidity_interp, &mut rng);

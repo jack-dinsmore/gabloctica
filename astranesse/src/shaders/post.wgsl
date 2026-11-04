@@ -1,7 +1,7 @@
 struct CameraUniform {
     view_proj: mat4x4<f32>,
-    shadow_proj: mat4x4<f32>,
     view_proj_inv: mat4x4<f32>,
+    shadow_proj: mat4x4<f32>,
 };
 struct LightUniform {
     pos: vec4<f32>,
@@ -107,7 +107,6 @@ fn fs_main(@builtin(position) pos : vec4<f32>) -> @location(0) vec4<f32> {
         let optical_depth = post.fog.xyz * get_optical_depth(start_cube.xyz, end_cube.xyz);
         let solar_depth = post.fog.xyz * get_optical_depth(end_cube.xyz, sun_cube.xyz);
     
-        // let mixed_color =  mix(post.fog.xyz, color.xyz, exp(-optical_depth));
         color *= exp(-optical_depth);
         color += 0.079577 * optical_depth * exp(-solar_depth);
     }

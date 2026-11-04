@@ -6,7 +6,7 @@ use noise::{NoiseFn, Perlin};
 use rand::{Rng, RngExt};
 use rand_distr::StandardNormal;
 
-use crate::{game::object::{BlockId, BlockProperties, chunk::{PhysicalBlock, PhysicalChunk}}, util::{CHUNK_SIZE, KMeans, Ori, SphericalInterpolator}};
+use crate::{game::object::{BlockId, BlockProperties, chunk::{PhysicalBlock, PhysicalChunk}}, util::{CHUNK_SIZE, KMeans, Ori, SphericalInterpolator, hsl_to_rgb}};
 
 pub struct Structure {
     blocks: Vec<((i32, i32, i32), Ori, BlockId)>, // Pos, ori, block
@@ -126,8 +126,8 @@ impl BlockSelector {
 
         for cube_index in 0..N_BLOCKS {
             let mut image: ImageBuffer<Rgba<u8>, _> = ImageBuffer::new(16 * 6, 16);
-            let color_1 = [rng.random::<u8>(), rng.random::<u8>(), rng.random::<u8>()];
-            let color_2 = [rng.random::<u8>(), rng.random::<u8>(), rng.random::<u8>()];
+            let color_1 = Vector3::new(rng.random::<f32>(), rng.random::<f32>(), rng.random::<f32>());
+            let color_2 = Vector3::new(rng.random::<f32>(), rng.random::<f32>(), rng.random::<f32>());
             for face in 0..6 {
                 let noise_1 = Perlin::new(rng.random());
                 let noise_2 = Perlin::new(rng.random());
@@ -136,12 +136,14 @@ impl BlockSelector {
 
                 for dx in 0..16 {
                     for dy in 0..16 {
-                        let n1 = noise_1.get([dx as f64 * SCALE_1, dy as f64 * SCALE_1]) as f32 * 0.5;
-                        let n2 = noise_2.get([dx as f64 * SCALE_2, dy as f64 * SCALE_2]) as f32 * 0.5;
+                        let n1 = noise_1.get([dx as f64 * SCALE_1, dy as f64 * SCALE_1]) as f32 * 0.1;
+                        let n2 = noise_2.get([dx as f64 * SCALE_2, dy as f64 * SCALE_2]) as f32 * 0.1;
+                        let color_hsv = (color_1 * (1.+n1) + color_2 * (1.+n2)) / 2.;
+                        let color_rgb = hsl_to_rgb(color_hsv);
                         let pixel = image.get_pixel_mut(face * 16 + dx, dy);
-                        pixel[0] = ((color_1[0] as f32 * (1. + n1) + color_2[0] as f32 * (1. + n2)) / 2.) as u8;
-                        pixel[1] = ((color_1[1] as f32 * (1. + n1) + color_2[1] as f32 * (1. + n2)) / 2.) as u8;
-                        pixel[2] = ((color_1[2] as f32 * (1. + n1) + color_2[2] as f32 * (1. + n2)) / 2.) as u8;
+                        pixel[0] = (color_rgb.x * 255.).clamp(0., 255.) as u8;
+                        pixel[1] = (color_rgb.y * 255.).clamp(0., 255.) as u8;
+                        pixel[2] = (color_rgb.z * 255.).clamp(0., 255.) as u8;
                         pixel[3] = 255;
                     }
                 }
@@ -152,7 +154,6 @@ impl BlockSelector {
         let mut structures = Vec::new();
         for _ in 0..4 {
             structures.push(Structure::new_tree(block_ids[0], rng));
-            break; // TODO
         }
 
         Self {

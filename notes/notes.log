@@ -1,4 +1,4 @@
-This is LuaHBTeX, Version 1.15.0 (TeX Live 2022)  (format=lualatex 2022.7.10)  31 OCT 2026 16:37
+This is LuaHBTeX, Version 1.15.0 (TeX Live 2022)  (format=lualatex 2022.7.10)  4 NOV 2026 09:32
  restricted system commands enabled.
  file:line:error style messages enabled.
 **/Users/jtd/Documents/personal/code/rust/astranesse/notes/notes
@@ -484,38 +484,38 @@ LaTeX Font Info:    Font shape `TU/EBGaramond(0)/b/n' will be
 LaTeX Font Info:    Font shape `TU/EBGaramond(0)/b/n' will be
 (Font)              scaled to size 10.95pt on input line 29.
 
-Underfull \hbox (badness 10000) in paragraph at lines 33--34
+Underfull \hbox (badness 10000) in paragraph at lines 38--39
 \TU/EBGaramond(0)/m/n/10.95 Take a patch of ground has nor-mal vec-tor $[] \OT1/cmr/m/n/10.95 =
  []
 
 
-Underfull \hbox (badness 3965) in paragraph at lines 33--34
+Underfull \hbox (badness 3965) in paragraph at lines 38--39
 \OT1/cmr/m/n/10.95 ([] \OML/cmm/m/it/10.95 ; \OT1/cmr/m/n/10.95 0\OML/cmm/m/it/10.95 ; [] \OT1/cmr/m/n/10.95 )$ \TU/EBGaramond(0)/m/n/10.95 in the lo-cal frame. This frame ro-tates
  []
 
 
-Underfull \hbox (badness 3078) in paragraph at lines 33--34
+Underfull \hbox (badness 3078) in paragraph at lines 38--39
 \TU/EBGaramond(0)/m/n/10.95 This equa-tion is hard to eval-u-ate. But I could eval-u-
  []
 
 
-Underfull \hbox (badness 1005) in paragraph at lines 33--34
+Underfull \hbox (badness 1005) in paragraph at lines 38--39
 \TU/EBGaramond(0)/m/n/10.95 ate by anal-ogy: $[][] \OML/cmm/m/it/10.95 dt  []\OT1/cmr/m/n/10.95 [[](
 \OML/cmm/m/it/10.95 t\OT1/cmr/m/n/10.95 )\OML/cmm/m/it/10.95 ; \OT1/cmr/m/n/10.95 0] = 2/
 $\TU/EBGaramond(0)/m/n/10.95 , and
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 38--39
+Underfull \hbox (badness 10000) in paragraph at lines 43--44
 []\TU/EBGaramond(0)/m/n/10.95 Mean-while, the loss due to ra-di-a-tion is $\OT1/cmr/m/n/10.95 \OML/cmm/m/it/10.95 E \OT1/cmr/m/n/10.95 =
  []
 
 LaTeX Font Info:    Font shape `TU/EBGaramond(0)/b/n' will be
-(Font)              scaled to size 8.0pt on input line 40.
+(Font)              scaled to size 8.0pt on input line 45.
 LaTeX Font Info:    Font shape `TU/EBGaramond(0)/b/n' will be
-(Font)              scaled to size 6.0pt on input line 40.
+(Font)              scaled to size 6.0pt on input line 45.
 
-Overfull \hbox (37.0148pt too wide) detected at line 41
+Overfull \hbox (37.0148pt too wide) detected at line 46
 []\OML/cmm/m/it/10.95 T \OT1/cmr/m/n/10.95 = []\OML/cmm/m/it/10.95 T[] [][] [][] :
  []
 
@@ -523,7 +523,7 @@ Overfull \hbox (37.0148pt too wide) detected at line 41
 
 
 ]
-Overfull \hbox (22.0903pt too wide) detected at line 79
+Overfull \hbox (22.0903pt too wide) detected at line 84
 []\OML/cmm/m/it/10.95 [] \OT1/cmr/m/n/10.95 = \OML/cmm/m/it/10.95 E[]H[]e[] [] :
  []
 
@@ -534,12 +534,12 @@ Here is how much of LuaTeX's memory you used:
  100000,552014 words of node,token memory allocated
  556 words of node memory still in use:
    6 hlist, 2 vlist, 2 rule, 2 glue, 4 kern, 1 glyph, 24 attribute, 52 glue_spec, 24 attribute_list, 1 write nodes
-   avail lists: 2:476,3:182,4:34,5:622,6:32,7:7447,8:61,9:585,10:18,11:345
+   avail lists: 2:482,3:186,4:34,5:726,6:34,7:8238,8:61,9:638,10:18,11:392
  25993 multiletter control sequences out of 65536+600000
  72 fonts using 11897791 bytes
  83i,8n,112p,1133b,257s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2022/texmf-dist/fonts/opentype/public/ebgaramond/EBGaramond-Bold.otf></usr/local/texlive/2022/texmf-dist/fonts/opentype/public/ebgaramond/EBGaramond-Regular.otf></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmmib10.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cmextra/cmmib8.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr/local/texlive/2022/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb>
-Output written on notes.pdf (2 pages, 146096 bytes).
+Output written on notes.pdf (2 pages, 148328 bytes).
 
 PDF statistics: 77 PDF objects out of 1000 (max. 8388607)
  53 compressed objects within 1 object stream

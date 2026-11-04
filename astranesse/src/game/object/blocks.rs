@@ -123,7 +123,7 @@ impl BlockProperties {
         self.blocks.insert(new_id, BlockInfo {
             id: new_id,
             mass,
-            graphic_id: new_id, // ????
+            graphic_id: new_id,
             script: None,
             is_pipe: false,
             is_conductor: false,

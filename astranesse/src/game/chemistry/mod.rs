@@ -1,4 +1,5 @@
 use cgmath::Vector3;
+use itertools::izip;
 
 use crate::util::lerp;
 
@@ -20,7 +21,7 @@ impl Chemical {
             molecular_mass: 18.,
             liquid_density: 1.,
             specific_heat: 0.004,
-            opacity: Vector3::new(0.3, 0.5, 1.) * 5e-7,
+            opacity: Vector3::new(0.3, 0.5, 1.) * 2e-5,
         }
     }
     pub fn air() -> Self {
@@ -30,15 +31,15 @@ impl Chemical {
             molecular_mass: 18.,
             liquid_density: 1.,
             specific_heat: 0.,
-            opacity: Vector3::new(0.3, 0.5, 1.) * 5e-7,
+            opacity: Vector3::new(0., 0., 0.),
         }
     }
 
-    pub fn get_pressure(&self, temp: f32) -> f32 {
+    pub fn get_vapor_pressure(&self, temp: f32) -> f32 {
         if temp < self.triple.0 {
-            0.
+            lerp(temp, 0., self.triple.0, 0., self.triple.1)
         } else {
-            lerp(temp.ln(), self.triple.0.ln(), self.critical.0.ln(), self.triple.1.ln(), self.critical.1.ln()).exp()
+            lerp(temp, self.triple.0, self.critical.0, self.triple.1, self.critical.1)
         }
     }
 }
@@ -47,42 +48,54 @@ impl Chemical {
 /// Struct to store information that can be used to compute how a system of gases behaves
 #[derive(Clone, Copy, Debug)]
 pub enum State {
-    Solid,
-    Gas,
-    Liquid(f32), // Partial papor pressure
+    Gas(f32),
+    Solid(f32, f32), // Solid volume, Vapor pressure
+    Liquid(f32, f32), // Liquid volume, Vapor pressure
+}
+impl State {
+    pub fn pressure(&self) -> f32 {
+        match self {
+            State::Gas(p) => *p,
+            State::Solid(_, p) => *p,
+            State::Liquid(_, p) => *p,
+        }
+    }
+    pub fn volume(&self) -> f32 {
+        match self {
+            State::Gas(_) => 0.,
+            State::Solid(v, _) => *v,
+            State::Liquid(v, _) => *v,
+        }
+    }
 }
 pub struct Concentration {
-    pub data: Vec<(Chemical, f32)>,
+    pub chemicals: Vec<Chemical>,
+    masses: Vec<f32>,
+    pressures: Vec<f32>,
 }
 impl Concentration {
-    pub fn new(data: &[(Chemical, f32)]) -> Self {
-        let mut data = (*data).to_vec();
-        data.sort_by(|a, b| (a.0.triple.0).partial_cmp(&b.0.triple.0).unwrap());
+    /// make an atmospheric concentration, providing the masses of each chemical
+    pub fn new(chemicals: Vec<Chemical>, masses: Vec<f32>, w: f32, g: f32) -> Self {
+        let pressures = masses.iter().map(|m| m*g / (6.*w*w)).collect::<Vec<f32>>();
         Self {
-            data: data.to_vec(),
+            chemicals,
+            masses,
+            pressures,
         }
     }
 
     pub fn get_states(&self, temp: f32) -> Vec<State> {
-        let mut total_pressure = 0.;
         let mut output = Vec::new();
-        for (chemical, pressure) in &self.data {
-            if chemical.triple.0 > temp {
-                output.push(State::Solid);
-                continue;
+        for (chemical, mass, pressure) in izip!(&self.chemicals, &self.masses, &self.pressures) {
+            let vapor_pressure = chemical.get_vapor_pressure(temp);
+            if vapor_pressure > *pressure {
+                output.push(State::Gas(*pressure));
             } else {
-                // It's a liquid or gas
-                let vp = chemical.get_pressure(temp);
-                if total_pressure > vp {
-                    output.push(State::Liquid(0.));
-                    continue
-                } else if total_pressure + pressure < vp {
-                    output.push(State::Gas);
-                    total_pressure += pressure;
+                let mass = mass * vapor_pressure / *pressure;
+                if temp < chemical.triple.0 {
+                    output.push(State::Solid(mass / chemical.liquid_density, vapor_pressure));
                 } else {
-                    let added_pressure = vp - total_pressure;
-                    total_pressure = vp;
-                    output.push(State::Liquid(added_pressure));
+                    output.push(State::Liquid(mass / chemical.liquid_density, vapor_pressure));
                 }
             }
         }
