@@ -126,7 +126,7 @@ fn vs_main(
 
     out.texpos = vec2(
         f32((vert.data>>26) & 0x7) / 7.,
-        f32((vert.data>>18) & 0xff) / 255,
+        f32((vert.data>>18) & 0xff) / 255.,
     );
 
     if ((vert.data>>29) & 1) != 0 { out.position.x += 32.; }
@@ -161,7 +161,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var shadow_coords = in.shadow_pos.xyz / in.shadow_pos.w;
     shadow_coords.y *= -1.;
 
-    let shadow = textureSampleCompare(t_shadow, s_shadow, shadow_coords.xy * 0.5 + 0.5, shadow_coords.z - 0.0005);
+    let shadow = textureSampleCompare(t_shadow, s_shadow, shadow_coords.xy * 0.5 + 0.5, shadow_coords.z - 0.00005);
 
     var illum = shadow * dot(in.normal.xyz, to_light);
 

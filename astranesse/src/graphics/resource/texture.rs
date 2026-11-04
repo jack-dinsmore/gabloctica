@@ -175,7 +175,7 @@ impl Texture {
                         mip_level: 0,
                         origin: wgpu::Origin3d {
                             x: 0,
-                            y: index as u32 * 16+1,
+                            y: index as u32 * 16,
                             z: 0,
                         },
                         aspect: wgpu::TextureAspect::All,
