@@ -1,4 +1,4 @@
-use cgmath::{Quaternion, Vector3, Zero};
+use cgmath::{InnerSpace, Quaternion, Vector3, Zero};
 
 use crate::{game::object::{BlockGlobalPos, ObjectIdentifier, Planet, Ship}, physics::{Physics, RigidBody, RigidBodyData, RigidBodyInit, shapes::BoxData}, util::CHUNK_SIZE};
 
@@ -33,12 +33,52 @@ impl Entity {
         self.body.add_force(dir);
     }
 
-    pub fn update(&mut self, delta_t: f64, ships: &[Ship], planets: &[Planet]) {
-        self.body.ori = Quaternion::new(1., 0., 0., 0.);
+    fn get_my_planet<'a>(&self, planets: &'a [Planet]) -> Option<&'a Planet> {
+        let camera_pos = self.body.pos.cast().unwrap();
+        if !planets.is_empty() {
+            let mut min_dist = f64::INFINITY;
+            let mut min_index = 0;
+            for (i, planet) in planets.iter().enumerate() {
+                let o = planet.object.body.clone();
+                let dist = (o.pos - camera_pos).magnitude();
+                if dist < min_dist {
+                    min_index = i;
+                    min_dist = dist;
+                }
+            }
+            Some(&planets[min_index])
+        } else {
+            None
+        }
+    }
+
+    pub fn update(&mut self, delta_t: f64, physics: &Physics, ships: &[Ship], planets: &[Planet]) {
         if let Some((id, block_key, pos)) = &self.chair {
             let rb = &id.get_object(ships, planets).body;
             self.body.pos = rb.pos + rb.ori * (pos - rb.com_pos);
             self.body.ori = rb.ori;
+        }
+
+        if let Some(planet) = self.get_my_planet(planets) {
+            if physics.contacting(&self.body, &planet.object.body) {
+                let up = self.body.ori * Vector3::new(0., 0., 1.);
+                let planet_normal = planet.object.body.ori * match planet.get_face_index(self.body.pos) {
+                    0 => Vector3::new(1., 0., 0.),
+                    1 => Vector3::new(-1., 0., 0.),
+                    2 => Vector3::new(0., 1., 1.),
+                    3 => Vector3::new(0., -1., -1.),
+                    4 => Vector3::new(0., 0., 1.),
+                    5 => Vector3::new(0., 0., -1.),
+                    _ => unreachable!()
+                };
+                let mut cross = up.cross(planet_normal);
+                let mag = cross.magnitude();
+                if mag > 0.001 {
+                    cross *= mag.min(1.5*delta_t) / mag;
+                    let cos = (1. - cross.magnitude2()).sqrt();
+                    self.body.ori = Quaternion::from_sv(1. + cos, cross).normalize() * self.body.ori;
+                }
+            }
         }
     }
 }

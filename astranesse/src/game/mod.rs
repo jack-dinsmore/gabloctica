@@ -97,11 +97,11 @@ impl Game {
             Planet::new(&graphics, &mut physics),
         ];
         let ships = vec![
-            Ship::new(&graphics, &mut physics, RigidBodyInit { pos: Vector3::new(12., 5., 140.), vel: Vector3::new(0., 0., 0.), ..Default::default() }),
+            // Ship::new(&graphics, &mut physics, RigidBodyInit { pos: Vector3::new(12., 5., 140.), vel: Vector3::new(0., 0., 0.), ..Default::default() }),
         ];
         let entities = vec![
             // Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(-200., 0., 80.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
-            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0.,0., 140.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
+            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 4., 170.), vel: Vector3::new(33., 0., 0.), ..Default::default()}),
         ];
 
         // Set cursor to center of screen
@@ -111,6 +111,7 @@ impl Game {
             size.height as f64 / 2.0,
         );
         graphics.window.set_cursor_position(center).unwrap();
+
 
         // Load block information
         let block_properties = BlockProperties::new(&graphics, &camera);
@@ -243,6 +244,29 @@ impl Game {
                 }
             }
         }
+
+        // Update the player
+        if let Some(i) = self.get_my_planet_index() {
+        }
+    }
+
+    fn get_my_planet_index(&self) -> Option<usize> {
+        let camera_pos = self.camera.pos.cast().unwrap();
+        if !self.planets.is_empty() {
+            let mut min_dist = f64::INFINITY;
+            let mut min_index = 0;
+            for (i, planet) in self.planets.iter().enumerate() {
+                let o = planet.object.body.clone();
+                let dist = (o.pos - camera_pos).magnitude();
+                if dist < min_dist {
+                    min_index = i;
+                    min_dist = dist;
+                }
+            }
+            Some(min_index)
+        } else {
+            None
+        }
     }
 
     fn interact(&mut self) {
@@ -318,21 +342,7 @@ impl Game {
         self.handle_keydowns(delta_t);
         
         let camera_pos = self.camera.pos.cast().unwrap();
-        let my_planet = if !self.planets.is_empty() {
-            let mut min_dist = f64::INFINITY;
-            let mut min_index = 0;
-            for (i, planet) in self.planets.iter().enumerate() {
-                let o = planet.object.body.clone();
-                let dist = (o.pos - camera_pos).magnitude();
-                if dist < min_dist {
-                    min_index = i;
-                    min_dist = dist;
-                }
-            }
-            Some(&self.planets[min_index])
-        } else {
-            None
-        };
+        let my_planet = self.get_my_planet_index().map(|i| &self.planets[i]);
         self.post_processor.update_buffer(&self.graphics, &self.camera, my_planet);
 
         // Update camera
@@ -348,8 +358,8 @@ impl Game {
         for ship in &mut self.ships {
             ship.update(&self.graphics, &self.block_properties, camera_pos, delta_t);
         }
-        for entity in &mut self.entities { // TODO reorder
-            entity.update(delta_t, &self.ships, &self.planets);
+        for entity in &mut self.entities {
+            entity.update(delta_t, &self.physics, &self.ships, &self.planets);
         }
         
         self.physics.update(delta_t);

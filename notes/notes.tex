@@ -97,4 +97,33 @@
       \end{equation}
 
 
+    \section{Gravity}
+
+    I need to make gravity point normal to the planet at the face of the planet. This can be done by warping space according to a metric such that the unit sphere gets mapped to a cube, but points at infinity are fixed. Then I just map gravitational forces using this metric. One example map is
+    \begin{equation}
+      \bm x \rightarrow \bm x' = \bm x f(\bm x),\qquad f(\bm x) = 1 + \frac{H}{x} \brackets{\frac{P(\bm x)}{x} - 1}
+    \end{equation}
+    where $H$ is the radius of the sphere that gets mapped to the cube, $P(\bm x) = \parens{\sum_i x_i^p}^{1/p}$, and $p$ controls the corner softness ($p\rightarrow \infty$ is sharp). What is the metric? The Jacobian is $J_{ij} = \partial_i x_j = \delta_{ij}f + x_i \partial_jf$, and according to Claude the metric is $f=J^{T} J$. Thus,
+    \begin{equation}
+      g_{ij} = f^2 \delta_{ij} + f (x_i \partial_j + x_j \partial_i)f + x^2 \partial_i \partial_j f.
+    \end{equation}
+    The Christoffel symbols satisfy 
+    \begin{equation}
+      \Gamma^i_{kl} = \frac{1}{2} g^{im}\parens{g_{mk,l} + g_{ml,k} - g_{kl,m}}.
+    \end{equation}
+    Plugging these into the equations of motion, one gets that $\ddot x'_i = \ddot x_j + \Gamma^i_{jk} \dot x_j \dot x_k$. Claude handled this for me so that it's completely a function of $x'$. The result is
+    \begin{align}
+    \ddot {\bm x'} &= -\frac{GM\,\bm x}{r^3}
+    + \frac{2H\,(\mathbf{u}\cdot\dot{\bm x'})}{r^2 D}\,\dot{\bm x'}
+    + \frac{H}{r^2 D^2}\brackets{w_{ij}\,\dot x'_i\,\dot x'_j + \frac{2H}{r^2}\,(\mathbf{u}\cdot\dot{\bm x'})^2}\bm x, \\
+    \bm x &= \mathbf{x'} \brackets{1 - \frac{H}{|\mathbf{x'}|}\parens{\frac{P(\mathbf{x'})}{|\mathbf{x'}|} - 1}}, \\
+    r &= |\bm x| = |\bm x'| - H\parens{\frac{P(\bm x')}{|\bm x'|} - 1}\\
+    P &= \parens{|x_1|^p + |x_2|^p + |x_3|^p}^{1/p}\\
+    D &= r^2 + H(P - r), \\
+    u_i &= r^2 P^{1-p}\,x_i|x_i|^{p-2} + (r - 2P)\,x_i, \\
+    w_{ij} &= (p-1)\,r^4 P^{1-p}\parens{|x_i|^{p-2}\,\delta_{ij} - P^{-p}\,x_i x_j\,|x_i|^{p-2}|x_j|^{p-2}}.
+    \end{align}
+
+    Now I take $D \rightarrow D/r^2$.
+
 \end{document}

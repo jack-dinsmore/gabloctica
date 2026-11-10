@@ -85,6 +85,7 @@ pub struct RigidBodyInit {
     pub kinetic_coeff: f64,
     pub collider: Option<Collider>,
     pub restitution: f64,
+    pub warp_length: Option<f64>
 }
 impl Default for RigidBodyInit {
     fn default() -> Self {
@@ -100,6 +101,7 @@ impl Default for RigidBodyInit {
             moi: MoI::new_diagonal(Vector3::new(1., 1., 1.)),
             collider: None,
             restitution: 0.5,
+            warp_length: None,
         }
     }
 }
@@ -122,6 +124,7 @@ pub struct RigidBodyData {
     pub kinetic_coeff: f64,
     pub collider: Option<Collider>,
     pub restitution: f64,
+    pub warp_length: Option<f64>,
 
     pub(super) forces: Vector3<f64>,
     pub(super) torques: Vector3<f64>,
@@ -142,6 +145,7 @@ impl RigidBodyData {
             kinetic_coeff: init.kinetic_coeff,
             collider: init.collider,
             restitution: init.restitution,
+            warp_length: init.warp_length,
             
             forces: Vector3::zero(),
             torques: Vector3::zero(),

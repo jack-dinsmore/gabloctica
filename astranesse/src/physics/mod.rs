@@ -8,11 +8,45 @@ pub use collisions::{shapes, Collider, CollisionReport};
 use rustc_hash::FxHashSet;
 use crate::util::Vendor;
 
-pub const NEWTON_G: f64 = 5.;
+pub const NEWTON_G: f64 = 1e-2;
 pub const STEFAN_BOLTZMANN: f64 = 1.;
 pub const PROTON_MASS: f32 = 1.;
-pub const BOLTZMANN: f32 = 0.5;
-const GRAVITY_THRESH: f64 = 10.;
+pub const BOLTZMANN: f32 = 5.;
+const GRAVITY_P: i32 = 20;
+
+fn gravity(x: Vector3<f64>, v: Vector3<f64>, mass: f64, warp_length: f64) -> Vector3<f64> {
+    let r_big = x.magnitude();
+    let e = x / r_big;
+    let ae = Vector3::new(e.x.abs(), e.y.abs(), e.z.abs());
+    let q = (e.x.abs().powi(GRAVITY_P) + e.y.abs().powi(GRAVITY_P) + e.z.abs().powi(GRAVITY_P)).powf(1.0 / GRAVITY_P as f64);
+    let q_fac = q.powi(1 - GRAVITY_P);
+    let grad_pe = Vector3::new(
+        e.x.signum() * ae.x.powi(GRAVITY_P - 1) * q_fac,
+        e.y.signum() * ae.y.powi(GRAVITY_P - 1) * q_fac,
+        e.z.signum() * ae.z.powi(GRAVITY_P - 1) * q_fac,
+    );
+    let u = q - 1.0;
+
+    let s = r_big + u * warp_length;
+    let fv = r_big / s;
+
+    let gamma = -(warp_length / (s * s)) * (grad_pe.dot(v) - (2.0 * q - 1.0) * e.dot(v));
+    let vel = (v - e * (s * gamma)) / fv;
+
+    let a = e.dot(vel);
+    let b = vel.dot(vel);
+    let sig = grad_pe.dot(vel);
+    let weighted = ae.x.powi(GRAVITY_P - 2) * vel.x * vel.x
+        + ae.y.powi(GRAVITY_P - 2) * vel.y * vel.y
+        + ae.z.powi(GRAVITY_P - 2) * vel.z * vel.z;
+    let phi = (GRAVITY_P - 1) as f64 / q * (q.powi(2 - GRAVITY_P) * weighted - sig * sig)
+        - 4.0 * sig * a
+        - q * b
+        + 5.0 * q * a * a
+        + u * (3.0 * a * a - b);
+
+    -e * (mass * NEWTON_G / (s * s)) + (vel * (2.0 * gamma) - e * (warp_length * phi / (s * s)))
+}
 
 pub struct Physics {
     collision_pairs: Vec<(RigidBody, RigidBody)>,
@@ -29,17 +63,28 @@ impl Physics {
         }
     }
 
+    pub fn contacting(&self, a: &RigidBody, b: &RigidBody) -> bool {
+        for (i, j) in &self.collision_pairs {
+            if (i == a && j == b) || (i == b && j == a) {
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn update(&mut self, delta_t: f64) {
         // Gravity
         for (i, planet) in self.rb_vendor.iter().enumerate() {
-            if planet.mass < GRAVITY_THRESH {continue;}
-            for (j, mut part) in &mut self.rb_vendor.iter().enumerate() {
-                if j == i {continue;}
-                if part.mass > GRAVITY_THRESH {continue;}
-                
-                let dist = part.pos - planet.pos;
-                let force = -NEWTON_G * planet.mass * part.mass * dist / dist.magnitude().powi(3);
-                part.add_force(force);
+            if let Some(warp_length) = planet.warp_length {
+                for (j, mut part) in &mut self.rb_vendor.iter().enumerate() {
+                    if j == i {continue;}
+                    if let None = part.warp_length {
+                        let dpos = planet.ori.invert() * (part.pos - planet.pos);
+                        let dvel = planet.ori.invert() * (part.vel - planet.vel);
+                        let force = part.mass * gravity(dpos, dvel, planet.mass, warp_length);
+                        part.add_force(planet.ori * force);
+                    }
+                }
             }
         }
 

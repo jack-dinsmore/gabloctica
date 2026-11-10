@@ -173,20 +173,21 @@ impl LoadedPlanet {
 
 impl Planet {
     pub fn new(graphics: &Graphics, physics: &mut Physics) -> Self {
-        let mass = 1000.;
         let width = 8;
+        let mass = (width*CHUNK_SIZE).pow(3) as f32;
         let real_width = width as f64 * CHUNK_SIZE as f64;
 
         let moi = mass as f64 * real_width.powi(2) / 6.;
         let rb_init = RigidBodyInit {
             mass: mass as f64,
             moi: MoI::new_diagonal(Vector3::new(1., 1., 1.)*moi),
+            warp_length: Some(((width-2)*CHUNK_SIZE) as f64/2.),
             ..Default::default()
         };
         let object = Object::new(graphics, physics, rb_init);
         let concentration = Concentration::new(
             vec![Chemical::air(), Chemical::water()],
-            vec![1.5e11, 0.5e10],
+            vec![1.5e6, 1.3e5],
             real_width as f32,
             (NEWTON_G * mass as f64 / (real_width/2.).powi(2)) as f32
         );
@@ -197,7 +198,7 @@ impl Planet {
             mass,
             to_sun: Vector3::new(1., 0., 0.) * 10000.,
             spin_local: Vector3::new(0., 0., 0.1),
-            sun_flux: 1e12,
+            sun_flux: 1.5e12,
             concentration,
             object,
 
@@ -341,16 +342,16 @@ impl Planet {
         }
         mean_mm /= total_pressure;
         specific_heat /= total_pressure;
-
+        
         let scale_height = BOLTZMANN * equilib_t / (PROTON_MASS * mean_mm * g_accel);
         extinction *= scale_height;
         let eta = (total_pressure * specific_heat / (STEFAN_BOLTZMANN as f32 * equilib_t.powi(3) * (g_accel*scale_height).sqrt())).tanh();
-
+        
         // Work out ocean via Newton's method
         let ocean_alt = {
             let mut alt = 0.;
             for _ in 0..4 {
-                let da = (self.width as f32 / OCEAN_RESOLUTION as f32).powi(2);
+                let da = (self.width as f32 / OCEAN_RESOLUTION as f32 * CHUNK_SIZE as f32).powi(2);
                 let mut volume = 0.;
                 let mut dvolume = 0.;
                 let mut min_alt = 0f32;
@@ -491,6 +492,11 @@ impl Planet {
             Some(l) => Some(l.get_post_params(camera, &self.object.body)),
             None => None
         }
+    }
+    
+    pub(crate) fn get_face_index(&self, pos: Vector3<f64>) -> u8 {
+        let local_pos = self.object.body.ori.invert() * (pos - self.object.body.pos);
+        get_face_index(local_pos.cast().unwrap())
     }
 }
 

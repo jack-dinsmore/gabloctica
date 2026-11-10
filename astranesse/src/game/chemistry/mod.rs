@@ -16,18 +16,18 @@ pub struct Chemical {
 impl Chemical {
     pub fn water() -> Self {
         Self {
-            critical: (1000., 1_000_000.),
-            triple: (100., 10.),
+            critical: (600., 1e3),
+            triple: (270., 1e-1),
             molecular_mass: 18.,
             liquid_density: 1.,
             specific_heat: 0.004,
-            opacity: Vector3::new(0.3, 0.5, 1.) * 2e-5,
+            opacity: Vector3::new(0.3, 0.5, 1.) * 1.,
         }
     }
     pub fn air() -> Self {
         Self {
-            critical: (100., 1_000_000.),
-            triple: (10., 10.),
+            critical: (300., 3e6),
+            triple: (70., 3e1),
             molecular_mass: 18.,
             liquid_density: 1.,
             specific_heat: 0.,
@@ -37,9 +37,9 @@ impl Chemical {
 
     pub fn get_vapor_pressure(&self, temp: f32) -> f32 {
         if temp < self.triple.0 {
-            lerp(temp, 0., self.triple.0, 0., self.triple.1)
+            lerp(temp.ln(), 0., self.triple.0.ln(), 0., self.triple.1.ln()).exp()
         } else {
-            lerp(temp, self.triple.0, self.critical.0, self.triple.1, self.critical.1)
+            lerp(temp.ln(), self.triple.0.ln(), self.critical.0.ln(), self.triple.1.ln(), self.critical.1.ln()).exp()
         }
     }
 }
@@ -91,11 +91,11 @@ impl Concentration {
             if vapor_pressure > *pressure {
                 output.push(State::Gas(*pressure));
             } else {
-                let mass = mass * vapor_pressure / *pressure;
+                let condensed_mass = mass * (1. - vapor_pressure / *pressure);
                 if temp < chemical.triple.0 {
-                    output.push(State::Solid(mass / chemical.liquid_density, vapor_pressure));
+                    output.push(State::Solid(condensed_mass / chemical.liquid_density, vapor_pressure));
                 } else {
-                    output.push(State::Liquid(mass / chemical.liquid_density, vapor_pressure));
+                    output.push(State::Liquid(condensed_mass / chemical.liquid_density, vapor_pressure));
                 }
             }
         }
