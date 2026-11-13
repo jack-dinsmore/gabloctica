@@ -101,7 +101,7 @@ impl Game {
         ];
         let entities = vec![
             // Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(-200., 0., 80.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
-            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 4., 170.), vel: Vector3::new(33., 0., 0.), ..Default::default()}),
+            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(-150., 4., 140.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
         ];
 
         // Set cursor to center of screen

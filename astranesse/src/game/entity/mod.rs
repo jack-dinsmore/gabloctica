@@ -76,7 +76,7 @@ impl Entity {
                 if mag > 0.001 {
                     cross *= mag.min(1.5*delta_t) / mag;
                     let cos = (1. - cross.magnitude2()).sqrt();
-                    self.body.ori = Quaternion::from_sv(1. + cos, cross).normalize() * self.body.ori;
+                    // self.body.ori = Quaternion::from_sv(1. + cos, cross).normalize() * self.body.ori;
                 }
             }
         }

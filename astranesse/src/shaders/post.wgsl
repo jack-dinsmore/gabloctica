@@ -105,10 +105,15 @@ fn fs_main(@builtin(position) pos : vec4<f32>) -> @location(0) vec4<f32> {
         let sun_cube = post.planet_model_inv * lights.pos;
     
         let optical_depth = post.fog.xyz * get_optical_depth(start_cube.xyz, end_cube.xyz);
-        let solar_depth = post.fog.xyz * get_optical_depth(end_cube.xyz, sun_cube.xyz);
+        let optical_depth_exp = exp(-optical_depth);
+        let solar_depth_start = post.fog.xyz * get_optical_depth(start_cube.xyz, sun_cube.xyz);
+        let solar_depth_end = post.fog.xyz * get_optical_depth(end_cube.xyz, sun_cube.xyz);
+        let solar_depth_exp = mix(exp(-solar_depth_end), exp(-solar_depth_start), optical_depth_exp);
+
+        color = vec3(0, 0, 0)/10.;
     
-        color *= exp(-optical_depth);
-        color += 0.079577 * optical_depth * exp(-solar_depth);
+        color *= optical_depth_exp;
+        color += 0.079577 * optical_depth * solar_depth_exp; // TODO
     }
 
     return vec4(color, 1.);
