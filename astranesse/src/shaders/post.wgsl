@@ -88,7 +88,7 @@ fn get_optical_depth(start_cube: vec3<f32>, stop_cube: vec3<f32>) -> vec3<f32> {
     return depth * post.fog.xyz;
 }
 
-fn get_optical_depth_bright(start_cube: vec3<f32>, end_cube: vec3<f32>, sun_cube: vec3<f32>) -> vec3<f32> {
+fn get_sky_color_bright(start_cube: vec3<f32>, end_cube: vec3<f32>, sun_cube: vec3<f32>) -> vec3<f32> {
     let look = end_cube - start_cube;
     let look_length = length(look);
     let alphas = array<f32, 6>(
@@ -111,28 +111,66 @@ fn get_optical_depth_bright(start_cube: vec3<f32>, end_cube: vec3<f32>, sun_cube
         }
         var normal = get_containing_normal(start_cube + look * (start_alpha + stop_alpha) / 2.);
         let sdot = dot(sun_cube, normal);
-        let ldot = dot(look, normal);
-        let adot = dot(start_cube, normal) - 1.;
-        let secant_l = look_length / ldot;
-        let secant_s = 1. / sdot;
+        if sdot > 0. {
+            let ldot = dot(look, normal);
+            let adot = dot(start_cube, normal) - 1.;
+            let secant_l = look_length / ldot;
+            let secant_s = 1. / sdot;
 
-        let a = exp(-(adot + ldot*stop_alpha) / post.fog.w) * secant_s * post.fog.xyz;
-        let b = exp(-(adot + ldot*start_alpha) / post.fog.w) * secant_s * post.fog.xyz;
-        depth += (exp(-a) - exp(-b)) * secant_l / secant_s;
+            let a = exp(-(adot + ldot*stop_alpha) / post.fog.w) * secant_s * post.fog.xyz;
+            let b = exp(-(adot + ldot*start_alpha) / post.fog.w) * secant_s * post.fog.xyz;
+            depth += (exp(-a) - exp(-b)) * secant_l / secant_s;
+        }
 
         if stop_alpha >= 1. {break;}
         start_alpha = stop_alpha;
     }
 
-    return depth;
+    return 0.079577 * depth;
 }
 
-fn get_sky_color(start_space: vec4<f32>, end_space: vec4<f32>, sun_cube: vec3<f32>) -> vec3<f32> {
-    // Get the location at which the sight ray enters a shadow
-    let start_cube = (post.planet_model_inv * (start_space/start_space.w)).xyz;
-    let end_cube = (post.planet_model_inv * (end_space/end_space.w)).xyz;
+fn get_sky_color(start_space: vec3<f32>, end_space: vec3<f32>, sun_cube: vec3<f32>) -> vec3<f32> {
+    // Get the location at which the sight ray enters a shadow. 
+    // var look = end_space - start_space;
+    // let look_length = length(look);
+    // look = normalize(look);
 
-    return 0.079577 * get_optical_depth_bright(start_cube, end_cube, sun_cube);
+    // var started = false;
+    // var color = vec3(0.);
+    // var start_cube = vec3(0.);
+    // for (var step=0.; step <= look_length; step += 32.) { // March over the shadow texture
+    //     let point_space = vec4(start_space + look * step, 1.);
+
+    //     var shadow_pos = camera.shadow_proj * point_space;
+    //     shadow_pos /= shadow_pos.w;
+    //     shadow_pos.x = shadow_map(shadow_pos.x);
+    //     shadow_pos.y = -shadow_map(shadow_pos.y);
+    //     let shadow = textureSampleCompare(t_shadow, s_shadow, shadow_pos.xy * 0.5 + 0.5, shadow_pos.z - 0.00005);
+        
+    //     if shadow < 0.5 && started {
+    //         // In shadow
+    //         let end_cube = (post.planet_model_inv * point_space).xyz;
+    //         color += get_sky_color_bright(start_cube, end_cube, sun_cube);
+    //         started = false;
+    //     }
+    //     if shadow > 0.5 && !started {
+    //         // In sun
+    //         start_cube = (post.planet_model_inv * point_space).xyz;
+    //         started = true;
+    //     }
+    // }
+    // if started {
+    //     let end_cube = (post.planet_model_inv * vec4(end_space, 1.)).xyz;
+    //     color += get_sky_color_bright(start_cube, end_cube, sun_cube);
+    // }
+
+    // return color;
+
+    return get_sky_color_bright(
+        (post.planet_model_inv * vec4(start_space, 1.)).xyz,
+        (post.planet_model_inv * vec4(end_space, 1.)).xyz,
+        sun_cube
+    );
 }
 
 @fragment
@@ -152,15 +190,16 @@ fn fs_main(@builtin(position) pos : vec4<f32>) -> @location(0) vec4<f32> {
     depth /= f32(count);
 
     if post.fog.w > 0. {
-        let end_space = camera.view_proj_inv * vec4(2. * uv.x - 1., 1. - 2*uv.y, depth, 1.);
+        var end_space = camera.view_proj_inv * vec4(2. * uv.x - 1., 1. - 2*uv.y, depth, 1.);
+        end_space /= end_space.w;
         let start_space =  vec4(0., 0., 0., 1.);
-        let end_cube = post.planet_model_inv * (end_space / end_space.w);
+
+        let end_cube = post.planet_model_inv * end_space;
         let start_cube = post.planet_model_inv * start_space;
         let sun_cube = normalize((post.planet_model_inv * lights.pos).xyz);
 
-    
         let optical_depth = get_optical_depth(start_cube.xyz, end_cube.xyz);
-        let sky_color = get_sky_color(start_space, end_space, sun_cube);
+        let sky_color = get_sky_color(start_space.xyz, end_space.xyz, sun_cube);
 
         color *= exp(-optical_depth);
         color += sky_color;

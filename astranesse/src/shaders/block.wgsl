@@ -102,7 +102,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     var illum = shadow * dot(in.normal.xyz, to_light);
 
-    illum = max(illum, 0.1);
+    illum = max(illum, 0.05);
 
     color.x *= illum;
     color.y *= illum;
