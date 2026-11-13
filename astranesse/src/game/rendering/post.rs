@@ -1,5 +1,5 @@
 use crate::game::object::Planet;
-use crate::graphics::{Camera, Graphics, Lighting, NEAR_DISTANCE, PostRenderer, PostVertex, RENDER_DISTANCE, RenderTarget, Renderer, ResourceType, Shader};
+use crate::graphics::{Camera, Graphics, GridTexture, Lighting, NEAR_DISTANCE, PostRenderer, PostVertex, RENDER_DISTANCE, RenderTarget, Renderer, ResourceType, Shader};
 use crate::graphics::{UniformBuffer, Uniform};
 
 #[repr(C)]
@@ -27,6 +27,7 @@ impl PostProcessor {
             ResourceType::Post,
             ResourceType::Camera,
             ResourceType::Lighting,
+            ResourceType::Texture,
         ], RenderTarget::Screen);
 
         let size = graphics.window.inner_size();
@@ -63,11 +64,12 @@ impl PostProcessor {
         self.buffer.write(graphics, self.uniform);
     }
 
-    pub fn render(&self, renderer: &mut Renderer, camera: &Camera, lighting: &Lighting) {
+    pub fn render(&self, renderer: &mut Renderer, camera: &Camera, lighting: &Lighting, texture: &GridTexture) {
         renderer.start_post();
         self.shader.bind(renderer);
         camera.bind(renderer);
         lighting.bind(renderer);
+        texture.bind(renderer, 1);
         self.post.bind(renderer);
         renderer.stop_post();
     }

@@ -101,7 +101,7 @@ impl Game {
         ];
         let entities = vec![
             // Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(-200., 0., 80.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
-            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(-150., 4., 140.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
+            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 4., 140.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
         ];
 
         // Set cursor to center of screen
@@ -418,6 +418,7 @@ impl Game {
                 self.block_shader.bind(&mut renderer);
                 self.camera.bind(&mut renderer);
                 self.lighting.bind(&mut renderer);
+                // TODO optimize move the texture binding outside 
                 for planet in &self.planets {
                     planet.object.draw(&mut renderer, &self.block_properties.get_texture())
                 }
@@ -426,7 +427,7 @@ impl Game {
                 }
 
                 // Post
-                self.post_processor.render(&mut renderer, &self.camera, &self.lighting);
+                self.post_processor.render(&mut renderer, &self.camera, &self.lighting, &self.block_properties.get_texture());
                 
                 // Draw text
                 self.font.render(&mut renderer, &self.camera, &self.lighting);

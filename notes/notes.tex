@@ -78,7 +78,7 @@
         \tau = |\ell| E_0 \sum_i \int_{\alpha_i}^{\alpha_{i+1}}d\alpha\, e^{-h_i(\alpha) / H}.
       \end{equation}
 
-      If the chunk is over a face with normal vector $\unit n$, then the height is $(\bm a + \alpha \bm \ell) \cdot \unit n - w$ where $w$ is the cube half-width and $\bm a$ is the ray's starting position. The integral of the summand is then
+      If the chunk is over a face with normal vector $\unit n$, then the height is $(\bm a + \alpha \bm \ell) \cdot \unit n - w$ where $w$ is the cube half-width and $\bm a$ is the ray's starting position. The integral of a single term is
       \begin{equation}
         \tau_i = E_0H\frac{\ell}{\bm \ell \cdot \unit n_i} e^{-(\bm a \cdot \unit n_i - w_i) / H} \parens{e^{-\bm\ell \cdot \unit n_i \alpha_{i} / H} - e^{-\unit\ell \cdot \unit n_i \alpha_{i+1} / H}}.
       \end{equation}
@@ -91,9 +91,12 @@
       \begin{equation}
         I = \int_0^\infty d\Omega_{\unit t} d\ell \frac{E(\ell)}{4\pi} \rho(\bm x, \unit t).
       \end{equation}
-      What is the radiation density though? If optical depth is small, $\rho(\bm x, \unit t)=0$ except along the axis to the sun $\unit s$. Specifically, $\rho(\bm x, \unit t) = I_0 e^{-\tau_0}\delta(\unit t - \unit s)$ where $I_0$ is the illumination of the sun, which sets the color of each block. If we're on a very large face, then $\tau_\odot$ is a constant and
+      What is the radiation density though? If optical depth is small, $\rho(\bm x, \unit t)=0$ except along the axis to the sun $\unit s$. Specifically, $\rho(\bm x, \unit t) = I_0 e^{-\tau_0}\delta(\unit t - \unit s)$ where $I_0$ is the illumination of the sun, which sets the color of each block. I computed this integral for the case where the sun extends only over one face:
       \begin{equation}
-        I/I_0 = \frac{1}{4\pi}\tau e^{-\tau_\odot}.
+        I/I_0 = \frac{1}{4\pi} \frac{\bm s \cdot \unit n |\bm \ell|}{\bm \ell \cdot \unit n |\bm s|} \brackets{
+          \exp\parens{e^{-((\bm a + \alpha_{i+1} \bm \ell) \cdot \bm n-w_i)/H} \frac{|\bm s|}{\bm s\cdot \unit n_i}E_0 H}
+          -\exp\parens{e^{-((\bm a + \alpha_i \bm \ell) \cdot \bm n-w_i)/H} \frac{|\bm s|}{\bm s\cdot \unit n_i}E_0 H}
+        }
       \end{equation}
 
 
