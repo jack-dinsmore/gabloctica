@@ -1,10 +1,11 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use cgmath::{InnerSpace, Vector3};
 use image::{ImageBuffer, Rgba};
 use noise::{NoiseFn, Perlin};
 use rand::{Rng, RngExt};
 use rand_distr::StandardNormal;
+use rustc_hash::FxHashMap;
 
 use crate::{game::object::{BlockId, BlockProperties, chunk::{PhysicalBlock, PhysicalChunk}}, util::{CHUNK_SIZE, KMeans, Ori, SphericalInterpolator, hsl_to_rgb}};
 
@@ -19,10 +20,10 @@ impl Structure {
         }
     }
 
-    pub fn new_tree(id: BlockId, rng: &mut impl Rng) -> Self {
-        fn get_acceptable(blocks: &HashSet<((i32, i32, i32), Ori, BlockId)>, new_pos: (i32, i32, i32)) -> bool {
+    pub fn new_tree(trunk: BlockId, leaf: BlockId, rng: &mut impl Rng) -> Self {
+        fn get_acceptable(trunks: &FxHashMap<(i32, i32, i32), Ori>, new_pos: (i32, i32, i32)) -> bool {
             let mut min_dist2 = i32::MAX;
-            for (pos, _, _) in blocks {
+            for pos in trunks.keys() {
                 if new_pos.2 > pos.2 {continue;}
                 let dist2 = ((pos.0 - new_pos.0) as i32).pow(2) + ((pos.1 - new_pos.1) as i32).pow(2) + ((pos.2 - new_pos.2) as i32).pow(2);
                 min_dist2 = min_dist2.min(dist2);
@@ -30,11 +31,11 @@ impl Structure {
             min_dist2 > 2
         }
 
-        let mut blocks = HashSet::new();
+        let mut trunks = FxHashMap::default();
         let mut queue = vec![(0, 0, 0)];
         let ori = Ori::identity();
         while let Some(pos) = queue.pop() {
-            blocks.insert((pos, ori, id));
+            trunks.insert(pos, ori);
 
             // Rotate
             let rotate_prob = if pos.2 < 4 { 0.1 } else { 0.3 };
@@ -49,7 +50,7 @@ impl Structure {
                         3 => (pos.0, pos.1 - 1, pos.2),
                         _ => unreachable!()
                     };
-                    if get_acceptable(&blocks, new_pos) {
+                    if get_acceptable(&trunks, new_pos) {
                         queue.push(new_pos);
                         success = true;
                         break;
@@ -84,16 +85,56 @@ impl Structure {
             }
 
             // Grow
-            if get_acceptable(&blocks, (pos.0, pos.1, pos.2 + 1)){
+            if get_acceptable(&trunks, (pos.0, pos.1, pos.2 + 1)){
                 queue.push((pos.0, pos.1, pos.2 + 1));
             }
         }
 
+        let mut leaves = FxHashMap::default();
+        for pos in trunks.keys() {
+            if pos.2 <= 2 { continue }
+            if !trunks.contains_key(&(pos.0+1, pos.1, pos.2)  )   { leaves.insert((pos.0+1, pos.1, pos.2  ), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0-1, pos.1, pos.2)  )   { leaves.insert((pos.0-1, pos.1, pos.2  ), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0, pos.1+1, pos.2)  )   { leaves.insert((pos.0, pos.1+1, pos.2  ), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0, pos.1-1, pos.2)  )   { leaves.insert((pos.0, pos.1-1, pos.2  ), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0, pos.1, pos.2+1)  )   { leaves.insert((pos.0, pos.1, pos.2+1  ), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0, pos.1, pos.2-1)  )   { leaves.insert((pos.0, pos.1, pos.2-1  ), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0+1, pos.1+1, pos.2))   { leaves.insert((pos.0+1, pos.1+1, pos.2), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0+1, pos.1-1, pos.2))   { leaves.insert((pos.0+1, pos.1-1, pos.2), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0-1, pos.1+1, pos.2))   { leaves.insert((pos.0-1, pos.1+1, pos.2), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0-1, pos.1-1, pos.2))   { leaves.insert((pos.0-1, pos.1-1, pos.2), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0+1, pos.1, pos.2+1))   { leaves.insert((pos.0+1, pos.1, pos.2+1), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0-1, pos.1, pos.2+1))   { leaves.insert((pos.0-1, pos.1, pos.2+1), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0-1, pos.1, pos.2-1))   { leaves.insert((pos.0-1, pos.1, pos.2-1), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0+1, pos.1, pos.2-1))   { leaves.insert((pos.0+1, pos.1, pos.2-1), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0, pos.1+1, pos.2+1))   { leaves.insert((pos.0, pos.1+1, pos.2+1), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0, pos.1-1, pos.2+1))   { leaves.insert((pos.0, pos.1-1, pos.2+1), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0, pos.1-1, pos.2-1))   { leaves.insert((pos.0, pos.1-1, pos.2-1), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0, pos.1+1, pos.2-1))   { leaves.insert((pos.0, pos.1+1, pos.2-1), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0+1, pos.1+1, pos.2+1)) { leaves.insert((pos.0+1, pos.1+1, pos.2+1), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0-1, pos.1+1, pos.2+1)) { leaves.insert((pos.0-1, pos.1+1, pos.2+1), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0+1, pos.1-1, pos.2+1)) { leaves.insert((pos.0+1, pos.1-1, pos.2+1), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0+1, pos.1+1, pos.2-1)) { leaves.insert((pos.0+1, pos.1+1, pos.2-1), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0-1, pos.1-1, pos.2+1)) { leaves.insert((pos.0-1, pos.1-1, pos.2+1), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0-1, pos.1+1, pos.2-1)) { leaves.insert((pos.0-1, pos.1+1, pos.2-1), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0+1, pos.1-1, pos.2-1)) { leaves.insert((pos.0+1, pos.1-1, pos.2-1), Ori::identity()); }
+            if !trunks.contains_key(&(pos.0-1, pos.1-1, pos.2-1)) { leaves.insert((pos.0-1, pos.1-1, pos.2-1), Ori::identity()); }
+        }
+
+        let mut blocks = Vec::new();
+        for (pos, ori) in trunks.iter() {
+            blocks.push((*pos, *ori, trunk));
+        }
+        for (pos, ori) in leaves.iter() {
+            blocks.push((*pos, *ori, leaf));
+        }
+
         Self {
-            blocks: blocks.into_iter().collect()
+            blocks
         }
     }
 
+    /// Place a structure in the cube
     pub fn place(&self, chunk: &mut PhysicalChunk, (u, v, w): (i32, i32, i32), global_ori: Ori) {
         for ((du, dv, dw), ori, id) in &self.blocks {
             let (du, dv, dw) = global_ori.rotate_integer(*du, *dv, *dw);
@@ -153,7 +194,7 @@ impl BlockSelector {
 
         let mut structures = Vec::new();
         for _ in 0..4 {
-            structures.push(Structure::new_tree(block_ids[0], rng));
+            structures.push(Structure::new_tree(block_ids[0],block_ids[1], rng));
         }
 
         Self {

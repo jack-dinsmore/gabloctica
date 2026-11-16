@@ -57,7 +57,7 @@ impl<const C: usize> KMeans<C> {
                 }
             }
         }
-        
+
         Self {
             n,
             centroids

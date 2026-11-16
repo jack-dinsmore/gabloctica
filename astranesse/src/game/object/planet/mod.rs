@@ -462,7 +462,7 @@ impl Planet {
             },
         };
 
-        let selector = BlockSelector::new(properties, &alt_interp, &temp_interp, &humidity_interp, &mut rng);
+        let selector = BlockSelector::new(properties, &alt_interp, &humidity_interp, &temp_interp, &mut rng);
 
         self.loaded = Some(LoadedPlanet {
             alt_interp,
