@@ -93,7 +93,7 @@ impl Default for RigidBodyInit {
             pos: Vector3::zero(),
             com_pos: Vector3::zero(),
             vel: Vector3::zero(),
-            ori: Quaternion::new(0., 0., 0., 1.),
+            ori: Quaternion::new(0., 0., 1e-5, 1.),
             ang_vel: Vector3::zero(),
             mass: 1.,
             static_coeff: 0.5,

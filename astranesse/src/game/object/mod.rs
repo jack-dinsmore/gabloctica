@@ -130,6 +130,13 @@ impl Object {
 
     /// Update the model buffers and rigid body. If only some chunks were changed, pass a vector of chunk positions. Otherwise, pass an empty vector. This will update the passed chunks, and neighbors if the neighbors now become visible.
     fn recalc_rigid_body(&mut self) {
+        if self.physical_chunks.len() == 0 {
+            self.body.mass = 1.;
+            self.body.com_pos = Vector3::new(0., 0., 0.);
+            self.body.moi = MoI::Diagonal { moi: Vector3::new(1., 1., 1.) };
+            return;
+        }
+
         let mut mass_m0 = 0.;
         let mut mass_m1 = Vector3::zero();
         let mut mass_m2 = Matrix3::zero();

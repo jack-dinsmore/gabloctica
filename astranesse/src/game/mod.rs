@@ -97,11 +97,12 @@ impl Game {
             Planet::new(&graphics, &mut physics),
         ];
         let ships = vec![
-            // Ship::new(&graphics, &mut physics, RigidBodyInit { pos: Vector3::new(12., 5., 140.), vel: Vector3::new(0., 0., 0.), ..Default::default() }),
+            // Ship::new(&graphics, &mut physics, RigidBodyInit { pos: Vector3::new(12., 3., 133.), vel: Vector3::new(0., 0., 0.), ..Default::default() }),
+            // Ship::new(&graphics, &mut physics, RigidBodyInit { pos: Vector3::new(12., 13., 133.), vel: Vector3::new(0., -3., 0.), ..Default::default() }),
         ];
         let entities = vec![
             // Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(-200., 0., 80.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
-            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 4., 140.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
+            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 140.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
         ];
 
         // Set cursor to center of screen
@@ -363,7 +364,6 @@ impl Game {
         }
         
         self.physics.update(delta_t);
-
         self.fps_counter.update(delta_t);
     }
 

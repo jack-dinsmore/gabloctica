@@ -19,19 +19,22 @@ fn get_sepn(a: &[f64], b: &[f64]) -> Option<f64> {
         min_b = min_b.min(*el);
         max_b = max_b.max(*el);
     }
-    if min_a < min_b && max_a > min_b { // c P
-        return Some(max_a - min_b);
+    let sepn = if min_a < min_b && max_a > min_b { // c P
+        max_a - min_b
+    } else if max_a <= max_b && min_a >= min_b {// c D
+        (max_a - min_b).abs().min((min_a - max_b).abs())
+    } else if min_b < min_a && max_b > min_a {
+        max_b - min_a
+    } else if max_b <= max_a && min_b >= min_a {
+        (max_b - min_a).abs().min((min_b - max_a).abs())
+    } else {
+        -1.
+    };
+    if sepn >= 0. {
+        Some(sepn)
+    } else {
+        None
     }
-    if max_a <= max_b && min_a >= min_b {// c D
-        return Some((max_a - min_b).abs().min((min_a - max_b).abs()))
-    }
-    if min_b < min_a && max_b > min_a {
-        return Some(max_b - min_a);
-    }
-    if max_b <= max_a && min_b >= min_a {
-        return Some((max_b - min_a).abs().min((min_b - max_a).abs()))
-    }
-    None
 }
 
 /// Return the normals of a cube with a given orientation
@@ -113,12 +116,6 @@ impl ColliderType {
                 let a_normals = get_normals(a.ori);
                 let b_normals = get_normals(b.ori);
                 let sepaxes = [
-                    a_normals[0],
-                    a_normals[1],
-                    a_normals[2],
-                    b_normals[0],
-                    b_normals[1],
-                    b_normals[2],
                     a_normals[0].cross(b_normals[0]).normalize(),
                     a_normals[0].cross(b_normals[1]).normalize(),
                     a_normals[0].cross(b_normals[2]).normalize(),
@@ -128,6 +125,12 @@ impl ColliderType {
                     a_normals[2].cross(b_normals[0]).normalize(),
                     a_normals[2].cross(b_normals[1]).normalize(),
                     a_normals[2].cross(b_normals[2]).normalize(),
+                    a_normals[0],
+                    a_normals[1],
+                    a_normals[2],
+                    b_normals[0],
+                    b_normals[1],
+                    b_normals[2],
                 ];
 
                 let mut best_sepax_index = 0;
@@ -138,7 +141,7 @@ impl ColliderType {
                     let dots_b = get_dots(&b_normals, *sepax, *b_edges, b_global_center);
                     match get_sepn(&dots_a, &dots_b) {
                         Some(sepn) => {
-                            if sepn < best_sepn {
+                            if sepn <= best_sepn {
                                 best_sepn = sepn;
                                 best_sepax_index = i;
                             }
@@ -150,7 +153,49 @@ impl ColliderType {
                 }
                 // A collision occurred with normal "best_sepax"
 
-                let global_pos = if best_sepax_index < 6 {
+                let global_pos = if best_sepax_index < 9 {
+                    // Edge collision
+                    let (a_mid, a_n) = match best_sepax_index {
+                        0|1|2 => (
+                            a_global_center + (a_normals[1]*a_edges.y + a_normals[2]*a_edges.z) * 0.5,
+                            a_normals[0],
+                        ), 3|4|5 => (
+                            a_global_center + (a_normals[0]*a_edges.x + a_normals[2]*a_edges.z) * 0.5,
+                            a_normals[1],
+                        ), 6|7|8 => (
+                            a_global_center + (a_normals[0]*a_edges.x + a_normals[1]*a_edges.y) * 0.5,
+                            a_normals[2],
+                        ), _ => unreachable!()
+                    };
+                    let (b_mid, b_n) = match best_sepax_index {
+                        0|3|6 => (
+                            b_global_center + (b_normals[1]*b_edges.y + b_normals[2]*b_edges.z) * 0.5,
+                            b_normals[0],
+                        ), 1|4|7 => (
+                            b_global_center + (b_normals[0]*b_edges.x + b_normals[2]*b_edges.z) * 0.5,
+                            b_normals[1],
+                        ), 2|5|8 => (
+                            b_global_center + (b_normals[0]*b_edges.x + b_normals[1]*b_edges.y) * 0.5,
+                            a_normals[2],
+                        ), _ => unreachable!()
+                    };
+                    let r = a_mid - b_mid;
+                    let a = a_n.dot(a_n);   // = 1 if a_n unit
+                    let b = a_n.dot(b_n);
+                    let c = b_n.dot(b_n);   // = 1 if b_n unit
+                    let d = a_n.dot(r);
+                    let e = b_n.dot(r);
+                    let denom = a * c - b * b;
+
+                    let s = if denom.abs() < 1e-9 {
+                        // parallel edges: pick s = 0, solve t
+                        0.0
+                    } else {
+                        (b * e - c * d) / denom
+                    };
+
+                    a_mid + a_n * s
+                } else {
                     // Vertex collision
                     let mut pos = Vector3::zero();
                     let mut n = 0;
@@ -172,48 +217,6 @@ impl ColliderType {
                     } else {
                         pos / n as f64
                     }
-                } else {
-                    // Vertex collision
-                    let (a_mid, a_n) = match best_sepax_index {
-                        6|7|8 => (
-                            a_global_center + (a_normals[1]*a_edges.y + a_normals[2]*a_edges.z) * 0.5,
-                            a_normals[0],
-                        ), 9|10|11 => (
-                            a_global_center + (a_normals[0]*a_edges.x + a_normals[2]*a_edges.z) * 0.5,
-                            a_normals[1],
-                        ), 12|13|14 => (
-                            a_global_center + (a_normals[0]*a_edges.x + a_normals[1]*a_edges.y) * 0.5,
-                            a_normals[2],
-                        ), _ => unreachable!()
-                    };
-                    let (b_mid, b_n) = match best_sepax_index {
-                        6|9|12 => (
-                            b_global_center + (b_normals[1]*b_edges.y + b_normals[2]*b_edges.z) * 0.5,
-                            b_normals[0],
-                        ), 7|10|13 => (
-                            b_global_center + (b_normals[0]*b_edges.x + b_normals[2]*b_edges.z) * 0.5,
-                            b_normals[1],
-                        ), 8|11|14 => (
-                            b_global_center + (b_normals[0]*b_edges.x + b_normals[1]*b_edges.y) * 0.5,
-                            a_normals[2],
-                        ), _ => unreachable!()
-                    };
-                    let r = a_mid - b_mid;
-                    let a = a_n.dot(a_n);   // = 1 if a_n unit
-                    let b = a_n.dot(b_n);
-                    let c = b_n.dot(b_n);   // = 1 if b_n unit
-                    let d = a_n.dot(r);
-                    let e = b_n.dot(r);
-                    let denom = a * c - b * b;
-
-                    let s = if denom.abs() < 1e-9 {
-                        // parallel edges: pick s = 0, solve t
-                        0.0
-                    } else {
-                        (b * e - c * d) / denom
-                    };
-
-                    a_mid + a_n * s
                 };
                 let p1_global = global_pos - a.pos;
                 let p2_global = global_pos - b.pos;

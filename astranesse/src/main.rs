@@ -52,6 +52,9 @@ impl ApplicationHandler<Graphics> for Initializer {
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
         if let Self::Ready(game, last_time) = self {
             if let WindowEvent::RedrawRequested = event {
+                while last_time.elapsed().as_millis() < 10 {
+                    continue;
+                }
                 game.update(last_time.elapsed().as_secs_f64());
                 *last_time = Instant::now();
                 game.draw()

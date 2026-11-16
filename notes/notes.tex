@@ -104,29 +104,50 @@
 
     I need to make gravity point normal to the planet at the face of the planet. This can be done by warping space according to a metric such that the unit sphere gets mapped to a cube, but points at infinity are fixed. Then I just map gravitational forces using this metric. One example map is
     \begin{equation}
-      \bm x \rightarrow \bm x' = \bm x f(\bm x),\qquad f(\bm x) = 1 + \frac{H}{x} \brackets{\frac{P(\bm x)}{x} - 1}
+      \bm x \rightarrow \bm x' = \bm x f(\bm x),\qquad f(\bm x) = 1 - \frac{H}{x} \brackets{\frac{P(\bm x)}{x} - 1}
     \end{equation}
-    where $H$ is the radius of the sphere that gets mapped to the cube, $P(\bm x) = \parens{\sum_i x_i^p}^{1/p}$, and $p$ controls the corner softness ($p\rightarrow \infty$ is sharp). What is the metric? The Jacobian is $J_{ij} = \partial_i x_j = \delta_{ij}f + x_i \partial_jf$, and according to Claude the metric is $f=J^{T} J$. Thus,
-    \begin{equation}
-      g_{ij} = f^2 \delta_{ij} + f (x_i \partial_j + x_j \partial_i)f + x^2 \partial_i \partial_j f.
-    \end{equation}
-    The Christoffel symbols satisfy 
-    \begin{equation}
-      \Gamma^i_{kl} = \frac{1}{2} g^{im}\parens{g_{mk,l} + g_{ml,k} - g_{kl,m}}.
-    \end{equation}
-    Plugging these into the equations of motion, one gets that $\ddot x'_i = \ddot x_j + \Gamma^i_{jk} \dot x_j \dot x_k$. Claude handled this for me so that it's completely a function of $x'$. The result is
-    \begin{align}
-    \ddot {\bm x'} &= -\frac{GM\,\bm x}{r^3}
-    + \frac{2H\,(\mathbf{u}\cdot\dot{\bm x'})}{r^2 D}\,\dot{\bm x'}
-    + \frac{H}{r^2 D^2}\brackets{w_{ij}\,\dot x'_i\,\dot x'_j + \frac{2H}{r^2}\,(\mathbf{u}\cdot\dot{\bm x'})^2}\bm x, \\
-    \bm x &= \mathbf{x'} \brackets{1 - \frac{H}{|\mathbf{x'}|}\parens{\frac{P(\mathbf{x'})}{|\mathbf{x'}|} - 1}}, \\
-    r &= |\bm x| = |\bm x'| - H\parens{\frac{P(\bm x')}{|\bm x'|} - 1}\\
-    P &= \parens{|x_1|^p + |x_2|^p + |x_3|^p}^{1/p}\\
-    D &= r^2 + H(P - r), \\
-    u_i &= r^2 P^{1-p}\,x_i|x_i|^{p-2} + (r - 2P)\,x_i, \\
-    w_{ij} &= (p-1)\,r^4 P^{1-p}\parens{|x_i|^{p-2}\,\delta_{ij} - P^{-p}\,x_i x_j\,|x_i|^{p-2}|x_j|^{p-2}}.
-    \end{align}
+    where $H$ is the radius of the sphere that gets mapped to the cube, $P(\bm x) = \parens{\sum_i x_i^p}^{1/p}$, and $p$ controls the corner softness ($p\rightarrow \infty$ is sharp). The procedure is to interpret $f$ as a metric and use differential geometry to calculate the fictitious force caused by the metric.
 
-    Now I take $D \rightarrow D/r^2$.
+    \section{Physics}
+
+    \subsection{Normal forces}
+    The condition at a collision is that the normal component of relative velocity is sent from $v_\perp$ to $-v_\perp \epsilon$. This involves adding an impulse $j \unit n$, where $\unit n$ is the normal vector. If there are also forces applied to the object, then it's also required that the normal component of the velocity remains unchanged. So I'll write the total impulse as $j + \alpha \delta$, in a frame of timespan $\delta$.
+
+    The velocity of a point at local position $\bm p$ is
+    \begin{equation}
+      \dot {\bm x} = \dot {\bm r} + R[\bm \omega \times \bm p].
+    \end{equation}
+    After the impulse is applied, $\dot {\bm r} \rightarrow \dot {\bm r} + [(j + \delta \alpha) \unit n + \delta \bm F]/m$ where $\delta$ is the time delay of the frame. Also, $\bm \omega \rightarrow \bm \omega + I^{-1} [\bm p \times (j + \delta \alpha) \unit n + \delta \bm \tau]$, if the self-torque has already been incorporated in $\tau$. Thus, the velocity at one point goes to
+    \begin{equation}
+      \bm v + R[\bm \omega \times \bm p] + [(j + \delta \alpha) \unit n + \delta \bm F]/m + R (I^{-1} [\bm p \times (j + \delta \alpha) \unit np + \delta \bm \tau] \times \bm p).
+    \end{equation}
+    Breaking this down by $\delta$,
+    \begin{equation}
+      \begin{aligned}
+        &\bm v + R[\bm \omega \times \bm p] + [j \unit n]/m + R (I^{-1} [\bm p \times j \unit n] \times \bm p)\\
+        +& \delta \parens{[\alpha \unit n + \bm F]/m + R (I^{-1} [\bm p \times \alpha \unit n +  \bm \tau] \times \bm p)}.
+      \end{aligned}
+    \end{equation}
+
+    If there are multiple objects in contact, then multiple impulses are applied on each object. Define $c$ to index over collision points, and each point involves collisions between objects $i_c$ and $j_c$. The normal vector $\unit n_c$ points from $i_c$ into $j_c$. Now define these variables:
+    \begin{align}
+      A_{i_c} &= \unit n_c \cdot \parens{\bm v_i + R_i \bm \omega_i \times \bm p_{i_c}}\\
+      B_{i_c} &= \unit n_c \cdot \parens{\bm F_i/m_i + R_i [(I_i^{-1} \bm \tau_i) \times \bm p_{i_c}]}\\
+      M_{i_c,c'} &= \unit n_c \cdot \parens{\unit n_{c'}/m_i + R_i [I_i^{-1} ( \bm p_{i_{c'}} \times \unit n_{c'})] \times \bm p_{i_c}}.
+    \end{align}
+    It's not great notation, but I'm using $i$ to describe properties which are generic to the object (orientation, mass, etc.), and $i_c$ for properties of the object and the collision point, like $\bm p_{i_c}$. Note that this turns the previous equation into $[A_{i_c} + j_c M_{i_c,c}] + \delta[B_{i_c} + \alpha_c M_{i_c,c}]$. But now we can handle when multiple collisions; the simultaneous equations are
+    \begin{align}
+      (A_{i_c}-A_{j_c}) + \sum_{c'}j_{c'}(M_{i_c,c'}-M_{j_c,c'}) &= -\epsilon (A_{i_c}-A_{j_c})\\
+      (B_{i_c}-B_{j_c}) + \sum_{c'}\alpha_{c'}(M_{i_c,c'}-M_{j_c,c'}) &= 0.
+    \end{align}
+    So, if I define the hypervectors $\bm j$, $\bm \alpha$, $\bm A$, and $\bm B$, then I could also define matrix $M$ to be the parenthetical terms above, I get
+    \begin{align}
+      [1+\epsilon]\bm A + M \bm j &= 0\\
+      \bm B + M \bm \alpha &= 0
+    \end{align}
+    or $\bm j = -M^{-1} (1+\epsilon) \bm A$ and $\bm \alpha = -M^{-1} \bm B$. It might be even better to write it as one matrix equation $Z = [-(1+\epsilon) \bm A | -\bm B]$, so that $[\bm j | \bm \alpha] = M^{-1} Z$. That way I can use the nice matrix inversion tricks.
+
+    \subsection{Friction}
+    Now that I know normal forces $[j_c/\delta + \alpha_c]\unit n_c$, I can assign friction force of magnitude $\bm F = \mu [j_c / \delta + \alpha_c]$. I'm not completely sure, but I think I should be including the collision impulse in this equation. Now the direction is computed by getting the tangential component of the relative velocity $\bm v_\mathrm{rel}$. Subtracting off the normal component, $\bm v_{\mathrm{rel},\parallel} = \bm v_\mathrm{rel} - \unit n (\bm v_\mathrm{rel} \cdot \unit n)$. And I need to normalize it before applying the force.
 
 \end{document}

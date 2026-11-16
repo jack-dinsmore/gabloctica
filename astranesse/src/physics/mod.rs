@@ -91,32 +91,11 @@ impl Physics {
         // Collisions
         self.collision_pairs.clear();
         self.collision_reports.clear();
-        for (i, mut a) in self.rb_vendor.iter().enumerate() {
-            for (j, mut  b) in self.rb_vendor.iter().enumerate() {
+        for (i, a) in self.rb_vendor.iter().enumerate() {
+            for (j,  b) in self.rb_vendor.iter().enumerate() {
                 if j >= i {break;}
                 let report = Collider::check_collision(&a, &b);
-                if let CollisionReport::Some { normal, depth, p1, p2 } = report {
-                    let normal1 = a.ori.invert() * normal;
-                    let normal2 = b.ori.invert() * normal;
-                    let denom = 
-                        1. / a.mass +
-                        1. / b.mass + 
-                        a.moi.mul_inv(p1.cross(normal1)).cross(p1).dot(normal1) + 
-                        b.moi.mul_inv(p2.cross(normal2)).cross(p2).dot(normal2)
-                    ;
-                    let rel_vel = (a.vel + a.ori*a.ang_vel.cross(p1)) - (b.vel + b.ori*b.ang_vel.cross(p2));
-                    let restitution = (a.restitution * b.restitution).sqrt();
-                    let kinetic_coeff = (a.kinetic_coeff * b.kinetic_coeff).sqrt();
-                    let force = (1. + restitution) * rel_vel.dot(normal) / denom / delta_t;
-                    a.add_force(-force * normal);
-                    b.add_force(force * normal);
-                    a.add_torque(-p1.cross(normal1) * force);
-                    b.add_torque(p2.cross(normal2) * force);
-
-                    let a_mass_frac = a.mass / (a.mass + b.mass);
-                    a.pos -= normal*depth * (1. - a_mass_frac);
-                    b.pos += normal*depth * a_mass_frac;
-
+                if report.is_some() {
                     self.collision_pairs.push((a.clone(), b.clone()));
                     self.collision_reports.push(report);
                 }
@@ -128,15 +107,24 @@ impl Physics {
             let torque = body.moi.get_self_torque(body.ang_vel);
             body.add_torque(torque);
         }
-        self.resolve_normal_forces();
+        self.resolve_normal_forces(delta_t);
 
         // Force updates
         for mut body in self.rb_vendor.iter() {
             body.update(delta_t);
         }
+
+        // Collision offsets
+        for ((a, b), report) in self.collision_pairs.iter_mut().zip(&self.collision_reports) {
+            if let CollisionReport::Some { normal, depth, p1, p2 } = report {
+                let a_mass_frac = a.mass / (a.mass + b.mass);
+                a.pos -= normal* *depth * (1. - a_mass_frac);
+                b.pos += normal* *depth * a_mass_frac;
+            }
+        }
     }
 
-    pub fn resolve_normal_forces(&mut self) {
+    pub fn resolve_normal_forces(&mut self, delta_t: f64) {
         if self.collision_reports.is_empty() {return;}
 
         let mut collision_bodies: Vec<FxHashSet<RigidBody>> = Vec::new();
@@ -146,13 +134,6 @@ impl Physics {
                 CollisionReport::None => unreachable!(),
                 CollisionReport::Some { normal, p1, p2, .. } => (normal, p1, p2),
             };
-            let mut rel_accel = Vector3::new(0., 0., 0.);
-            rel_accel -= (i.forces + i.ori * (i.moi.mul_inv(i.torques).cross(pi))) / i.mass;
-            rel_accel += (j.forces + j.ori * (j.moi.mul_inv(j.torques).cross(pj))) / j.mass;
-            if rel_accel.dot(normal_k) > 0. {
-                // Do not consider pairs which are forced away from each other (normal force would be negative)
-                continue;
-            }
 
             let mut found = false;
             for index in 0..collision_bodies.len() {
@@ -173,67 +154,88 @@ impl Physics {
             }
         }
         for indices in collision_indices {
-            self.resolve_normal_forces_chunk(indices);
+            self.resolve_normal_forces_chunk(indices, delta_t);
         }
     }
 
-    pub fn resolve_normal_forces_chunk(&mut self, indices: Vec<usize>) {
+    pub fn resolve_normal_forces_chunk(&mut self, indices: Vec<usize>, delta_t: f64) {
         let dimension = indices.len();
-        let mut delta: Mat<f64> = Mat::zeros(dimension, dimension);
-        let mut a = Mat::zeros(dimension, 1);
-        let mut friction_dirs = Vec::new();
-        for (ki, k) in indices.iter().enumerate() {
-            let i = self.collision_pairs[*k].0.clone();
-            let j = self.collision_pairs[*k].1.clone();
-            let (normal_k, pi, pj) = match self.collision_reports[*k] {
+        let mut z = Mat::zeros(dimension, 2);
+        let mut m: Mat<f64> = Mat::zeros(dimension, dimension);
+        let mut rel_vels = Vec::with_capacity(dimension);
+        for (ci, c) in indices.iter().enumerate() {
+            let (i, j) = self.collision_pairs[*c].clone();
+            let restitution = (i.restitution * j.restitution).sqrt();
+            let (normal_c, pi, pj) = match self.collision_reports[*c] {
                 CollisionReport::None => unreachable!(),
                 CollisionReport::Some { normal, p1, p2, .. } => (normal, p1, p2),
             };
-            let mut rel_accel = Vector3::new(0., 0., 0.);
-            rel_accel -= (i.forces + i.ori * (i.moi.mul_inv(i.torques).cross(pi))) / i.mass;
-            rel_accel += (j.forces + j.ori * (j.moi.mul_inv(j.torques).cross(pj))) / j.mass;
-            a[(ki, 0)] = rel_accel.dot(normal_k);
-            let friction_dir = rel_accel - normal_k * rel_accel.dot(normal_k);
-            friction_dirs.push(friction_dir.normalize());
-            for (kpi, kp) in indices.iter().enumerate() {
-                let normal_kp = match self.collision_reports[*k] {
+            z[(ci, 0)] = (i.vel + i.ori * i.ang_vel.cross(pi)).dot(normal_c);
+            z[(ci, 0)] -= (j.vel + j.ori * j.ang_vel.cross(pj)).dot(normal_c);
+            z[(ci, 0)] *= -(1. + restitution);
+
+            z[(ci, 1)] = (i.forces/i.mass + i.ori * (i.moi.mul_inv(i.torques).cross(pi))).dot(normal_c);
+            z[(ci, 1)] -= (j.forces/j.mass + j.ori * (j.moi.mul_inv(j.torques).cross(pj))).dot(normal_c);
+            z[(ci, 1)] *= -1.;
+
+            for (cpi, cp) in indices.iter().enumerate() {
+                if cpi > ci {break;}
+                let (normal_cp, pip, pjp) = match self.collision_reports[*cp] {
                     CollisionReport::None => unreachable!(),
-                    CollisionReport::Some { normal, .. } => normal,
+                    CollisionReport::Some { normal, p1, p2, .. } => (normal, p1, p2),
                 };
-
-                let ip = self.collision_pairs[*kp].0.clone();
-                let jp = self.collision_pairs[*kp].1.clone();
-                let s = if i == ip {1.} else if i == jp {-1.} else {0.};
-                delta[(ki, kpi)] += s * (normal_kp + i.ori * (i.moi.mul_inv((i.ori.invert()*normal_kp).cross(pi)))).dot(normal_k);
-                let s = if j == ip {1.} else if j == jp {-1.} else {0.};
-                delta[(ki, kpi)] -= s * (normal_kp + j.ori * (j.moi.mul_inv((j.ori.invert()*normal_kp).cross(pj)))).dot(normal_k);
+                let (ip, jp) = self.collision_pairs[*cp].clone();
+                let normal_cp_i = i.ori.invert() * normal_cp;
+                let normal_cp_j = j.ori.invert() * normal_cp;
+                if i == ip {
+                    m[(ci,cpi)] += (normal_cp / i.mass + i.ori*i.moi.mul_inv(pip.cross(normal_cp_i)).cross(pi)).dot(normal_c);
+                }
+                if i == jp {
+                    m[(ci,cpi)] -= (normal_cp / i.mass + i.ori*i.moi.mul_inv(pip.cross(normal_cp_i)).cross(pi)).dot(normal_c);
+                }
+                if j == ip {
+                    m[(ci,cpi)] -= (normal_cp / j.mass + j.ori*j.moi.mul_inv(pjp.cross(normal_cp_j)).cross(pj)).dot(normal_c);
+                }
+                if j == jp {
+                    m[(ci,cpi)] += (normal_cp / j.mass + j.ori*j.moi.mul_inv(pjp.cross(normal_cp_j)).cross(pj)).dot(normal_c);
+                }
+                m[(cpi,ci)] = m[(ci,cpi)];
             }
+            // Note M is supposed to be symmetric and positive definite
+            
+            let mut rel_vel = i.vel + i.ori * i.ang_vel.cross(pi);
+            rel_vel -= j.vel + j.ori * j.ang_vel.cross(pj);
+            rel_vel -= normal_c * rel_vel.dot(normal_c);
+            rel_vels.push(rel_vel);
         }
-        delta.llt(Side::Upper).unwrap().solve_in_place(&mut a);
 
-        for (ki, k) in indices.iter().enumerate() {
-            let mut i = self.collision_pairs[*k].0.clone();
-            let mut j = self.collision_pairs[*k].1.clone();
-            let (normal, pi, pj) = match self.collision_reports[*k] {
+        m.llt(Side::Upper).unwrap().solve_in_place(&mut z);
+
+        for (ci, c) in indices.iter().enumerate() {
+            let mut i = self.collision_pairs[*c].0.clone();
+            let mut j = self.collision_pairs[*c].1.clone();
+            let (normal, pi, pj) = match self.collision_reports[*c] {
                 CollisionReport::None => unreachable!(),
                 CollisionReport::Some { normal, p1, p2, .. } => (normal, p1, p2),
             };
             
-            let rel_vel = (i.vel + i.ori * i.ang_vel.cross(pi)) - (j.vel + j.ori * j.ang_vel.cross(pj));
-            let coeff = if rel_vel.magnitude() < 0.001 {
-                (i.static_coeff * j.static_coeff).sqrt()
-            } else {
-                (i.kinetic_coeff * j.kinetic_coeff).sqrt()
-            };
+            let coeff = (i.kinetic_coeff * j.kinetic_coeff).sqrt();
 
-            let force = a[(ki, 0)] * (normal + friction_dirs[ki] * coeff);
+            let force_mag = z[(ci, 0)] / delta_t + z[(ci, 1)].max(0.);
+            let mut force = force_mag * normal;
+            let rel_vel_mag = rel_vels[ci].magnitude();
+            if rel_vel_mag > 0. {
+                // TODO implement maximum friction
+                let friction_mag = coeff * force_mag;
+                force += rel_vels[ci]/rel_vel_mag * friction_mag;
+            }
             let inv_ori_i = i.ori.invert();
             let inv_ori_j = j.ori.invert();
 
             i.add_force(force);
             j.add_force(-force);
-            i.add_force(pi.cross(inv_ori_i * force));
-            j.add_force(pj.cross(inv_ori_j * -force));
+            i.add_torque(pi.cross(inv_ori_i * force));
+            j.add_torque(pj.cross(inv_ori_j * -force));
         }
     }
 }

@@ -60,7 +60,7 @@ impl Camera {
         Self {
             pos: Vector3::new(0., 0., (5.)*16.),
             theta: 1.57,
-            phi: 0.,
+            phi: 3.14,
             up,
             fovy: 45., // Degrees
             
