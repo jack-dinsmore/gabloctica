@@ -148,6 +148,17 @@
     or $\bm j = -M^{-1} (1+\epsilon) \bm A$ and $\bm \alpha = -M^{-1} \bm B$. It might be even better to write it as one matrix equation $Z = [-(1+\epsilon) \bm A | -\bm B]$, so that $[\bm j | \bm \alpha] = M^{-1} Z$. That way I can use the nice matrix inversion tricks.
 
     \subsection{Friction}
-    Now that I know normal forces $[j_c/\delta + \alpha_c]\unit n_c$, I can assign friction force of magnitude $\bm F = \mu [j_c / \delta + \alpha_c]$. I'm not completely sure, but I think I should be including the collision impulse in this equation. Now the direction is computed by getting the tangential component of the relative velocity $\bm v_\mathrm{rel}$. Subtracting off the normal component, $\bm v_{\mathrm{rel},\parallel} = \bm v_\mathrm{rel} - \unit n (\bm v_\mathrm{rel} \cdot \unit n)$. And I need to normalize it before applying the force.
+    Now that I know normal forces $[j_c/\delta + \alpha_c]\unit n_c$, I can assign friction force of magnitude $\mu [j_c / \delta + \alpha_c]$. I'm not completely sure, but I think I should be including the collision impulse in this equation. Now the direction is computed by getting the tangential component of the relative velocity $\bm v_\mathrm{rel}$. Subtracting off the normal component, $\bm v_{\mathrm{rel},\parallel} = \bm v_\mathrm{rel} - \unit n (\bm v_\mathrm{rel} \cdot \unit n)$. And I need to normalize it before applying the force.
+
+    However, the friction force should not be so large that the relative velocity is reversed. The velocity at the body's point after a friction force $\beta\unit f$ is applied is
+    \begin{equation}
+      \bm v + R[\bm \omega \times \bm p] + \beta \unit f/ m + R (I^{-1} [\bm p \times \beta \unit f] \times \bm p).
+    \end{equation}
+    So I could define 
+    \begin{align}
+      A_i &= (\bm v + R[\bm \omega \times \bm p]) \cdot \unit f\\
+      B_i &= 1/m + [R(I^{-1}[\bm p \times \unit f] \times \bm p)] \cdot \unit f
+    \end{align}
+    and then the equation $(A_i - A_i) + \beta (B_i + B_j) = 0$ gives the maximum force. I take the minimum of $\beta$ and the force magnitude $\mu [j_c / \delta + \alpha_c]$.
 
 \end{document}

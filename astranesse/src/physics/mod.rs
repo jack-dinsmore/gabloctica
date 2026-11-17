@@ -162,7 +162,6 @@ impl Physics {
         let dimension = indices.len();
         let mut z = Mat::zeros(dimension, 2);
         let mut m: Mat<f64> = Mat::zeros(dimension, dimension);
-        let mut rel_vels = Vec::with_capacity(dimension);
         for (ci, c) in indices.iter().enumerate() {
             let (i, j) = self.collision_pairs[*c].clone();
             let restitution = (i.restitution * j.restitution).sqrt();
@@ -202,11 +201,6 @@ impl Physics {
                 m[(cpi,ci)] = m[(ci,cpi)];
             }
             // Note M is supposed to be symmetric and positive definite
-            
-            let mut rel_vel = i.vel + i.ori * i.ang_vel.cross(pi);
-            rel_vel -= j.vel + j.ori * j.ang_vel.cross(pj);
-            rel_vel -= normal_c * rel_vel.dot(normal_c);
-            rel_vels.push(rel_vel);
         }
 
         m.llt(Side::Upper).unwrap().solve_in_place(&mut z);
@@ -220,14 +214,20 @@ impl Physics {
             };
             
             let coeff = (i.kinetic_coeff * j.kinetic_coeff).sqrt();
-
-            let force_mag = z[(ci, 0)] / delta_t + z[(ci, 1)].max(0.);
+            let force_mag = (z[(ci, 0)] / delta_t + z[(ci, 1)]).min(0.);
             let mut force = force_mag * normal;
-            let rel_vel_mag = rel_vels[ci].magnitude();
+
+            let mut rel_vel = i.vel + i.ori*i.ang_vel.cross(pi);
+            rel_vel -= j.vel + j.ori*j.ang_vel.cross(pj);
+            rel_vel -= normal * rel_vel.dot(normal);
+            let rel_vel_mag = rel_vel.magnitude();
             if rel_vel_mag > 0. {
-                // TODO implement maximum friction
-                let friction_mag = coeff * force_mag;
-                force += rel_vels[ci]/rel_vel_mag * friction_mag;
+                let friction_dir = -rel_vel / rel_vel_mag;
+                let mut b_term = 1./i.mass + (i.ori * (i.moi.mul_inv(pi.cross(friction_dir)).cross(pi))).dot(friction_dir);     
+                b_term += 1./j.mass + (j.ori * (j.moi.mul_inv(pj.cross(friction_dir)).cross(pj))).dot(friction_dir);
+                let max_friction_mag = rel_vel_mag/b_term/delta_t;
+                let friction_mag = (-coeff * force_mag).min(max_friction_mag);
+                force += friction_dir * friction_mag;
             }
             let inv_ori_i = i.ori.invert();
             let inv_ori_j = j.ori.invert();

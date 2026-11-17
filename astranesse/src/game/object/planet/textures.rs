@@ -1,5 +1,3 @@
-use std::collections::{HashMap, HashSet};
-
 use cgmath::{InnerSpace, Vector3};
 use image::{ImageBuffer, Rgba};
 use noise::{NoiseFn, Perlin};
