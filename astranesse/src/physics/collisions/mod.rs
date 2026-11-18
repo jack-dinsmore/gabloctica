@@ -1,59 +1,46 @@
 mod algo;
 pub mod shapes;
 
-use cgmath::Vector3;
+use cgmath::{InnerSpace, Vector3};
 use rustc_hash::FxHashMap;
 use std::cmp::Ordering;
-use crate::physics::{RigidBody, collisions::shapes::ObjectData};
+use crate::{physics::{RigidBody, collisions::shapes::ObjectData}, util::BinaryIterator};
 use algo::ColliderType;
 use shapes::ColliderIterator;
 
 /// Note: Greater reports are collided more deeply
-#[derive(Debug,PartialEq)]
-pub enum CollisionReport {
-    None,
-    /// * Normal vector pointing out of body 1 in inertial space
-    /// * Depth of body 1 in body 2 along the normal vector
-    /// * Position of the collided vertex of body 1 in body space
-    /// * Position of the collided vertex of body 2 in body space
-    Some {
-        normal: Vector3<f64>,
-        depth: f64,
-        p1: Vector3<f64>,
-        p2: Vector3<f64>,
-    }
+#[derive(PartialEq, Clone)]
+pub struct CollisionReport {
+    pub normal: Vector3<f64>,
+    pub depth: f64,
+    pub p1: Vector3<f64>,
+    pub p2: Vector3<f64>,
 }
 impl CollisionReport {
-    pub fn is_some(&self) -> bool {
-        match self {
-            CollisionReport::None => false,
-            CollisionReport::Some {..} => true,
+    pub fn invert(&self) -> Self {
+        Self {
+            normal: -self.normal,
+            depth: self.depth,
+            p1: self.p2,
+            p2: self.p1,
         }
-    }
-    pub fn is_none(&self) -> bool {
-        !self.is_some()
     }
     
-    fn invert(&self) -> Self {
-        match self {
-            CollisionReport::None => CollisionReport::None,
-            CollisionReport::Some { normal, depth, p1, p2 } => CollisionReport::Some {
-                normal: -*normal,
-                depth: *depth,
-                p1: *p2,
-                p2: *p1,
-            },
-        }
+    pub fn equiv(&self, other: &Self) -> bool {
+        (self.normal - other.normal).magnitude2() < 1e-6 ||
+        (self.p1 - other.p1).magnitude2() < 1e-6 ||
+        (self.p2 - other.p2).magnitude2() < 1e-6
     }
 }
 impl PartialOrd for CollisionReport {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self, other) {
-            (CollisionReport::None, CollisionReport::None) => Some(Ordering::Equal),
-            (CollisionReport::None, CollisionReport::Some { .. }) => Some(Ordering::Less),
-            (CollisionReport::Some { .. }, CollisionReport::None) => Some(Ordering::Greater),
-            (CollisionReport::Some { depth: d1, .. }, CollisionReport::Some { depth: d2, .. }) => d1.partial_cmp(&d2),
-        }
+        self.depth.partial_cmp(&other.depth)
+    }
+}
+
+impl std::fmt::Debug for CollisionReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CollisionReport ({:.4}, {:.4}, {:.4}) > {:.4} | {:.4}, {:.4}, {:.4} | {:.4}, {:.4} {:.4}", self.normal.x, self.normal.y, self.normal.z, self.depth, self.p1.x, self.p1.y, self.p1.z, self.p2.x, self.p2.y, self.p2.z)
     }
 }
 
@@ -65,51 +52,55 @@ pub enum Collider {
 }
 
 impl Collider {
-    /// Check for a collision between two rigid bodies.
-    pub fn check_collision(a: &RigidBody, b: &RigidBody) -> CollisionReport {
-        match (&a.collider, &b.collider) {
-            (Some(ac), Some(bc)) => {
-                let mut report = CollisionReport::None;
-                let mut col_stack = Vec::new();
-                let a_children = ac.iter();
-                let b_children = bc.iter();
-                for a_child in &a_children {
-                    for b_child in &b_children {
-                        col_stack.push((a_child.clone(), b_child.clone()));
-                    }
-                }
-
-                loop {
-                    match col_stack.pop() {
-                        Some((ai, bi)) => {
-                            let this_report = ColliderType::check_collision(&ai.collider(), &bi.collider(), a, b);
-                            if this_report.is_some() {
-                                if ai.is_leaf() && bi.is_leaf() {
-                                    // This was the last collision in the tree and it was a success
-                                    if this_report > report {
-                                        report = this_report;
-                                    }
-                                } else {
-                                    // The collision was a success but it wasn't the last
-                                    let a_children = ai.next();
-                                    let b_children = bi.next();
-                                    for a_child in &a_children {
-                                        for b_child in &b_children {
-                                            col_stack.push((a_child.clone(), b_child.clone()));
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        None => {
-                            // The queue ended
-                            break
-                        },
-                    }
-                }
-                report
+    pub fn check_closest_collision(a: &RigidBody, b: &RigidBody) -> Option<CollisionReport> {
+        let mut out = None;
+        Self::check_collisions(a, b, &mut |report| {
+            match &out {
+                None => out = Some(report),
+                Some(o) => if report > *o { out = Some(report) },
             }
-            _ => CollisionReport::None
+        });
+        out
+    }
+
+    /// Check for a collision between two rigid bodies and save all collisions to a list
+    pub fn check_collisions(a: &RigidBody, b: &RigidBody, action: &mut impl FnMut(CollisionReport)) {
+        if let (Some(ac), Some(bc)) = (&a.collider, &b.collider) {
+            for a_iter in ac.iter() {
+                for b_iter in bc.iter() {
+                    Self::check_intermediate_collision(a_iter.clone(), b_iter, a, b, action, false);
+                }
+            }
+        }
+    }
+
+    fn check_intermediate_collision(ai: ColliderIterator, bi: ColliderIterator, a: &RigidBody, b: &RigidBody, action: &mut impl FnMut(CollisionReport), inverse: bool) {
+        if let Some(report) = ColliderType::check_collision(&ai.collider(), &bi.collider(), a, b) {
+            // A collision occurred
+            match (ai.left(), ai.right()) {
+                (Some(left), Some(right)) => {
+                    Self::check_intermediate_collision(bi.clone(), left, b, a, action, !inverse);
+                    Self::check_intermediate_collision(bi, right, b, a, action, !inverse);
+                },
+                (Some(left), None) => Self::check_intermediate_collision(bi, left, b, a, action, !inverse),
+                (None, Some(right)) => Self::check_intermediate_collision(bi, right, b, a, action, !inverse),
+                (None, None) => {
+                    // a is a leaf
+                    match (bi.left(), bi.right()) {
+                        (Some(left), Some(right)) => {
+                            Self::check_intermediate_collision(ai.clone(), left, a, b, action, inverse);
+                            Self::check_intermediate_collision(ai, right, a, b, action, inverse);
+                        },
+                        (Some(left), None) => Self::check_intermediate_collision(ai, left, a, b, action, inverse),
+                        (None, Some(right)) => Self::check_intermediate_collision(ai, right, a, b, action, inverse),
+                        (None, None) => {
+                            // b is also a leaf
+                            let report = if inverse {report.invert()} else {report};
+                            action(report);
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -117,7 +108,16 @@ impl Collider {
         match self {
             Collider::Ray(d) => vec![ColliderIterator::new_ray(d)],
             Collider::Box(d) => vec![ColliderIterator::new_box(d)],
-            Collider::Object(d) => d.chunks.keys().map(|c| ColliderIterator::new_object(d, *c)).collect(),
+            Collider::Object(d) => {
+                let mut output = Vec::new();
+                for chunk in d.chunks.keys() {
+                    let iter = ColliderIterator::new_object(d, *chunk);
+                    if iter.contains_blocks() {
+                        output.push(iter);
+                    }
+                }
+                output
+            }
         }
     }
     

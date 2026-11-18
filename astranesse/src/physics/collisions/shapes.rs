@@ -1,7 +1,7 @@
 use cgmath::{InnerSpace, Vector3};
 use rustc_hash::FxHashMap;
 
-use crate::util::CHUNK_SIZE;
+use crate::util::{BinaryIterator, CHUNK_SIZE};
 use super::algo::ColliderType;
 
 
@@ -73,42 +73,27 @@ impl<'a> ColliderIterator<'a> {
         }
     }
 
-    /// This function is called only if a collision occurred
-    pub fn next(&self) -> Vec<Self> {
-        let mut copy = self.clone();
-        match &copy {
-            ColliderIterator::ObjectIterator {xyz_index, ..} => {
-                // Descend deeper into the chunk
-                // OPTIMIZE check if the collision report is inside a block. If it is, return an empty vector
-                let mut output = Vec::new();
-                let old_xyz_index = *xyz_index;
-
-                if let ColliderIterator::ObjectIterator {xyz_index, width_x, width_y, width_z, ..} = &mut copy {
-                    *xyz_index = (old_xyz_index + 1) % 3;
-                    match old_xyz_index {
-                        0 => if *width_x == 1 { return Vec::new(); } else { *width_x /= 2; },
-                        1 => if *width_y == 1 { return Vec::new(); } else { *width_y /= 2; },
-                        2 => if *width_z == 1 { return Vec::new(); } else { *width_z /= 2; },
-                        _ => unreachable!()
-                    };
+    /// Returns true if the iterator contains blocks. This is a helper function for object iterators only
+    pub fn contains_blocks(&self) -> bool {
+        match self {
+            ColliderIterator::ObjectIterator { data, chunk_coord, start_x, start_y, start_z, width_x, width_y, width_z, .. } => {
+                for z in *start_z..(*start_z + *width_z) {
+                    for y in *start_y..(*start_y + *width_y) {
+                        let row = data.chunks[&chunk_coord][(y + z * CHUNK_SIZE as u16) as usize];
+                        let mut row_mask = 0;
+                        for x in *start_x..(*start_x + *width_x) {
+                            row_mask |= 1 << x;
+                        }
+                        if row & row_mask != 0 {return true;}
+                    }
                 }
-                if copy.contains_blocks() { output.push(copy.clone()); }
-
-                if let ColliderIterator::ObjectIterator {start_x, start_y, start_z, width_x, width_y, width_z, ..} = &mut copy {
-                    match old_xyz_index {
-                        0 => *start_x += *width_x,
-                        1 => *start_y += *width_y,
-                        2 => *start_z += *width_z,
-                        _ => unreachable!()
-                    };
-                }
-                if copy.contains_blocks() { output.push(copy); }
-                output
+                false
             },
-            _ => vec![copy],
+            _ => true,
         }
     }
 
+    /// Get the collider corresponding to the iterator
     pub fn collider(&self) -> ColliderType {
         match self {
             ColliderIterator::BoxIterator { data } => ColliderType::Box {
@@ -134,31 +119,50 @@ impl<'a> ColliderIterator<'a> {
             },
         }
     }
-    
-    /// Return true if this iterator splits into smaller ones, and false if it never splits.
-    pub fn is_leaf(&self) -> bool {
-        match self {
-            ColliderIterator::ObjectIterator { width_x, width_y, width_z, .. } => *width_x == 1 && *width_y == 1 && *width_z == 1,
-            ColliderIterator::BoxIterator { .. } => true,
-            ColliderIterator::RayIterator { .. } => true,
+}
+
+impl<'a> BinaryIterator for ColliderIterator<'a> {
+    fn left(&self) -> Option<Self> {
+        let mut copy = self.clone();
+        match &mut copy {
+            ColliderIterator::BoxIterator { data } => None,
+            ColliderIterator::RayIterator { data } => None,
+            ColliderIterator::ObjectIterator { data, chunk_coord, start_x, start_y, start_z, width_x, width_y, width_z, xyz_index } => {
+                match *xyz_index {
+                    0 => if *width_x == 1 {return None; /* leaf */ } else { *width_x /= 2; },
+                    1 => if *width_y == 1 {return None; /* leaf */ } else { *width_y /= 2; },
+                    2 => if *width_z == 1 {return None; /* leaf */ } else { *width_z /= 2; },
+                    _ => unreachable!()
+                }
+                *xyz_index = (*xyz_index + 1) % 3;
+                if copy.contains_blocks() {
+                    Some(copy)
+                } else {
+                    None
+                }
+            },
         }
     }
 
-    /// Returns true if the iterator contains blocks. This is a helper function for object iterators only
-    fn contains_blocks(&self) -> bool {
-        match self {
-            ColliderIterator::ObjectIterator { data, chunk_coord, start_x, start_y, start_z, width_x, width_y, width_z, .. } => {
-                for z in *start_z..(*start_z + *width_z) {
-                    for y in *start_y..(*start_y + *width_y) {
-                        let row = data.chunks[&chunk_coord][(y + z * CHUNK_SIZE as u16) as usize];
-                        for x in *start_x..(*start_x + *width_x) {
-                            if row & (1 << x) != 0 {return true;}
-                        }
-                    }
+    fn right(&self) -> Option<Self> {
+        let mut copy = self.clone();
+        match &mut copy {
+            ColliderIterator::BoxIterator { data } => None,
+            ColliderIterator::RayIterator { data } => None,
+            ColliderIterator::ObjectIterator { data, chunk_coord, start_x, start_y, start_z, width_x, width_y, width_z, xyz_index } => {
+                match *xyz_index {
+                    0 => if *width_x == 1 {return None; /* leaf */ } else { *width_x /= 2; *start_x += *width_x; },
+                    1 => if *width_y == 1 {return None; /* leaf */ } else { *width_y /= 2; *start_y += *width_y; },
+                    2 => if *width_z == 1 {return None; /* leaf */ } else { *width_z /= 2; *start_z += *width_z; },
+                    _ => unreachable!()
                 }
-                false
+                *xyz_index = (*xyz_index + 1) % 3;
+                if copy.contains_blocks() {
+                    Some(copy)
+                } else {
+                    None
+                }
             },
-            _ => unreachable!(),
         }
     }
 }

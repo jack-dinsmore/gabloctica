@@ -105,7 +105,7 @@ fn check_inside(pos: Vector3<f64>, center: Vector3<f64>, normals: &[Vector3<f64>
 }
 
 impl ColliderType {
-    pub fn check_collision(ac: &ColliderType, bc: &ColliderType, a: &RigidBody, b: &RigidBody) -> CollisionReport {
+    pub fn check_collision(ac: &ColliderType, bc: &ColliderType, a: &RigidBody, b: &RigidBody) -> Option<CollisionReport> {
         match (ac, bc) {
             (
                 ColliderType::Box { center: a_center_raw, edges: a_edges },
@@ -147,7 +147,7 @@ impl ColliderType {
                             }
                         },
                         None => {
-                            return CollisionReport::None
+                            return None
                         },
                     }
                 }
@@ -157,41 +157,39 @@ impl ColliderType {
                     // Edge collision
                     let (a_mid, a_n) = match best_sepax_index {
                         0|1|2 => (
-                            a_global_center + (a_normals[1]*a_edges.y + a_normals[2]*a_edges.z) * 0.5,
+                            a_global_center - (a_normals[1]*a_edges.y + a_normals[2]*a_edges.z),
                             a_normals[0],
                         ), 3|4|5 => (
-                            a_global_center + (a_normals[0]*a_edges.x + a_normals[2]*a_edges.z) * 0.5,
+                            a_global_center - (a_normals[0]*a_edges.x + a_normals[2]*a_edges.z),
                             a_normals[1],
                         ), 6|7|8 => (
-                            a_global_center + (a_normals[0]*a_edges.x + a_normals[1]*a_edges.y) * 0.5,
+                            a_global_center - (a_normals[0]*a_edges.x + a_normals[1]*a_edges.y),
                             a_normals[2],
                         ), _ => unreachable!()
                     };
                     let (b_mid, b_n) = match best_sepax_index {
                         0|3|6 => (
-                            b_global_center + (b_normals[1]*b_edges.y + b_normals[2]*b_edges.z) * 0.5,
+                            b_global_center - (b_normals[1]*b_edges.y + b_normals[2]*b_edges.z),
                             b_normals[0],
                         ), 1|4|7 => (
-                            b_global_center + (b_normals[0]*b_edges.x + b_normals[2]*b_edges.z) * 0.5,
+                            b_global_center - (b_normals[0]*b_edges.x + b_normals[2]*b_edges.z),
                             b_normals[1],
                         ), 2|5|8 => (
-                            b_global_center + (b_normals[0]*b_edges.x + b_normals[1]*b_edges.y) * 0.5,
+                            b_global_center - (b_normals[0]*b_edges.x + b_normals[1]*b_edges.y),
                             a_normals[2],
                         ), _ => unreachable!()
                     };
                     let r = a_mid - b_mid;
-                    let a = a_n.dot(a_n);   // = 1 if a_n unit
                     let b = a_n.dot(b_n);
-                    let c = b_n.dot(b_n);   // = 1 if b_n unit
                     let d = a_n.dot(r);
                     let e = b_n.dot(r);
-                    let denom = a * c - b * b;
+                    let denom = 1. - b * b;
 
                     let s = if denom.abs() < 1e-9 {
                         // parallel edges: pick s = 0, solve t
                         0.0
                     } else {
-                        (b * e - c * d) / denom
+                        (b * e - d) / denom
                     };
 
                     a_mid + a_n * s
@@ -226,12 +224,12 @@ impl ColliderType {
                     normal *= -1.;
                 }
 
-                CollisionReport::Some {
+                Some(CollisionReport {
                     normal,
                     depth: best_sepn,
                     p1: a.ori.invert()*p1_global,
                     p2: b.ori.invert()*p2_global,
-                }
+                })
             },
             (
                 ColliderType::Box { center, edges },
@@ -259,26 +257,26 @@ impl ColliderType {
                                 best_sepax = sepax;
                             }
                         },
-                        None => return CollisionReport::None,
+                        None => return None,
                     }
                 }
                 
                 // A collision occurred
                 let collision_pos = stop - dir * best_alpha;
-                CollisionReport::Some {
+                Some(CollisionReport {
                     normal: best_sepax,
                     depth: best_alpha,
                     p1: a.ori.invert() * (collision_pos - a.pos) + a.com_pos,
                     p2: b.ori.invert() * (collision_pos - b.pos) + b.com_pos,
-                }
+                })
             },
             (
                 ColliderType::Ray { start, stop, dir },
                 ColliderType::Box { center, edges }
             ) => {
-                Self::check_collision(bc, ac, b, a).invert()
+                Self::check_collision(bc, ac, b, a).map(|c| c.invert())
             },
-            (ColliderType::Ray { .. }, ColliderType::Ray { .. }) => CollisionReport::None,
+            (ColliderType::Ray { .. }, ColliderType::Ray { .. }) => None,
         }
     }
 }

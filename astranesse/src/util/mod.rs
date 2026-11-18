@@ -48,3 +48,8 @@ pub fn get_face_index(pos: Vector3<f32>) -> u8 {
         if pos.z > 0. { 4 } else { 5 }
     }
 }
+
+pub trait BinaryIterator : Sized {
+    fn left(&self) -> Option<Self>;
+    fn right(&self) -> Option<Self>;
+}

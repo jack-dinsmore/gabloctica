@@ -13,7 +13,7 @@ impl Entity {
             center: Vector3::zero(),
             edges: Vector3::new(0.4, 0.4, 1.4), // Remember that these lengths are halfwidths
         }));
-        init.moi = crate::physics::MoI::new_diagonal(Vector3::new(1e8, 1e8, 1e8));
+        init.moi = crate::physics::MoI::new_diagonal(Vector3::new(50., 50., 50.));
         Self {
             body: RigidBodyData::new(&mut physics.rb_vendor, init),
             chair: None,

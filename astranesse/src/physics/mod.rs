@@ -94,11 +94,17 @@ impl Physics {
         for (i, a) in self.rb_vendor.iter().enumerate() {
             for (j,  b) in self.rb_vendor.iter().enumerate() {
                 if j >= i {break;}
-                let report = Collider::check_collision(&a, &b);
-                if report.is_some() {
+                let mut paired_reports = Vec::<CollisionReport>::new();
+                Collider::check_collisions(&a, &b, &mut |report| {
+                    for old_report in &paired_reports {
+                        if old_report.equiv(&report) {
+                            return;
+                        }
+                    }
+                    paired_reports.push(report.clone());
                     self.collision_pairs.push((a.clone(), b.clone()));
                     self.collision_reports.push(report);
-                }
+                });
             }
         }
 
@@ -109,18 +115,16 @@ impl Physics {
         }
         self.resolve_normal_forces(delta_t);
 
+        // Collision offsets
+        for ((a, b), report) in self.collision_pairs.iter_mut().zip(&self.collision_reports) {
+            let a_mass_frac = a.mass / (a.mass + b.mass);
+            a.pos -= report.normal * report.depth * (1. - a_mass_frac);
+            b.pos += report.normal * report.depth * a_mass_frac;
+        }
+
         // Force updates
         for mut body in self.rb_vendor.iter() {
             body.update(delta_t);
-        }
-
-        // Collision offsets
-        for ((a, b), report) in self.collision_pairs.iter_mut().zip(&self.collision_reports) {
-            if let CollisionReport::Some { normal, depth, p1, p2 } = report {
-                let a_mass_frac = a.mass / (a.mass + b.mass);
-                a.pos -= normal* *depth * (1. - a_mass_frac);
-                b.pos += normal* *depth * a_mass_frac;
-            }
         }
     }
 
@@ -130,10 +134,9 @@ impl Physics {
         let mut collision_bodies: Vec<FxHashSet<RigidBody>> = Vec::new();
         let mut collision_indices: Vec<Vec<usize>> = Vec::new();
         for (k, (i, j)) in self.collision_pairs.iter().enumerate() {
-            let (normal_k, pi, pj) = match self.collision_reports[k] {
-                CollisionReport::None => unreachable!(),
-                CollisionReport::Some { normal, p1, p2, .. } => (normal, p1, p2),
-            };
+            let normal_k = self.collision_reports[k].normal;
+            let pi = self.collision_reports[k].p1;
+            let pj = self.collision_reports[k].p2;
 
             let mut found = false;
             for index in 0..collision_bodies.len() {
@@ -165,10 +168,11 @@ impl Physics {
         for (ci, c) in indices.iter().enumerate() {
             let (i, j) = self.collision_pairs[*c].clone();
             let restitution = (i.restitution * j.restitution).sqrt();
-            let (normal_c, pi, pj) = match self.collision_reports[*c] {
-                CollisionReport::None => unreachable!(),
-                CollisionReport::Some { normal, p1, p2, .. } => (normal, p1, p2),
-            };
+            let normal_c = self.collision_reports[*c].normal;
+            dbg!(&self.collision_reports[*c]);
+            let pi = self.collision_reports[*c].p1;
+            let pj = self.collision_reports[*c].p2;
+
             z[(ci, 0)] = (i.vel + i.ori * i.ang_vel.cross(pi)).dot(normal_c);
             z[(ci, 0)] -= (j.vel + j.ori * j.ang_vel.cross(pj)).dot(normal_c);
             z[(ci, 0)] *= -(1. + restitution);
@@ -179,10 +183,10 @@ impl Physics {
 
             for (cpi, cp) in indices.iter().enumerate() {
                 if cpi > ci {break;}
-                let (normal_cp, pip, pjp) = match self.collision_reports[*cp] {
-                    CollisionReport::None => unreachable!(),
-                    CollisionReport::Some { normal, p1, p2, .. } => (normal, p1, p2),
-                };
+                let normal_cp = self.collision_reports[*cp].normal;
+                let pip = self.collision_reports[*cp].p1;
+                let pjp = self.collision_reports[*cp].p2;
+
                 let (ip, jp) = self.collision_pairs[*cp].clone();
                 let normal_cp_i = i.ori.invert() * normal_cp;
                 let normal_cp_j = j.ori.invert() * normal_cp;
@@ -203,16 +207,16 @@ impl Physics {
             // Note M is supposed to be symmetric and positive definite
         }
 
+        dbg!(&m);
         m.llt(Side::Upper).unwrap().solve_in_place(&mut z);
 
         for (ci, c) in indices.iter().enumerate() {
             let mut i = self.collision_pairs[*c].0.clone();
             let mut j = self.collision_pairs[*c].1.clone();
-            let (normal, pi, pj) = match self.collision_reports[*c] {
-                CollisionReport::None => unreachable!(),
-                CollisionReport::Some { normal, p1, p2, .. } => (normal, p1, p2),
-            };
-            
+            let normal = self.collision_reports[*c].normal;
+            let pi = self.collision_reports[*c].p1;
+            let pj = self.collision_reports[*c].p2;
+
             let coeff = (i.kinetic_coeff * j.kinetic_coeff).sqrt();
             let force_mag = (z[(ci, 0)] / delta_t + z[(ci, 1)]).min(0.);
             let mut force = force_mag * normal;
@@ -223,7 +227,7 @@ impl Physics {
             let rel_vel_mag = rel_vel.magnitude();
             if rel_vel_mag > 0. {
                 let friction_dir = -rel_vel / rel_vel_mag;
-                let mut b_term = 1./i.mass + (i.ori * (i.moi.mul_inv(pi.cross(friction_dir)).cross(pi))).dot(friction_dir);     
+                let mut b_term = 1./i.mass + (i.ori * (i.moi.mul_inv(pi.cross(friction_dir)).cross(pi))).dot(friction_dir);
                 b_term += 1./j.mass + (j.ori * (j.moi.mul_inv(pj.cross(friction_dir)).cross(pj))).dot(friction_dir);
                 let max_friction_mag = rel_vel_mag/b_term/delta_t;
                 let friction_mag = (-coeff * force_mag).min(max_friction_mag);

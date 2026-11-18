@@ -97,12 +97,12 @@ impl Game {
             Planet::new(&graphics, &mut physics),
         ];
         let ships = vec![
-            // Ship::new(&graphics, &mut physics, RigidBodyInit { pos: Vector3::new(12., 3., 133.), vel: Vector3::new(0., 0., 0.), ..Default::default() }),
+            // Ship::new(&graphics, &mut physics, RigidBodyInit { pos: Vector3::new(12., 3., 133.), vel: Vector3::new(0., 3., 0.), ori: cgmath::Quaternion::new(0., 0., 0.01, 1.), ..Default::default() }),
             // Ship::new(&graphics, &mut physics, RigidBodyInit { pos: Vector3::new(12., 13., 133.), vel: Vector3::new(0., -3., 0.), ..Default::default() }),
         ];
         let entities = vec![
             // Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(-200., 0., 80.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
-            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 140.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
+            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 141.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
         ];
 
         // Set cursor to center of screen
@@ -156,34 +156,41 @@ impl Game {
                 let forward = self.camera.get_forward().cast().unwrap();
                 player.body.collider = Some(Collider::new_ray(self.camera.pos.cast().unwrap(), forward*LOOK_DIST));
 
-                let mut report = CollisionReport::None;
+                let mut report = None;
                 let mut collided_object = None;
 
                 for planet in &mut self.planets {
-                    let new_report = Collider::check_collision(&player.body, &planet.object.body);
+                    let new_report = Collider::check_closest_collision(&player.body, &planet.object.body);
 
-                    if new_report > report {
-                        report = new_report;
-                        collided_object = Some(&mut planet.object);
+                    if let Some(new_report) = new_report {
+                        if match &report {
+                            None => true,
+                            Some(r) => new_report > *r
+                        } { 
+                            report = Some(new_report);
+                            collided_object = Some(&mut planet.object);
+                        }
                     }
                 }
                 for ship in &mut self.ships {
-                    let new_report = Collider::check_collision(&player.body, &ship.object.body);
+                    let new_report = Collider::check_closest_collision(&player.body, &ship.object.body);
 
-                    if new_report > report {
-                        report = new_report;
-                        collided_object = Some(&mut ship.object);
+                    if let Some(new_report) = new_report {
+                        if match &report {
+                            None => true,
+                            Some(r) => new_report > *r
+                        } { 
+                            report = Some(new_report);
+                            collided_object = Some(&mut ship.object);
+                        }
                     }
                 }
 
                 if let Some(o) = collided_object {
-                    let place_pos = match report {
-                        CollisionReport::Some { p2, .. } => {
-                            let offset = o.body.ori.invert() * forward;
-                            p2 - offset*0.001
-                        }
-                        CollisionReport::None => unreachable!(),
-                    };
+                    let place_pos = if let Some(report) = report {
+                        let offset = o.body.ori.invert() * forward;
+                        report.p2 - offset*0.001
+                    } else {unreachable!()};
                     o.insert_block(&self.graphics, &self.block_properties, 1, place_pos);
                 }
 
@@ -278,28 +285,37 @@ impl Game {
         player.body.collider = Some(Collider::new_ray(self.camera.pos.cast().unwrap(), forward*LOOK_DIST));
 
         let (collided_object, object_id, report) = {
-            let mut report = CollisionReport::None;
             let mut object_id = ObjectIdentifier::Ship(0);
+            let mut report = None;
             let mut collided_object = None;
     
             for (i, ship) in self.ships.iter_mut().enumerate() {
                 // The collision function should always pick some over None, but choose the one with the smallest distance to the target otherwise.
-                let new_report = Collider::check_collision(&player.body, &ship.object.body);
-    
-                if new_report > report {
-                    report = new_report;
-                    collided_object = Some(&mut ship.object);
-                    object_id = ObjectIdentifier::Ship(i);  
+
+                let new_report = Collider::check_closest_collision(&player.body, &ship.object.body);
+                if let Some(new_report) = new_report {
+                    if match &report {
+                        None => true,
+                        Some(r) => new_report > *r
+                    } { 
+                        report = Some(new_report);
+                        collided_object = Some(&mut ship.object);
+                        object_id = ObjectIdentifier::Ship(i);  
+                    }
                 }
             }
             for (i, planet) in self.planets.iter_mut().enumerate() {
                 // The collision function should always pick some over None, but choose the one with the smallest distance to the target otherwise.
-                let new_report = Collider::check_collision(&player.body, &planet.object.body);
-    
-                if new_report > report {
-                    report = new_report;
-                    collided_object = Some(&mut planet.object);
-                    object_id = ObjectIdentifier::Planet(i);
+                let new_report = Collider::check_closest_collision(&player.body, &planet.object.body);
+                if let Some(new_report) = new_report {
+                    if match &report {
+                        None => true,
+                        Some(r) => new_report > *r
+                    } { 
+                        report = Some(new_report);
+                        collided_object = Some(&mut planet.object);
+                        object_id = ObjectIdentifier::Planet(i);  
+                    }
                 }
             }
 
@@ -309,11 +325,11 @@ impl Game {
         if let Some(o) = collided_object {
             // Interacted with this block
             let place_pos = match report {
-                CollisionReport::Some { p2, .. } => {
+                Some(report) => {
                     let offset = o.body.ori.invert() * forward;
-                    p2 + offset*0.001
+                    report.p2 + offset*0.001
                 }
-                CollisionReport::None => unreachable!(),
+                None => unreachable!(),
             };
             let interacted_block = o.get_block(place_pos).clone();
             if !interacted_block.is_null() {
