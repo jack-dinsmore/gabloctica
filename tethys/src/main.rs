@@ -30,7 +30,7 @@ impl ApplicationHandler<Graphics> for Initializer {
             if let Some(proxy) = proxy.take() {
                 let mut win_attr = Window::default_attributes();
                 win_attr = win_attr.with_inner_size(winit::dpi::Size::Physical(winit::dpi::PhysicalSize { width: 1920, height: 1080} ));
-                win_attr = win_attr.with_title("Gabloctica");
+                win_attr = win_attr.with_title("Tethys");
                 let window = event_loop.create_window(win_attr).expect("Create window error");
 
                 // let monitor = window.current_monitor().unwrap();

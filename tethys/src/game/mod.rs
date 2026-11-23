@@ -102,7 +102,7 @@ impl Game {
         ];
         let entities = vec![
             // Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(-200., 0., 80.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
-            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 141.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
+            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 241.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
         ];
 
         // Set cursor to center of screen
@@ -446,7 +446,7 @@ impl Game {
                 self.post_processor.render(&mut renderer, &self.camera, &self.lighting, &self.block_properties.get_texture());
                 
                 // Draw text
-                self.font.render(&mut renderer, &self.camera, &self.lighting);
+                // self.font.render(&mut renderer, &self.camera, &self.lighting);
             },
         );
     }

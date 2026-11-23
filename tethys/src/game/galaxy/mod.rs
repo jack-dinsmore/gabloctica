@@ -6,9 +6,9 @@ use noise::{NoiseFn, Perlin};
 use rand::{RngExt, rngs::ThreadRng};
 use rustc_hash::FxHashMap;
 
-use crate::graphics::{Camera, FlatVertex, Graphics, IndexBuffer, ModelUniform, Renderer, Texture, UniformBuffer, VertexBuffer};
+use crate::{graphics::{Camera, FlatVertex, Graphics, IndexBuffer, ModelUniform, Renderer, Texture, UniformBuffer, VertexBuffer}, util::percentile};
 
-const MAX_STEPS: usize = 100;
+const MAX_STEPS: usize = 300;
 const MAX_RADIUS: f32 = 1e8;
 const NOISE_SCALE: f32 = 1e6;
 
@@ -72,9 +72,9 @@ impl Galaxy {
         let model_buffer = UniformBuffer::new(graphics);
         model_buffer.write(graphics, ModelUniform::new(Matrix4::identity()));
 
-        let star_h = 2e6;
+        let star_h = 8e6;
         let dust_h = 5e6;
-        let halflight_r = 3e6;
+        let halflight_r = 1e7;
         let max_rho = MAX_RADIUS / halflight_r;
 
         let mut stars = Vec::new();
@@ -89,7 +89,7 @@ impl Galaxy {
             rho *= halflight_r;
             stars.push(Star::new(Vector3::new(rho*theta.cos(), rho*theta.sin(), z), &mut rng));
         }
-        
+
         Self {
             dust_noise: Perlin::new(1525252),//TODO
             stellar_noise: Perlin::new(1525252),//TODO
@@ -105,7 +105,7 @@ impl Galaxy {
     }
 
     pub fn update_skybox(&mut self, graphics: &Graphics, camera: &Camera, camera_pos: Vector3<f32>) {
-        let size = 32;//512;
+        let size = 512;
         let mut image = ImageBuffer::from_pixel(3*size, 2*size, Rgba([0, 0, 0, 255]));
 
         // Partition the stars
@@ -137,7 +137,7 @@ impl Galaxy {
         }
 
         // Get colors
-        let mut index = 0;
+        let mut colors = Vec::new();
         for face in 0..6 {
             let (start_x, start_y) = match face {
                 0 => (0, 0),
@@ -162,54 +162,52 @@ impl Galaxy {
                         _ => unreachable!()
                     }.normalize();
 
-                    let star_vec = star_map.get(&index);
+                    let star_vec = star_map.get(&colors.len());
                     let color = self.raytrace(camera_pos, dir, star_vec);
-                    index += 1;
-
-                    image[(start_x + x, start_y + y)] = Rgba(get_color(color, 0.1));
+                    colors.push(((start_x + x, start_y + y), color));
                 }
             }
+        }
+
+        const BRIGHTNESS: f32 = 1.;
+        let min_color = percentile(&colors.iter().map(|c| c.1[0].max(c.1[1].max(c.1[2]))).collect::<Vec<_>>(), 50.);
+        let max_color = colors.iter().fold(0., |a, c| c.1[0].max(c.1[1].max(c.1[2].max(a))));
+        for (pos, color) in colors {
+            image[pos] = Rgba([
+                ((color[0]-min_color)/(max_color-min_color) * BRIGHTNESS * 255.) as u8,
+                ((color[1]-min_color)/(max_color-min_color) * BRIGHTNESS * 255.) as u8,
+                ((color[2]-min_color)/(max_color-min_color) * BRIGHTNESS * 255.) as u8,
+                255
+            ]);
         }
 
         self.texture = Some(Texture::from_image(graphics, &camera, &image, (3*size, 2*size)));
     }
 
     fn raytrace(&self, camera: Vector3<f32>, dir: Vector3<f32>, star_indices: Option<&Vec<usize>>) -> [f32; 3] {
-        let d_step = 1. / MAX_STEPS as f32;
+        let d_step = MAX_RADIUS / MAX_STEPS as f32;
         let mut color = [0., 0., 0.];
 
-        let mut star_step_indices = FxHashMap::default();
+        let mut star_queries = Vec::new();
         if let Some(indices) = star_indices {
             for index in indices {
                 let star = &self.stars[*index];
-                let delta = star.pos - camera;
-                let alpha = delta.dot(dir);
-                let index = (alpha / MAX_RADIUS * MAX_STEPS as f32) as usize;
-                if index < 3 {continue;}
-                if !star_step_indices.contains_key(&index) {
-                    star_step_indices.insert(index, [0., 0., 0.,]);
-                }
-                star_step_indices.get_mut(&index).unwrap()[0] += 1. * star.lum / delta.magnitude2();
-                star_step_indices.get_mut(&index).unwrap()[1] += 1. * star.lum / delta.magnitude2();
-                star_step_indices.get_mut(&index).unwrap()[2] += 1. * star.lum / delta.magnitude2();
+                let dist = (star.pos - camera).magnitude();
+                let star_flux = 10. * star.lum / (dist*dist);
+                star_queries.push((dist, star_flux));
             }
         }
 
         let mut dist = 0.;
-        let mut step = d_step*1e8;
-        while dist < 1e8 {
+        let mut step = d_step;
+        while dist < MAX_RADIUS {
             dist += step;
+
             let pos = camera + dir*dist;
             if pos.z.abs() > self.dust_h*3. {continue;}
             let rad2 = pos.x*pos.x + pos.y*pos.y;
             let mut brightness = (-pos.z.abs()/self.star_h).exp();
             brightness *= 1. / (1. + rad2/(self.halflight_r*self.halflight_r));
-
-            // if let Some(c) = star_step_indices.get(&i) {
-            //     color[0] += c[0];
-            //     color[1] += c[1];
-            //     color[2] += c[2];
-            // }
 
             let mut dust = (-pos.z.abs()/self.dust_h).exp();
 
@@ -220,17 +218,31 @@ impl Galaxy {
             ];
             brightness *= (2. + self.stellar_noise.get(noise_pos)).abs() as f32;
             dust *= (1. + self.dust_noise.get(noise_pos)).powi(2) as f32;
-            color[0] += brightness * 1. * d_step;
-            color[1] += brightness * 0.9 * d_step;
-            color[2] += brightness * 0.8 * d_step;
+            color[0] += brightness * 5e-9 * step;
+            color[1] += brightness * 7e-9 * step;
+            color[2] += brightness * 10e-9 * step;
 
-            color[0] *= 1. - dust * 1.5 * d_step;
-            color[1] *= 1. - dust * 2. * d_step;
-            color[2] *= 1. - dust * 2.5 * d_step;
+            color[0] *= 1. - dust * 3e-9 * step;
+            color[1] *= 1. - dust * 5e-9 * step;
+            color[2] *= 1. - dust * 9e-9 * step;
 
-            step = d_step*1e8 / (brightness.max(0.02));
+            step = d_step / (brightness.max(dust).max(0.01));
+
+            if !color[0].is_finite() {
+                dbg!(brightness, step, dust, color[0]);
+                panic!();
+            }
+
+            for (star_dist, flux) in &star_queries {
+                if dist < *star_dist && dist + step > *star_dist {
+                    color[0] += flux;
+                    color[1] += flux;
+                    color[2] += flux;
+                }
+            }
         }
-        color
+
+        [color[0].ln(), color[1].ln(), color[2].ln()]
     }
 
 
@@ -243,6 +255,7 @@ impl Galaxy {
     }
 }
 
+#[derive(Clone, Debug)]
 struct Star {
     pos: Vector3<f32>,
     lum: f32,
@@ -256,16 +269,4 @@ impl Star {
             lum,
         }
     }
-}
-
-fn get_color(rgb: [f32; 3], thresh: f32) -> [u8; 4] {
-    let out = [rgb[0]/thresh, rgb[1]/thresh, rgb[2]/thresh];
-    let delta = out[0].max(out[1].max(out[2].max(1.)));
-    let inv_delta = 1. / delta;
-    [
-        255 - (inv_delta * 255. * (1. - out[0].min(1.))) as u8,
-        255 - (inv_delta * 255. * (1. - out[1].min(1.))) as u8,
-        255 - (inv_delta * 255. * (1. - out[2].min(1.))) as u8,
-        255
-    ]
 }

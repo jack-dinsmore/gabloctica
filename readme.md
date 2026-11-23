@@ -1,5 +1,8 @@
 # Todo
 
+* Fix stars in galaxy
+* Make cover image
+* Write substack
 * Why is the normal force so high when there are multiple collision points?
 * Make procedurally generated ground clutter
 * Fill out wind simulation

@@ -271,10 +271,6 @@ impl Planet {
     fn set_rigid_body(&mut self) {
         let fwidth = self.width as f64 * CHUNK_SIZE as f64;
         self.object.body.mass = self.mass as f64;
-        self.object.body.pos = Vector3::new(0., 0., 0.);
-        self.object.body.vel = Vector3::new(0., 0., 0.);
-        self.object.body.ang_vel = Vector3::new(0., 0., 0.);
-        self.object.body.ori = Quaternion::new(1., 0., 0., 0.);
         let moi = self.mass as f64 * fwidth * fwidth / 6.;
         self.object.body.moi = MoI::Diagonal { moi: Vector3::new(moi, moi, moi) };
     }

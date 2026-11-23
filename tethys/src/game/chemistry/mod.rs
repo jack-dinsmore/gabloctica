@@ -21,7 +21,7 @@ impl Chemical {
             molecular_mass: 18.,
             liquid_density: 1.,
             specific_heat: 0.004,
-            opacity: Vector3::new(0.3, 0.5, 1.) * 1.,
+            opacity: Vector3::new(0.3, 0.5, 1.) * 3.,
         }
     }
     pub fn air() -> Self {

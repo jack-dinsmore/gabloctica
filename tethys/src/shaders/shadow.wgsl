@@ -24,7 +24,8 @@ struct VertexOutput {
 @group(1) @binding(0) var<uniform> model: ModelUniform;
 
 fn shadow_map(x: f32) -> f32 {
-    return (sqrt(1 + x*x) - 1.) / x;
+    let b = 4.;
+    return (sqrt(b*b + x*x) - b) / x;
 }
 
 @vertex

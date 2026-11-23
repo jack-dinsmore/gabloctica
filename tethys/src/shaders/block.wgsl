@@ -37,7 +37,8 @@ struct VertexOutput {
 
 
 fn shadow_map(x: f32) -> f32 {
-    return (sqrt(1 + x*x) - 1.) / x;
+    let b = 4.;
+    return (sqrt(b*b + x*x) - b) / x;
 }
 
 @vertex
@@ -98,7 +99,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var shadow_coords = in.shadow_pos.xyz / in.shadow_pos.w;
     shadow_coords.y *= -1.;
 
-    let shadow = textureSampleCompare(t_shadow, s_shadow, shadow_coords.xy * 0.5 + 0.5, shadow_coords.z - 0.00005);
+    let shadow = textureSampleCompare(t_shadow, s_shadow, shadow_coords.xy * 0.5 + 0.5, shadow_coords.z - 0.001);
 
     var illum = shadow * dot(in.normal.xyz, to_light);
 

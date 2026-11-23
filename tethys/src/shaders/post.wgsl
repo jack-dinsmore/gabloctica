@@ -36,7 +36,8 @@ fn vs_main(@builtin(vertex_index) i: u32) -> @builtin(position) vec4<f32> {
 @group(3) @binding(3) var s_shadow: sampler_comparison;
 
 fn shadow_map(x: f32) -> f32 {
-    return (sqrt(1 + x*x) - 1.) / x;
+    let b = 4.;
+    return (sqrt(b*b + x*x) - b) / x;
 }
 
 fn get_containing_normal(pos: vec3<f32>) -> vec3<f32> {

@@ -1,6 +1,6 @@
 # project/Cargo.toml
 [workspace]
-members = ["biscuit", "astranesse"]
+members = ["biscuit", "tethys"]
 resolver = "2"
 
 [profile.dev.package.faer]

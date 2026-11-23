@@ -28,6 +28,12 @@ pub fn moi_product(v: Vector3<f64>) -> Matrix3<f64> {
     )
 }
 
+pub fn percentile(data: &[f32], p: f32) -> f32 {
+    let mut sorted_data = data.to_vec();
+    sorted_data.sort_by(|a,b|a.total_cmp(b));
+    percentile_sorted(&sorted_data, p)
+}
+
 /// Find the pth percentile of a slice `data` assuming the slice is sorted.
 pub fn percentile_sorted(data: &[f32], p: f32) -> f32 {
     let rank = p / 100.0 * (data.len() - 1) as f32;
