@@ -6,7 +6,7 @@ use noise::{NoiseFn, Perlin};
 use rand::{RngExt, rngs::ThreadRng};
 use rustc_hash::FxHashMap;
 
-use crate::{graphics::{Camera, FlatVertex, Graphics, IndexBuffer, ModelUniform, Renderer, Texture, UniformBuffer, VertexBuffer}, util::percentile};
+use crate::{graphics::{Camera, FlatVertex, Graphics, IndexBuffer, ModelUniform, Renderer, Texture, UniformBuffer, VertexBuffer}, physics::STEFAN_BOLTZMANN, util::{CHUNK_SIZE, percentile}};
 
 const MAX_STEPS: usize = 300;
 const MAX_RADIUS: f32 = 1e8;
@@ -22,7 +22,7 @@ pub struct Galaxy {
     star_h: f32,
     dust_h: f32,
     halflight_r: f32,
-    stars: Vec<Star>
+    pub stars: Vec<Star>
 }
 impl Galaxy {
     pub fn new(graphics: &Graphics) -> Self {
@@ -256,17 +256,26 @@ impl Galaxy {
 }
 
 #[derive(Clone, Debug)]
-struct Star {
-    pos: Vector3<f32>,
-    lum: f32,
+pub struct Star {
+    pub pos: Vector3<f32>,
+    pub lum: f32,
+    pub mass: f32,
+    pub width: u32,
+    pub temp: f32,
 }
 impl Star {
     pub fn new(pos: Vector3<f32>, rng: &mut ThreadRng) -> Self {
-        const MIN_LUM: f32 = 5e12;
-        let lum = MIN_LUM * rng.random::<f32>().powf(-0.5);
+        let temp: f32 = 3000.;
+        let width = 4;
+        let real_width = width as f32 * CHUNK_SIZE as f32;
+        let lum = STEFAN_BOLTZMANN as f32 * temp.powi(4) * 6.*real_width*real_width;
+        let mass = 100. * real_width*real_width*real_width;
         Self {
             pos,
+            temp,
             lum,
+            mass,
+            width,
         }
     }
 }

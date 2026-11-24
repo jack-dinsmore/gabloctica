@@ -202,6 +202,14 @@ impl BlockSelector {
         }
     }
 
+    pub fn blank() -> Self {
+        Self {
+            kmeans: KMeans::single(),
+            block_ids: vec![1],
+            structures: Vec::new(),
+        }
+    }
+
     pub fn get_block_id(&self, altitude: f32, humidity: f32, temperature: f32) -> BlockId {
         self.block_ids[self.kmeans.evaluate([altitude, humidity, temperature])] as BlockId
     }

@@ -71,12 +71,14 @@ impl MoI {
 }
 
 pub struct RigidBodyInit {
+    /// Points to the center of mass
     pub pos: Vector3<f64>,
+    /// Points from the body origin to the center of mass
     pub com_pos: Vector3<f64>,
     pub vel: Vector3<f64>,
     /// Orientation rotates FROM body TO inertial
     pub ori: Quaternion<f64>,
-    /// Angular velocity in local coordinate
+    /// Angular velocity in local coordinates
     pub ang_vel: Vector3<f64>,
     pub mass: f64,
     /// MOI in local coordinates
@@ -85,6 +87,7 @@ pub struct RigidBodyInit {
     pub kinetic_coeff: f64,
     pub collider: Option<Collider>,
     pub restitution: f64,
+    /// Set for gravitating objects, indicating the side length of the square
     pub warp_length: Option<f64>
 }
 impl Default for RigidBodyInit {
@@ -109,14 +112,10 @@ impl Default for RigidBodyInit {
 #[derive(Debug, Clone)]
 /// A point at position x on the RB is at inertial pos `pos + ori*(x-com_pos)`
 pub struct RigidBodyData {
-    /// Points to the center of mass
     pub pos: Vector3<f64>,
-    /// Points from the body origin to the center of mass
     pub com_pos: Vector3<f64>,
     pub vel: Vector3<f64>,
-    /// Rotates from the body to global
     pub ori: Quaternion<f64>,
-    /// Defined in local coordinates
     pub ang_vel: Vector3<f64>,
     pub mass: f64,
     pub moi: MoI,

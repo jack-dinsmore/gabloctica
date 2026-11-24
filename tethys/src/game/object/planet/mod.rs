@@ -7,11 +7,12 @@ use rand::rngs::StdRng;
 use textures::BlockSelector;
 
 use crate::game::chemistry::{Chemical, Concentration, State};
+use crate::game::galaxy::Star;
 use crate::game::object::chunk::PhysicalChunk;
 use crate::game::object::{BlockProperties, RENDER_DISTANCE};
 use crate::game::object::Object;
 use crate::graphics::{Camera, GraphicalChunk, Graphics};
-use crate::physics::{BOLTZMANN, MoI, NEWTON_G, PROTON_MASS, Physics, RigidBody, RigidBodyInit, STEFAN_BOLTZMANN};
+use crate::physics::{MoI, NEWTON_G, Physics, RigidBody, RigidBodyInit, STEFAN_BOLTZMANN};
 use crate::util::{CHUNK_SIZE, Ori, SphericalInterpolator, get_face_index};
 
 const OCEAN_RESOLUTION: isize = 16;
@@ -38,11 +39,14 @@ pub struct Planet {
     width: u32,
     seed: u64,
     mass: f32,
-    to_sun: Vector3<f32>,
-    sun_flux: f32,
-    spin_local: Vector3<f32>,
+    is_star: bool,
     concentration: Concentration,
     pub object: Object,
+
+    /// Sun flux contains the temperature of the star if this planet is a star
+    sun_lum: f32,
+    to_sun: Vector3<f32>,
+    spin_local: Vector3<f32>,
 
     loaded: Option<LoadedPlanet>,
 }
@@ -179,14 +183,16 @@ impl LoadedPlanet {
 impl Planet {
     pub fn new(graphics: &Graphics, physics: &mut Physics) -> Self {
         let width = 8;
-        let mass = (width*CHUNK_SIZE).pow(3) as f32;
-        let real_width = width as f64 * CHUNK_SIZE as f64;
+        let real_width = width as f32 * CHUNK_SIZE as f32;
+        let mass = real_width.powi(3);
+        let pos = Vector3::new(1200., 0., 0.);
 
-        let moi = mass as f64 * real_width.powi(2) / 6.;
+        let moi = mass as f64 * real_width.powi(2) as f64 / 6.;
         let rb_init = RigidBodyInit {
             mass: mass as f64,
             moi: MoI::new_diagonal(Vector3::new(1., 1., 1.)*moi),
             warp_length: Some(((width-2)*CHUNK_SIZE) as f64/2.),
+            pos: pos,
             ..Default::default()
         };
         let object = Object::new(graphics, physics, rb_init);
@@ -194,19 +200,52 @@ impl Planet {
             vec![Chemical::air(), Chemical::water()],
             vec![1.5e6, 1.3e5],
             real_width as f32,
-            (NEWTON_G * mass as f64 / (real_width/2.).powi(2)) as f32
+            mass
         );
 
         Self {
             seed: 79842121,
             width,
             mass,
-            to_sun: Vector3::new(1., 0., 0.) * 10000.,
+            to_sun: -pos.cast().unwrap(),
             spin_local: Vector3::new(0., 0., 0.1),
-            sun_flux: 1.5e12,
+            sun_lum: 1.5e14,
             concentration,
             object,
+            is_star: false,
+            loaded: None,
+        }
+    }
 
+    pub fn star(graphics: &Graphics, physics: &mut Physics, star: &Star) -> Self {
+        let mass = star.mass;
+        let real_width = star.width as f64 * CHUNK_SIZE as f64;
+
+        let moi = mass as f64 * real_width.powi(2) / 6.;
+        let rb_init = RigidBodyInit {
+            mass: mass as f64,
+            moi: MoI::new_diagonal(Vector3::new(1., 1., 1.)*moi),
+            warp_length: Some((8*CHUNK_SIZE) as f64/2.),
+            ..Default::default()
+        };
+        let object = Object::new(graphics, physics, rb_init);
+        let concentration = Concentration::new(
+            vec![Chemical::star_matter()],
+            vec![1.5e6],
+            real_width as f32,
+            mass,
+        );
+
+        Self {
+            seed: 79842121,
+            width: star.width,
+            mass,
+            to_sun: Vector3::new(0., 0., 0.),
+            spin_local: Vector3::new(0., 0., 0.1),
+            sun_lum: star.temp,
+            concentration,
+            object,
+            is_star: true,
             loaded: None,
         }
     }
@@ -281,6 +320,32 @@ impl Planet {
     }
     
     fn load(&mut self, graphics: &Graphics, properties: &mut BlockProperties) {
+        if self.is_star {
+            // Load the star
+            let body_width = 1; // By convention, the star cube has width 1
+            let true_width = self.width as f32 * CHUNK_SIZE as f32;
+            let selector = BlockSelector::blank();
+            let (scale_height, extinction, eta) = self.concentration.get_gas_transmission(self.sun_lum);
+            
+            self.loaded = Some(LoadedPlanet {
+                alt_interp: SphericalInterpolator::new(|pos| {0.}, body_width),
+                humidity_interp: SphericalInterpolator::new(|pos| {0.}, body_width),
+                temp_interp: SphericalInterpolator::new(|pos| {0.}, body_width),
+                ocean_alt: -1.,
+                rng: StdRng::seed_from_u64(self.seed),
+                scale_height,
+                extinction,
+                halfwidth: body_width as f32 * CHUNK_SIZE as f32 / 2.,
+                last_load: std::time::Instant::now() - std::time::Duration::from_millis(2*LOAD_TIME as u64),
+                selector,
+                seed: self.seed,
+            });
+        } else {
+            self.load_planet(graphics, properties);
+        }
+    }
+
+    fn load_planet(&mut self, graphics: &Graphics, properties: &mut BlockProperties) {
         let mut rng = StdRng::seed_from_u64(self.seed);
 
         // Get continental layout
@@ -318,36 +383,24 @@ impl Planet {
             (flow_interp, alt_interp)
         };
 
-        // Work out atmospheric properties
-        let equilib_t = self.sun_flux / (16. * std::f32::consts::PI * self.to_sun.magnitude2() * STEFAN_BOLTZMANN as f32);
+        // Get atmospheric properties
+        let equilib_t = (self.sun_lum / (16. * std::f32::consts::PI * self.to_sun.magnitude2() * STEFAN_BOLTZMANN as f32)).powf(0.25);
+        dbg!(equilib_t);
         let radius = (self.width * CHUNK_SIZE) as f32 / 2.;
         let g_accel = NEWTON_G as f32 * self.mass / radius.powi(2);
+        let (scale_height, extinction, eta) = self.concentration.get_gas_transmission(equilib_t);
 
-        let mut total_pressure = 0.;
-        let mut mean_mm = 0.;
-        let mut specific_heat = 0.;
-        let mut extinction = Vector3::new(0., 0., 0.);
-        let mut ocean_volume = 0.;
         let states = self.concentration.get_states(equilib_t);
         let mut liquid_chemical = None;
+        let mut ocean_volume = 0.;
         for (state, chemical) in states.iter().zip(&self.concentration.chemicals) {
             let pressure = state.pressure();
-            total_pressure += pressure;
             ocean_volume += state.volume();
-            mean_mm += pressure * chemical.molecular_mass;
-            extinction += pressure * chemical.opacity;
-            specific_heat += pressure * chemical.specific_heat;
             if let State::Liquid(_, _) = state {
                 liquid_chemical = Some(chemical.clone());
             }
         }
-        mean_mm /= total_pressure;
-        specific_heat /= total_pressure;
-        
-        let scale_height = BOLTZMANN * equilib_t / (PROTON_MASS * mean_mm * g_accel);
-        extinction *= scale_height;
-        let eta = (total_pressure * specific_heat / (STEFAN_BOLTZMANN as f32 * equilib_t.powi(3) * (g_accel*scale_height).sqrt())).tanh();
-        
+
         // Work out ocean via Newton's method
         let ocean_alt = {
             let mut alt = 0.;

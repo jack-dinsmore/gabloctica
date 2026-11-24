@@ -131,42 +131,6 @@ fn get_sky_color_bright(start_cube: vec3<f32>, end_cube: vec3<f32>, sun_cube: ve
 }
 
 fn get_sky_color(start_space: vec3<f32>, end_space: vec3<f32>, sun_cube: vec3<f32>) -> vec3<f32> {
-    // Get the location at which the sight ray enters a shadow. 
-    // var look = end_space - start_space;
-    // let look_length = length(look);
-    // look = normalize(look);
-
-    // var started = false;
-    // var color = vec3(0.);
-    // var start_cube = vec3(0.);
-    // for (var step=0.; step <= look_length; step += 32.) { // March over the shadow texture
-    //     let point_space = vec4(start_space + look * step, 1.);
-
-    //     var shadow_pos = camera.shadow_proj * point_space;
-    //     shadow_pos /= shadow_pos.w;
-    //     shadow_pos.x = shadow_map(shadow_pos.x);
-    //     shadow_pos.y = -shadow_map(shadow_pos.y);
-    //     let shadow = textureSampleCompare(t_shadow, s_shadow, shadow_pos.xy * 0.5 + 0.5, shadow_pos.z - 0.00005);
-        
-    //     if shadow < 0.5 && started {
-    //         // In shadow
-    //         let end_cube = (post.planet_model_inv * point_space).xyz;
-    //         color += get_sky_color_bright(start_cube, end_cube, sun_cube);
-    //         started = false;
-    //     }
-    //     if shadow > 0.5 && !started {
-    //         // In sun
-    //         start_cube = (post.planet_model_inv * point_space).xyz;
-    //         started = true;
-    //     }
-    // }
-    // if started {
-    //     let end_cube = (post.planet_model_inv * vec4(end_space, 1.)).xyz;
-    //     color += get_sky_color_bright(start_cube, end_cube, sun_cube);
-    // }
-
-    // return color;
-
     return get_sky_color_bright(
         (post.planet_model_inv * vec4(start_space, 1.)).xyz,
         (post.planet_model_inv * vec4(end_space, 1.)).xyz,

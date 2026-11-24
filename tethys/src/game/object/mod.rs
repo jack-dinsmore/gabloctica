@@ -18,7 +18,7 @@ pub use blocks::{BlockId, GraphicId, BlockProperties};
 pub use planet::Planet;
 pub use ship::Ship;
 
-pub const RENDER_DISTANCE: i32 = 12; // Units of chunks
+pub const RENDER_DISTANCE: i32 = 128; // Units of chunks
 
 #[derive(Debug, Clone, Copy)]
 pub enum ObjectIdentifier {

@@ -8,6 +8,13 @@ pub struct KMeans<const C: usize> {
 }
 
 impl<const C: usize> KMeans<C> {
+    pub fn single() -> Self {
+        Self {
+            centroids: vec![[0.; C]],
+            n: 1,
+        }
+    }
+
     pub fn new(points: &[[f32; C]], n: usize, rng: &mut impl Rng) -> Self {
         let mut centroids = vec![[0.; C]; n];
         for i in 0..C {

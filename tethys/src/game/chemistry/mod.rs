@@ -1,7 +1,7 @@
 use cgmath::Vector3;
 use itertools::izip;
 
-use crate::util::lerp;
+use crate::{physics::{BOLTZMANN, NEWTON_G, PROTON_MASS, STEFAN_BOLTZMANN}, util::lerp};
 
 #[derive(Clone, Debug)]
 pub struct Chemical {
@@ -32,6 +32,16 @@ impl Chemical {
             liquid_density: 1.,
             specific_heat: 0.,
             opacity: Vector3::new(0., 0., 0.),
+        }
+    }
+    pub fn star_matter() -> Self {
+        Self {
+            critical: (300., 3e6),
+            triple: (70., 3e1),
+            molecular_mass: 1.,
+            liquid_density: 1.,
+            specific_heat: 0.,
+            opacity: Vector3::new(1., 1., 1.),
         }
     }
 
@@ -72,15 +82,18 @@ pub struct Concentration {
     pub chemicals: Vec<Chemical>,
     masses: Vec<f32>,
     pressures: Vec<f32>,
+    g_accel: f32,
 }
 impl Concentration {
     /// make an atmospheric concentration, providing the masses of each chemical
-    pub fn new(chemicals: Vec<Chemical>, masses: Vec<f32>, w: f32, g: f32) -> Self {
-        let pressures = masses.iter().map(|m| m*g / (6.*w*w)).collect::<Vec<f32>>();
+    pub fn new(chemicals: Vec<Chemical>, masses: Vec<f32>, width: f32, mass: f32) -> Self {
+        let g_accel = NEWTON_G as f32 * mass as f32 / (width/2.).powi(2);
+        let pressures = masses.iter().map(|m| m*g_accel / (6.*width*width)).collect::<Vec<f32>>();
         Self {
             chemicals,
             masses,
             pressures,
+            g_accel,
         }
     }
 
@@ -100,5 +113,29 @@ impl Concentration {
             }
         }
         output
+    }
+
+    /// Returns the scale height, extincton, and eta parameter
+    pub fn get_gas_transmission(&self, temperature: f32) -> (f32, Vector3<f32>, f32) {
+        let mut total_pressure = 0.;
+        let mut mean_mm = 0.;
+        let mut specific_heat = 0.;
+        let mut extinction = Vector3::new(0., 0., 0.);
+        let states = self.get_states(temperature);
+        for (state, chemical) in states.iter().zip(&self.chemicals) {
+            let pressure = state.pressure();
+            total_pressure += pressure;
+            mean_mm += pressure * chemical.molecular_mass;
+            extinction += pressure * chemical.opacity;
+            specific_heat += pressure * chemical.specific_heat;
+        }
+        mean_mm /= total_pressure;
+        specific_heat /= total_pressure;
+        
+        let scale_height = BOLTZMANN * temperature / (PROTON_MASS * mean_mm * self.g_accel);
+        extinction *= scale_height;
+        let eta = (total_pressure * specific_heat / (STEFAN_BOLTZMANN as f32 * temperature.powi(3) * (self.g_accel*scale_height).sqrt())).tanh();
+
+        (scale_height, extinction, eta)
     }
 }

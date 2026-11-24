@@ -93,16 +93,21 @@ impl Game {
         let lighting = Lighting::new(&graphics);
         let post_processor = PostProcessor::new(&mut graphics, &camera);
 
+        let mut galaxy = Galaxy::new(&graphics);
+        galaxy.update_skybox(&graphics, &camera, Vector3::new(-1e7, 0., 0.));
+
         let planets = vec![
+            Planet::star(&graphics, &mut physics, &galaxy.stars[0]),
             Planet::new(&graphics, &mut physics),
         ];
+
         let ships = vec![
             // Ship::new(&graphics, &mut physics, RigidBodyInit { pos: Vector3::new(12., 3., 133.), vel: Vector3::new(0., 3., 0.), ori: cgmath::Quaternion::new(0., 0., 0.01, 1.), ..Default::default() }),
             // Ship::new(&graphics, &mut physics, RigidBodyInit { pos: Vector3::new(12., 13., 133.), vel: Vector3::new(0., -3., 0.), ..Default::default() }),
         ];
         let entities = vec![
             // Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(-200., 0., 80.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
-            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(0., 0., 241.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
+            Entity::new(&mut physics, RigidBodyInit {pos: Vector3::new(1200., 0., 200.), vel: Vector3::new(0., 0., 0.), ..Default::default()}),
         ];
 
         // Set cursor to center of screen
@@ -119,8 +124,6 @@ impl Game {
 
         let font = Font::new(&mut graphics, &camera, include_bytes!("../../../assets/Rockwell.ttc"));
 
-        let mut galaxy = Galaxy::new(&graphics);
-        galaxy.update_skybox(&graphics, &camera, Vector3::new(-1e7, 0., 0.));
 
         Self {
             graphics,
@@ -358,7 +361,6 @@ impl Game {
     pub fn update(&mut self, delta_t: f64) {
         self.handle_keydowns(delta_t);
         
-        let camera_pos = self.camera.pos.cast().unwrap();
         let my_planet = self.get_my_planet_index().map(|i| &self.planets[i]);
         self.post_processor.update_buffer(&self.graphics, &self.camera, my_planet);
 
@@ -367,6 +369,7 @@ impl Game {
         let camera_motion = ((SPEED*delta_t) as f32 *self.mouse_motion.0, (SPEED*delta_t) as f32 *self.mouse_motion.1);
         self.mouse_motion = (0., 0.);
         self.camera.update(&self.entities[0], my_planet, &self.lighting, camera_motion);
+        let camera_pos = self.camera.pos.cast().unwrap();
         
         // Update scene
         for planet in &mut self.planets {
