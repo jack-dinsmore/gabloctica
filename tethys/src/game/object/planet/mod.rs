@@ -1,6 +1,6 @@
 mod textures;
 
-use cgmath::{InnerSpace, Matrix4, Quaternion, Rotation, Vector3};
+use cgmath::{InnerSpace, Matrix4, Rotation, Vector3};
 use noise::{NoiseFn, Perlin};
 use rand::{RngExt, SeedableRng};
 use rand::rngs::StdRng;
@@ -68,7 +68,6 @@ impl LoadedPlanet {
     }
 
     pub(super) fn load_chunk(&mut self, graphics: &Graphics, properties: &BlockProperties, chunk_coord: (i32, i32, i32)) -> Option<PhysicalChunk> {
-
         let chunk_pos = Vector3::new(chunk_coord.0 as f32, chunk_coord.1 as f32, chunk_coord.2 as f32) * CHUNK_SIZE as f32;
         if self.get_point_altitude(chunk_pos) > self.get_altitude(chunk_pos) + CHUNK_SIZE as f32 {
             // The chunk is outside the planet. Don't load it.
@@ -96,29 +95,34 @@ impl LoadedPlanet {
             }
         }
 
-        for u in -(CHUNK_SIZE as i32)..2*(CHUNK_SIZE as i32) {
-            for v in -(CHUNK_SIZE as i32)..2*(CHUNK_SIZE as i32) {
-                let mut seed = self.seed;
-                let w = match face_index {
-                    0|1 => {
-                        let pos = chunk_pos + Vector3::new(0., u as f32, v as f32);
-                        seed += (chunk_coord.1 * CHUNK_SIZE as i32 + u).cast_unsigned() as u64;
-                        seed += ((chunk_coord.2 * CHUNK_SIZE as i32 + v).cast_unsigned() as u64) << 32;
-                        (self.get_altitude(pos) - self.get_point_altitude(pos)) as i32 + 2
-                    }
-                    2|3 => {
-                        let pos = chunk_pos + Vector3::new(u as f32, 0., v as f32);
-                        seed += (chunk_coord.0 * CHUNK_SIZE as i32 + u).cast_unsigned() as u64;
-                        seed += ((chunk_coord.2 * CHUNK_SIZE as i32 + v).cast_unsigned() as u64) << 32;
-                        (self.get_altitude(pos) - self.get_point_altitude(pos)) as i32 + 2
-                    }
-                    4|5 => {
-                        let pos = chunk_pos + Vector3::new(u as f32, v as f32, 0.);
-                        seed += (chunk_coord.0 * CHUNK_SIZE as i32 + u).cast_unsigned() as u64;
-                        seed += ((chunk_coord.1 * CHUNK_SIZE as i32 + v).cast_unsigned() as u64) << 32;
-                        (self.get_altitude(pos) - self.get_point_altitude(pos)) as i32 + 2
-                    },
+        for face_index in 0..6 {
+            self.place_structures(&mut chunk, chunk_coord, face_index);
+        }
+
+        Some(chunk)
+    }
+
+    fn place_structures(&self, chunk: &mut PhysicalChunk, chunk_coord: (i32, i32, i32), face_index: u8) {
+        let chunk_pos = Vector3::new(chunk_coord.0 as f32, chunk_coord.1 as f32, chunk_coord.2 as f32) * CHUNK_SIZE as f32;
+
+        for u in -(CHUNK_SIZE as i32)..(2*CHUNK_SIZE as i32) {
+            for v in -(CHUNK_SIZE as i32)..(2*CHUNK_SIZE as i32) {
+                // Make a position which is deep into the cube, so it has the correct face index
+                let test_pos = chunk_pos + match face_index {
+                    0 => Vector3::new((CHUNK_SIZE-1) as f32, u as f32, v as f32),
+                    1 => Vector3::new(0., u as f32, v as f32),
+                    2 => Vector3::new(u as f32, (CHUNK_SIZE-1) as f32, v as f32),
+                    3 => Vector3::new(u as f32, 0., v as f32),
+                    4 => Vector3::new(u as f32, v as f32, (CHUNK_SIZE-1) as f32),
+                    5 => Vector3::new(u as f32, v as f32, 0.),
                     _ => unreachable!()
+                };
+                if get_face_index(test_pos) != face_index {continue;} // Skip if the position is not at the desired face
+                
+                let mut w = (self.get_altitude(test_pos) - self.get_point_altitude(test_pos)) as i32;
+                match face_index {
+                    0|2 |4 => w += (CHUNK_SIZE-1) as i32,
+                    _ => ()
                 };
                 if w < -(CHUNK_SIZE as i32) || w >= 2*CHUNK_SIZE as i32 { continue; }
                 let (u, v, w) = match face_index {
@@ -130,31 +134,32 @@ impl LoadedPlanet {
                     5 => (u, v, -w),
                     _ => unreachable!()
                 };
-
-                let mut rng = StdRng::seed_from_u64(seed);
                 let pos = chunk_pos + Vector3::new(u as f32, v as f32, w as f32);
-                if get_face_index(pos) != face_index {continue;};
-                let global_ori = match face_index {
-                    0 => Ori { data: 0 },
-                    1 => Ori { data: 14 },
-                    2 => Ori { data: 1 },
-                    3 => Ori { data: 15 },
-                    4 => Ori { data: 16 },
-                    5 => Ori { data: 20 },
-                    _ => unreachable!()
-                } * Ori::z(rng.random::<u8>() % 4);
+                if get_face_index(pos) != face_index {continue;} // Skip if the position is not at the desired face
 
+                // Create the RNG
+                let width = (self.halfwidth*2.) as i32;
+                let seed = self.seed + ((chunk_coord.0 + u)*width*width + (chunk_coord.1 + v)*width + (chunk_coord.2 + w)).cast_unsigned() as u64;
+                let mut rng = StdRng::seed_from_u64(seed);
                 
                 let alt = self.alt_interp.get(pos);
                 let temp = self.temp_interp.get(pos);
                 let humidity = self.humidity_interp.get(pos);
                 if let Some(structure) = self.selector.get_structure(alt, temp, humidity, &mut rng) {
-                    structure.place(&mut chunk, (u, v, w), global_ori);
+                    let global_ori = match face_index {
+                        0 => Ori { data: 0 },
+                        1 => Ori { data: 14 },
+                        2 => Ori { data: 1 },
+                        3 => Ori { data: 15 },
+                        4 => Ori { data: 16 },
+                        5 => Ori { data: 20 },
+                        _ => unreachable!()
+                    } * Ori::z(rng.random::<u8>() % 4);
+                    
+                    structure.place(chunk, (u, v, w), global_ori);
                 }
             }
         }
-
-        Some(chunk)
     }
     
     pub(super) fn unload_chunk(&self, chunk_coord: (i32, i32, i32), chunk: &PhysicalChunk) {

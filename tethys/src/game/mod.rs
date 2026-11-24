@@ -446,7 +446,7 @@ impl Game {
                 self.post_processor.render(&mut renderer, &self.camera, &self.lighting, &self.block_properties.get_texture());
                 
                 // Draw text
-                // self.font.render(&mut renderer, &self.camera, &self.lighting);
+                self.font.render(&mut renderer, &self.camera, &self.lighting);
             },
         );
     }
